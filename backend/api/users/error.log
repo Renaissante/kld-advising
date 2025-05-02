@@ -1,0 +1,71 @@
+[21-Feb-2025 10:56:51 Europe/Berlin] Executing query: 
+        SELECT u.user_id, u.email, u.role, CONCAT(u.fname, ' ', u.lname) AS name
+        FROM users u LIMIT 5 OFFSET 0
+[21-Feb-2025 10:56:51 Europe/Berlin] Params: []
+[21-Feb-2025 10:56:58 Europe/Berlin] Executing query: 
+        SELECT u.user_id, u.email, u.role, CONCAT(u.fname, ' ', u.lname) AS name
+        FROM users u
+        WHERE u.role = ?
+        JOIN employees e ON u.user_id = e.employee_id
+        JOIN system_admins sa ON e.employee_id = sa.system_admin_id LIMIT 5 OFFSET 0
+[21-Feb-2025 10:56:58 Europe/Berlin] Params: ["admin"]
+[21-Feb-2025 10:57:33 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role, CONCAT(e.fname, ' ', e.lname) AS name FROM users u JOIN employees e ON u.user_id = e.employee_id WHERE 1 LIMIT 5 OFFSET 0
+[21-Feb-2025 10:57:33 Europe/Berlin] Params: []
+[21-Feb-2025 10:59:06 Europe/Berlin] Executing query: 
+        SELECT u.user_id, u.email, u.role, 
+        CASE 
+            WHEN u.role = 'admin' THEN CONCAT(sa.fname, ' ', sa.lname)
+            WHEN u.role = 'dean' THEN CONCAT(dn.fname, ' ', dn.lname)
+            WHEN u.role = 'program_chair' THEN CONCAT(pc.fname, ' ', pc.lname)
+            WHEN u.role = 'faculty' THEN CONCAT(f.fname, ' ', f.lname)
+            WHEN u.role = 'student' THEN CONCAT(s.fname, ' ', s.lname)
+            ELSE 'Unknown'
+        END AS name
+        FROM users u
+        LEFT JOIN employees e ON u.user_id = e.employee_id
+        LEFT JOIN system_admins sa ON e.employee_id = sa.system_admin_id
+        LEFT JOIN deans dn ON e.employee_id = dn.dean_id
+        LEFT JOIN program_chairs pc ON e.employee_id = pc.program_chair_id
+        LEFT JOIN faculty f ON e.employee_id = f.faculty_id
+        LEFT JOIN students s ON u.user_id = s.student_id LIMIT 5 OFFSET 0
+[21-Feb-2025 10:59:06 Europe/Berlin] Params: []
+[21-Feb-2025 10:59:16 Europe/Berlin] Executing query: 
+        SELECT u.user_id, u.email, u.role, 
+        CASE 
+            WHEN u.role = 'admin' THEN CONCAT(sa.fname, ' ', sa.lname)
+            WHEN u.role = 'dean' THEN CONCAT(dn.fname, ' ', dn.lname)
+            WHEN u.role = 'program_chair' THEN CONCAT(pc.fname, ' ', pc.lname)
+            WHEN u.role = 'faculty' THEN CONCAT(f.fname, ' ', f.lname)
+            WHEN u.role = 'student' THEN CONCAT(s.fname, ' ', s.lname)
+            ELSE 'Unknown'
+        END AS name
+        FROM users u
+        LEFT JOIN employees e ON u.user_id = e.employee_id
+        LEFT JOIN system_admins sa ON e.employee_id = sa.system_admin_id
+        LEFT JOIN deans dn ON e.employee_id = dn.dean_id
+        LEFT JOIN program_chairs pc ON e.employee_id = pc.program_chair_id
+        LEFT JOIN faculty f ON e.employee_id = f.faculty_id
+        LEFT JOIN students s ON u.user_id = s.student_id
+        WHERE u.role = ? LIMIT 5 OFFSET 0
+[21-Feb-2025 10:59:16 Europe/Berlin] Params: ["admin"]
+[21-Feb-2025 11:00:39 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role FROM users u LIMIT 5 OFFSET 0
+[21-Feb-2025 11:00:39 Europe/Berlin] Params: []
+[21-Feb-2025 11:00:46 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role, CONCAT(sa.fname, ' ', sa.lname) AS name
+            FROM users u
+            JOIN employees e ON u.user_id = e.employee_id
+            JOIN system_admins sa ON e.employee_id = sa.system_admin_id WHERE u.role = ? LIMIT 5 OFFSET 0
+[21-Feb-2025 11:00:46 Europe/Berlin] Params: ["admin"]
+[21-Feb-2025 11:03:59 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role FROM users u LIMIT 5 OFFSET 0
+[21-Feb-2025 11:03:59 Europe/Berlin] Params: []
+[21-Feb-2025 11:09:15 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role FROM users u LIMIT 5 OFFSET 0
+[21-Feb-2025 11:09:15 Europe/Berlin] Params: []
+[21-Feb-2025 11:09:20 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role, CONCAT(sa.fname, ' ', sa.lname) AS name
+            FROM users u
+            JOIN employees e ON u.user_id = e.employee_id
+            JOIN system_admins sa ON e.employee_id = sa.system_admin_id WHERE u.role = ? LIMIT 5 OFFSET 0
+[21-Feb-2025 11:09:20 Europe/Berlin] Params: ["admin"]
+[21-Feb-2025 11:09:59 Europe/Berlin] Executing query: SELECT u.user_id, u.email, u.role, CONCAT(sa.fname, ' ', sa.lname) AS name
+            FROM users u
+            JOIN employees e ON u.user_id = e.employee_id
+            JOIN system_admins sa ON e.employee_id = sa.system_admin_id WHERE u.role = ? LIMIT 5 OFFSET 0
+[21-Feb-2025 11:09:59 Europe/Berlin] Params: ["admin"]

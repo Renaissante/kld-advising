@@ -1,0 +1,189 @@
+stdClass Object
+(
+    [username] => stdClass Object
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"rvespiritu@kld.edu.ph","password":"123456"}
+Parsed Data: Array
+(
+    [email] => rvespiritu@kld.edu.ph
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":1,"email":"rvespiritu@kld.edu.ph","role":"student"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 1
+            [email] => rvespiritu@kld.edu.ph
+            [role] => student
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)
+Raw Input: 
+Parsed Data: Raw Input: {"email":"admin@gmail.com","password":"123456"}
+Parsed Data: Array
+(
+    [email] => admin@gmail.com
+    [password] => 123456
+)
+Raw Input: {"username":{"success":true,"id":2,"email":"admin@gmail.com","role":"admin"}}
+Parsed Data: Array
+(
+    [username] => Array
+        (
+            [success] => 1
+            [id] => 2
+            [email] => admin@gmail.com
+            [role] => admin
+        )
+
+)

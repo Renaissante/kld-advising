@@ -1,0 +1,24 @@
+[27-Mar-2025 16:43:00 Europe/Berlin] Starting get_courses.php script
+[27-Mar-2025 16:43:00 Europe/Berlin] Database file included
+[27-Mar-2025 16:43:00 Europe/Berlin] GET Params: Array
+(
+    [curriculum_id] => 11
+)
+
+[27-Mar-2025 16:43:00 Europe/Berlin] Looking for courses with curriculum_id: 11
+[27-Mar-2025 16:43:00 Europe/Berlin] PHP Fatal error:  Uncaught Error: Class "Database" not found in C:\xampp\htdocs\kld-advising\backend\api\curriculum\get_courses.php:38
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\kld-advising\backend\api\curriculum\get_courses.php on line 38
+[27-Mar-2025 16:44:42 Europe/Berlin] Starting get_courses.php script
+[27-Mar-2025 16:44:42 Europe/Berlin] Database file included
+[27-Mar-2025 16:44:42 Europe/Berlin] GET Params: Array
+(
+    [curriculum_id] => 11
+)
+
+[27-Mar-2025 16:44:42 Europe/Berlin] Looking for courses with curriculum_id: 11
+[27-Mar-2025 16:44:42 Europe/Berlin] PHP Fatal error:  Uncaught Error: Class "Database" not found in C:\xampp\htdocs\kld-advising\backend\api\curriculum\get_courses.php:38
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\kld-advising\backend\api\curriculum\get_courses.php on line 38
