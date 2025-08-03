@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { PlusSquare } from "lucide-react";
 import eventService from "@/services/eventService";
-
+import { API_BASE_URL } from '@/config/api';
 export function CreateAccountModal({onAccountCreated}) {
 
   const [departments, setDepartments] = useState([]);
@@ -64,23 +64,23 @@ export function CreateAccountModal({onAccountCreated}) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const departmentResponse = await fetch('http://localhost/kld-advising/backend/api/users/departments.php');
+        const departmentResponse = await fetch(`${API_BASE_URL}/users/departments.php`);
         const departmentData = await departmentResponse.json();
         setDepartments(departmentData);
 
-        const programResponse = await fetch('http://localhost/kld-advising/backend/api/users/programs.php');
+        const programResponse = await fetch(`${API_BASE_URL}/users/programs.php`);
         const programData = await programResponse.json();
         setPrograms(programData);
 
-        const yearLevelResponse = await fetch('http://localhost/kld-advising/backend/api/users/year_levels.php');
+        const yearLevelResponse = await fetch(`${API_BASE_URL}/users/year_levels.php`);
         const yearLevelData = await yearLevelResponse.json();
         setYearLevels(yearLevelData);
 
-        const sectionResponse = await fetch('http://localhost/kld-advising/backend/api/users/sections.php');
+        const sectionResponse = await fetch(`${API_BASE_URL}/users/sections.php`);
         const sectionData = await sectionResponse.json();
         setSections(sectionData);
 
-        const academicYearResponse = await fetch('http://localhost/kld-advising/backend/api/academic_year/read.php');
+        const academicYearResponse = await fetch(`${API_BASE_URL}/academic_year/read.php`);
         const academicYearData = await academicYearResponse.json();
         setAcademicYears(academicYearData);
         console.log("Academic Years:", academicYearData);
@@ -150,7 +150,7 @@ export function CreateAccountModal({onAccountCreated}) {
       formData.employeeId = employeeId;
     
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/create_system_admin.php', {
+        const response = await fetch(`${API_BASE_URL}/users/create_system_admin.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -177,7 +177,7 @@ export function CreateAccountModal({onAccountCreated}) {
       formData.department = department;
     
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/create_dean.php', {
+        const response = await fetch(`${API_BASE_URL}/users/create_dean.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -205,7 +205,7 @@ export function CreateAccountModal({onAccountCreated}) {
       formData.program = program;
 
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/create_program_chair.php', {
+        const response = await fetch(`${API_BASE_URL}/users/create_program_chair.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -233,7 +233,7 @@ export function CreateAccountModal({onAccountCreated}) {
       formData.specialization = specialization;
 
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/create_faculty.php', {
+        const response = await fetch(`${API_BASE_URL}/users/create_faculty.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -284,7 +284,7 @@ export function CreateAccountModal({onAccountCreated}) {
       formData.entryYear = entryYear;
 
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/create_student.php', {
+        const response = await fetch(`${API_BASE_URL}/users/create_student.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

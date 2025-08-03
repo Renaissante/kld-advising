@@ -7,7 +7,6 @@ import StudentHome from "@/pages/student/StudentHome";
 import FacultyHome from "@/pages/faculty/FacultyHome";
 import AdvisingPage from "@/pages/faculty/AdvisingPage";
 import ProgramChairHome from "@/pages/program-chair/ProgramChairHome";
-
 import ProgramChairManageCurriculum from "@/pages/program-chair/ManageCurriculum";
 import DeanHome from "@/pages/dean/DeanHome";
 import ProtectedRoute from "@/routes/ProtectedRoute";
@@ -16,6 +15,7 @@ import ManageCurriculum from "@/pages/admin/ManageCurriculum";
 import StudentCurriculum from "@/pages/student/StudentCurriculum";
 import ManageFaculty from "@/pages/program-chair/ManageFaculty";
 import FacultyAssignment from "@/pages/program-chair/FacultyAssignment";
+import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 
 export default function AppRoutes() {
   return (
@@ -86,6 +86,16 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/student/advising-records"
+        element={
+          <ProtectedRoute role="student">
+            <StudentAdvisingRecords />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/student/curriculum"
         element={

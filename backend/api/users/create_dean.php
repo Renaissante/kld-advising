@@ -1,14 +1,14 @@
 <?php
 
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
+// header("Access-Control-Allow-Origin: *");
+// header("Access-Control-Allow-Methods: POST, OPTIONS");
+// header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+include_once '../../config/cors.php';
+// if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+//     http_response_code(204);
+//     exit;
+// }
 
 
 require_once "../../config/database.php";
@@ -97,6 +97,37 @@ try {
 
    
     $conn->commit();
+
+    require dirname(__DIR__, 3) . '/vendor/autoload.php';
+
+    try {
+        // Connect to the websocket server running on localhost:8080
+        $client = new WebSocket\Client("ws://localhost:8080");
+
+        // Prepare the message to send (JSON format is good practice)
+        $message = json_encode([
+            'type' => 'backend_event', // Generic type for backend events
+            'payload' => [
+                'event' => 'user_created', // Specific event type within payload
+                'role' => 'dean', // Role of the created user
+                'userId' => $userId, // Optionally include relevant data
+                'message' => 'A new dean account has been created.' // Optional message
+            ]
+        ]);
+
+        // Send the message
+        $client->send($message);
+
+        // Close the connection
+        $client->close();
+
+        // Optional: Log success
+        // error_log("WebSocket message sent: " . $message);
+
+    } catch (Exception $e) {
+        // Log the error, but don't stop the API from returning success
+        error_log("WebSocket error sending message: " . $e->getMessage());
+    }
 
     http_response_code(201);
     echo json_encode(["message" => "Dean account created successfully"]);

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-
+import { API_BASE_URL } from '@/config/api';
 const ActiveContext = createContext();
 
 export const ActiveProvider = ({ children }) => {
@@ -13,7 +13,7 @@ export const ActiveProvider = ({ children }) => {
       setLoading(true);
       
       // Fetch academic years
-      const academicYearResponse = await fetch('http://localhost/kld-advising/backend/api/academic_year/read.php');
+      const academicYearResponse = await fetch(`${API_BASE_URL}/academic_year/read.php`);
       const academicYears = await academicYearResponse.json();
       
       // Find active academic year
@@ -21,7 +21,7 @@ export const ActiveProvider = ({ children }) => {
       setActiveAcademicYear(activeYear || null);
 
       // Fetch semesters
-      const semesterResponse = await fetch('http://localhost/kld-advising/backend/api/semester/read.php');
+      const semesterResponse = await fetch(`${API_BASE_URL}/semester/read.php`);
       const semesters = await semesterResponse.json();
       
       // Find active semester

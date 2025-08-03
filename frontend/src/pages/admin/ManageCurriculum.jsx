@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/shared/DatePicker";
 import { Label } from "@/components/ui/label";
 import { PaginationComponent } from "@/components/shared/PaginationComponent";
 import { useActive } from '@/contexts/ActiveContext';
-
+import { API_BASE_URL } from '@/config/api';
 const ManageCurriculum = () => {
   const [selectedTab, setSelectedTab] = useState("academic_year");
   const [showStatusDialog, setShowStatusDialog] = useState(false);
@@ -283,7 +283,7 @@ const ManageCurriculum = () => {
         semester: activeSemester
       });
 
-      const response = await fetch('http://localhost/kld-advising/backend/api/academic_year/update.php', {
+      const response = await fetch(`${API_BASE_URL}/academic_year/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -358,7 +358,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/academic_year/create.php', {
+      const response = await fetch(`${API_BASE_URL}/academic_year/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -393,7 +393,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/program/create.php', {
+      const response = await fetch(`${API_BASE_URL}/program/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -427,7 +427,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/semester/create.php', {
+      const response = await fetch(`${API_BASE_URL}/semester/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -460,7 +460,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/year_level/create.php', {
+      const response = await fetch(`${API_BASE_URL}/year_level/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -489,7 +489,7 @@ const ManageCurriculum = () => {
   useEffect(() => {
     const fetchAcademicYears = async () => {
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/academic_year/read.php');
+        const response = await fetch(`${API_BASE_URL}/academic_year/read.php`);
         const data = await response.json();
         
         if (response.ok) {
@@ -504,7 +504,7 @@ const ManageCurriculum = () => {
 
     const fetchSemesters = async () => {
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/semester/read.php');
+        const response = await fetch(`${API_BASE_URL}/semester/read.php`);
         const data = await response.json();
         
         if (response.ok) {
@@ -519,7 +519,7 @@ const ManageCurriculum = () => {
 
     const fetchPrograms = async () => {
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/program/read.php');
+        const response = await fetch(`${API_BASE_URL}/program/read.php`);
         const data = await response.json();
         
         if (response.ok) {
@@ -534,7 +534,7 @@ const ManageCurriculum = () => {
 
     const fetchDepartments = async () => {
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/users/departments.php');
+        const response = await fetch(`${API_BASE_URL}/users/departments.php`);
         const data = await response.json();
         
         if (response.ok) {
@@ -556,7 +556,7 @@ const ManageCurriculum = () => {
 
     const fetchYearLevels = async () => {
       try {
-        const response = await fetch('http://localhost/kld-advising/backend/api/year_level/read.php');
+        const response = await fetch(`${API_BASE_URL}/year_level/read.php`);
         const data = await response.json();
         
         if (response.ok) {
@@ -586,7 +586,7 @@ const ManageCurriculum = () => {
   // Add delete handler function
   const handleDeleteAcademicYear = async () => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/academic_year/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/academic_year/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -701,7 +701,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/academic_year/update.php', {
+      const response = await fetch(`${API_BASE_URL}/academic_year/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -758,7 +758,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/semester/update.php', {
+      const response = await fetch(`${API_BASE_URL}/semester/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -802,7 +802,7 @@ const ManageCurriculum = () => {
 
   const handleDeleteSemester = async () => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/semester/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/semester/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -867,7 +867,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/program/update.php', {
+      const response = await fetch(`${API_BASE_URL}/program/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -912,7 +912,7 @@ const ManageCurriculum = () => {
 
   const handleDeleteProgram = async () => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/program/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/program/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -973,7 +973,7 @@ const ManageCurriculum = () => {
     }
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/year_level/update.php', {
+      const response = await fetch(`${API_BASE_URL}/year_level/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1015,7 +1015,7 @@ const ManageCurriculum = () => {
 
   const handleDeleteYearLevel = async () => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/year_level/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/year_level/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1070,7 +1070,7 @@ const ManageCurriculum = () => {
         semester: activeSemester
       });
 
-      const response = await fetch('http://localhost/kld-advising/backend/api/semester/update.php', {
+      const response = await fetch(`${API_BASE_URL}/semester/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

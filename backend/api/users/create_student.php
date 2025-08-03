@@ -1,15 +1,15 @@
 <?php
 
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// header("Access-Control-Allow-Origin: *");
+// header("Access-Control-Allow-Methods: POST, OPTIONS");
+// header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
+// if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+//     http_response_code(204);
+//     exit;
+// }
+include_once '../../config/cors.php';
 require_once "../../config/database.php";
 
 error_reporting(E_ALL);
@@ -145,7 +145,7 @@ try {
 
     // 9. Pre-populate course_grades table for the student
     if (!empty($courses)) {
-        $sqlGradeInsert = "INSERT INTO course_grades (student_id, course_id, grade) VALUES (:student_id, :course_id, NULL)";
+        $sqlGradeInsert = "INSERT INTO course_grades (student_id, course_id) VALUES (:student_id, :course_id)";
         $stmtGradeInsert = $conn->prepare($sqlGradeInsert);
         
         foreach ($courses as $course) {
@@ -156,6 +156,37 @@ try {
     }
 
     $conn->commit();
+
+    require dirname(__DIR__, 3) . '/vendor/autoload.php';
+
+    try {
+        // Connect to the websocket server running on localhost:8080
+        $client = new WebSocket\Client("ws://localhost:8080");
+
+        // Prepare the message to send (JSON format is good practice)
+        $message = json_encode([
+            'type' => 'backend_event', // Generic type for backend events
+            'payload' => [
+                'event' => 'user_created', // Specific event type within payload
+                'role' => 'student', // Role of the created user
+                'userId' => $userId, // Optionally include relevant data
+                'message' => 'A new student account has been created.' // Optional message
+            ]
+        ]);
+
+        // Send the message
+        $client->send($message);
+
+        // Close the connection
+        $client->close();
+
+        // Optional: Log success
+        // error_log("WebSocket message sent: " . $message);
+
+    } catch (Exception $e) {
+        // Log the error, but don't stop the API from returning success
+        error_log("WebSocket error sending message: " . $e->getMessage());
+    }
 
     http_response_code(201);
     echo json_encode(["message" => "Student account created successfully"]);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { API_BASE_URL } from '@/config/api';
 import { Search, Edit, Trash2, ArrowLeft, PlusCircle, Loader2, AlertTriangle, ChevronsUpDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -119,7 +120,7 @@ export default function FacultyAssignment() {
       setLoadingProgramData(true);
       console.log("Fetching programs for Program Chair ID:", user.id);
       try {
-        const programResponse = await fetch(`http://localhost/kld-advising/backend/api/program/read_by_program_chair.php?id=${user.id}`);
+        const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
         const programData = await programResponse.json();
         if (!programResponse.ok) {
           console.error("Failed to fetch programs:", programData.message);
@@ -157,7 +158,7 @@ export default function FacultyAssignment() {
       setError(null)
       try {
         const response = await fetch(
-          `http://localhost/kld-advising/backend/api/program_chair/read_single_faculty_assignment.php?faculty_id=${facultyId}`,
+          `${API_BASE_URL}/program_chair/read_single_faculty_assignment.php?faculty_id=${facultyId}`,
         )
         if (!response.ok) {
           let errorMsg = `HTTP error! status: ${response.status}`
@@ -202,7 +203,7 @@ export default function FacultyAssignment() {
       console.log("Fetching sections for AY:", activeAcademicYear.id, "Sem:", activeSemester.id, "Programs:", assignedProgramIds);
       setLoadingSections(true);
       try {
-        const url = `http://localhost/kld-advising/backend/api/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+        const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
         const response = await fetch(url);
         if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
         const data = await response.json();
@@ -263,7 +264,7 @@ export default function FacultyAssignment() {
     const toastId = toast.loading("Deleting assignment...");
     try {
       // --- API Call for Deletion ---
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/delete_assignment.php', { // Replace with your actual delete endpoint
+      const response = await fetch(`${API_BASE_URL}/program_chair/delete_assignment.php`, { // Replace with your actual delete endpoint
         method: 'DELETE', // Or POST if using body for ID
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignment_id: assignmentToDelete.assignment_id })
@@ -308,7 +309,7 @@ export default function FacultyAssignment() {
         course_id: assignmentData.courseId
       };
       console.log("Saving course assignment:", completeAssignmentData);
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/assign_course.php', {
+      const response = await fetch(`${API_BASE_URL}/program_chair/assign_course.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(completeAssignmentData)
@@ -379,7 +380,7 @@ export default function FacultyAssignment() {
           // semester_id: newAssignment.semesterId
       };
       console.log("Updating assignment:", updateData);
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/update_assignment.php', { // Replace with your actual update endpoint
+      const response = await fetch(`${API_BASE_URL}/program_chair/update_assignment.php`, { // Replace with your actual update endpoint
         method: 'PUT', // Or POST
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
@@ -425,7 +426,7 @@ export default function FacultyAssignment() {
           // --- API Call for Unassigning Advisee ---
           // This likely involves removing the faculty_id from the section's advisor field
           // Or deleting a record from a section_advisors table
-          const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/unassign_advisor.php', { // Replace with your actual endpoint
+          const response = await fetch(`${API_BASE_URL}/program_chair/unassign_advisor.php`, { // Replace with your actual endpoint
               method: 'POST', // Or DELETE/PUT
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -557,7 +558,7 @@ export default function FacultyAssignment() {
       const fetchCoursesForSection = async () => {
         setLoadingCoursesForSection(true);
         try {
-          const url = new URL("http://localhost/kld-advising/backend/api/program_chair/get_courses_for_section.php");
+          const url = new URL(`${API_BASE_URL}/program_chair/get_courses_for_section.php`);
           url.searchParams.append('section_id', assignment.sectionId);
           if (activeAcademicYear?.id) url.searchParams.append('academic_year_id', activeAcademicYear.id);
           if (activeSemester?.id) url.searchParams.append('semester_id', activeSemester.id);
@@ -715,7 +716,7 @@ export default function FacultyAssignment() {
         setLoadingUnassignedSections(true);
         try {
           // URL for sections without advisors, filtered by AY and Sem
-          const url = `http://localhost/kld-advising/backend/api/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor`;
+          const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor`;
 
           console.log("Fetching sections without advisors for dialog:", url);
 
@@ -884,7 +885,7 @@ export default function FacultyAssignment() {
     setError(null)
     try {
       const response = await fetch(
-        `http://localhost/kld-advising/backend/api/program_chair/read_single_faculty_assignment.php?faculty_id=${facultyId}`,
+        `${API_BASE_URL}/program_chair/read_single_faculty_assignment.php?faculty_id=${facultyId}`,
       )
       if (!response.ok) {
         let errorMsg = `HTTP error! status: ${response.status}`
@@ -922,7 +923,7 @@ export default function FacultyAssignment() {
       console.log("Assigning advisor:", payload);
       // Endpoint should handle assigning faculty_id to section's advisor field,
       // potentially overwriting an existing one.
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/assign_advisor.php', {
+      const response = await fetch(`${API_BASE_URL}/program_chair/assign_advisor.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

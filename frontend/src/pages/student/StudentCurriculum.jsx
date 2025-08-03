@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableHead, TableRow, TableHeader, TableCell, TableBody, TableFooter } from "@/components/ui/table";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// --- Import Layout Components (Adjust paths as needed) ---
+import { API_BASE_URL } from '@/config/api';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/App-sidebar';
 import Header from '@/components/layout/Header';
@@ -81,7 +80,7 @@ const StudentCurriculum = () => {
       setError(null);
       try {
         // Use fetch API with student_id as query parameter
-        const response = await fetch(`http://localhost/kld-advising/backend/api/student/get_curriculum.php?student_id=${studentId}`, {
+        const response = await fetch(`${API_BASE_URL}/student/get_curriculum.php?student_id=${studentId}`, {
              credentials: 'include' // Send cookies for session-based auth
         });
 
@@ -197,7 +196,7 @@ const StudentCurriculum = () => {
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
 
         <div className="p-4">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="border rounded-md p-4 shadow-lg">
               {/* Curriculum Title Section - Use fetched data */}
               <div className="mb-4">

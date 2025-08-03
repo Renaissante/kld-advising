@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/App-sidebar";
 import Header from "@/components/layout/Header";
@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useActive } from "@/contexts/ActiveContext";
-
+import * as XLSX from "xlsx";
+import { API_BASE_URL } from '@/config/api'; 
 const ManageGrades = () => {
   const { user } = useAuth();
   const { activeAcademicYear, activeSemester } = useActive();
@@ -25,8 +26,9 @@ const ManageGrades = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+
   const [gradesChanged, setGradesChanged] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [activeTab, setActiveTab] = useState("current");
   const [selectedHistoricalAy, setSelectedHistoricalAy] = useState("");
@@ -38,47 +40,49 @@ const ManageGrades = () => {
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Add new state for course grade status
-  const [courseGradeStatus, setCourseGradeStatus] = useState(null);
+
+  // Reference for the hidden file input
+  const fileInputRef = useRef(null);
+
 
   // Fetch faculty courses
   const fetchCourses = useCallback(async () => {
     if (!user || user.role !== 'faculty') return;
-    
+
     setCoursesLoading(true);
     setError(null);
-    
+
     try {
       // Include faculty_id in URL for direct testing
-      const response = await fetch(`http://localhost/kld-advising/backend/api/faculty/get_courses.php?faculty_id=${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/faculty/get_courses.php?faculty_id=${user.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         setAllCourses(data.data);
-        
+
         // Extract unique academic years and semesters for the filters
         const uniqueAcademicYears = [...new Set(data.data.map(course => course.ay))];
         const uniqueSemesters = [...new Set(data.data.map(course => course.sem))];
-        
+
         // Create academic years array with id and year
         setAcademicYears(uniqueAcademicYears.map(year => ({
-          id: year,
+          id: year, // Assuming AY is unique enough for ID here
           year: year
         })));
-        
+
         // Create semesters array with id and name
         setSemesters(uniqueSemesters.map(sem => ({
-          id: sem,
+          id: sem, // Assuming semester name is unique enough for ID here
           name: sem
         })));
       } else {
@@ -101,19 +105,19 @@ const ManageGrades = () => {
 
   const getDisplayedCourses = () => {
     let coursesToDisplay = [];
-    
-    // Add debug logging
-    console.log("Active AY:", activeAcademicYear?.year);
-    console.log("Active Semester:", activeSemester?.name);
-    console.log("Active Semester ID:", activeSemester?.id);
-    console.log("All Courses:", allCourses);
-    
+
+  
+    // console.log("Active AY:", activeAcademicYear?.year);
+    // console.log("Active Semester:", activeSemester?.name);
+    // console.log("Active Semester ID:", activeSemester?.id);
+    // console.log("All Courses:", allCourses);
+
     if (activeTab === "current") {
       // Filter for current semester courses using activeAcademicYear and activeSemester
       coursesToDisplay = allCourses.filter(course =>
         course.ay === activeAcademicYear?.year && course.sem === activeSemester?.name
       );
-      console.log("Current semester courses:", coursesToDisplay);
+      // console.log("Current semester courses:", coursesToDisplay);
     } else {
       // For the "all" tab (previous semesters)
       if (selectedHistoricalAy && selectedHistoricalSem) {
@@ -121,42 +125,42 @@ const ManageGrades = () => {
         coursesToDisplay = allCourses.filter(course =>
           course.ay === selectedHistoricalAy && course.sem === selectedHistoricalSem
         );
-        console.log("Selected historical courses:", coursesToDisplay);
+        // console.log("Selected historical courses:", coursesToDisplay);
       } else {
         // Show courses from previous semesters only
         // Convert values to ensure proper comparison
         const activeAY = activeAcademicYear?.year || "";
         const activeSemID = parseInt(activeSemester?.id) || 0;
-        
+
         // First priority: courses from previous academic years
         const previousAYCourses = allCourses.filter(course => {
           // Compare as strings to handle academic year format like "2023-2024"
           return String(course.ay) < String(activeAY);
         });
-        
-        console.log("Previous AY courses:", previousAYCourses);
-        
+
+        // console.log("Previous AY courses:", previousAYCourses);
+
         // Second priority: courses from earlier semesters in the current academic year
         const currentAYPreviousSemCourses = allCourses.filter(course => {
           const courseSemID = parseInt(course.semester_id) || 0;
           return String(course.ay) === String(activeAY) && courseSemID < activeSemID;
         });
-        
-        console.log("Current AY previous semester courses:", currentAYPreviousSemCourses);
-        
+
+        // console.log("Current AY previous semester courses:", currentAYPreviousSemCourses);
+
         // Combine both sets of courses
         coursesToDisplay = [...previousAYCourses, ...currentAYPreviousSemCourses];
-        console.log("All previous courses:", coursesToDisplay);
+        // console.log("All previous courses:", coursesToDisplay);
       }
     }
-    
+
     // Apply search filter
     const filteredCourses = coursesToDisplay.filter((course) =>
       course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    
-    console.log("Filtered displayed courses:", filteredCourses);
+
+    // console.log("Filtered displayed courses:", filteredCourses);
     return filteredCourses;
   };
 
@@ -166,24 +170,32 @@ const ManageGrades = () => {
   const fetchStudents = async (courseId, sectionId) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Call API to get students for this course section
-      const response = await fetch(`http://localhost/kld-advising/backend/api/faculty/get_students.php?course_id=${courseId}&section_id=${sectionId}${user?.id ? `&faculty_id=${user.id}` : ''}`, {
+      const response = await fetch(`${API_BASE_URL}/faculty/get_students.php?course_id=${courseId}&section_id=${sectionId}${user?.id ? `&faculty_id=${user.id}` : ''}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
-        setStudents(data.data || []);
+        // Initialize students with fetched data, ensuring new fields exist
+        setStudents(data.data.map(student => ({
+            ...student,
+            midterm: student.midterm === '' ? null : parseFloat(student.midterm), // Ensure numeric is float or null
+            final: student.final === '' ? null : parseFloat(student.final), // Ensure numeric is float or null
+            midterm_status: student.midterm_status === '' ? null : student.midterm_status, // Ensure status is string or null
+            final_status: student.final_status === '' ? null : student.final_status, // Ensure status is string or null
+            // average, transmutation, remarks will be calculated in GradesInputTable
+        })) || []);
       } else {
         throw new Error(data.message || "Failed to fetch students");
       }
@@ -204,14 +216,14 @@ const ManageGrades = () => {
     } else {
       setStudents([]);
     }
-  }, [selectedSection, selectedCourse]);
+  }, [selectedSection, selectedCourse, user?.id]); // Added user.id dependency
 
   const resetAndProceed = (action) => {
     if (gradesChanged) {
       if (window.confirm("You have unsaved changes. Do you want to discard them and proceed?")) {
         setGradesChanged(false);
         setSaving(false);
-        setSubmitting(false);
+        setIsUploading(false);
         action();
       }
     } else {
@@ -246,7 +258,7 @@ const ManageGrades = () => {
       toast.error("Please select a different semester than the current one");
       return;
     }
-    
+
     resetAndProceed(() => {
       setSelectedHistoricalSem(semesterName);
       setSelectedCourse(null);
@@ -274,33 +286,76 @@ const ManageGrades = () => {
     });
   };
 
+  
   const handleGradeChange = (studentId, field, value) => {
-    // For numeric fields (midterm and final), validate that input is a number
-    if ((field === "midterm" || field === "final") && value !== "" && !/^\d*\.?\d*$/.test(value)) return;
-    
-    // For numeric fields, validate the range (0-100)
-    if ((field === "midterm" || field === "final") && value !== "") {
-      const numValue = parseFloat(value);
-      if (numValue < 0 || numValue > 100) return;
-    }
-
     setStudents((prevStudents) =>
       prevStudents.map((student) => {
         if (student.student_id === studentId) {
-          const updatedStudent = { ...student, [field]: value };
-          
-          // Recalculate average if midterm or final changes
-          if (field === "midterm" || field === "final") {
-            const midtermStr = field === "midterm" ? value : student.midterm;
-            const finalStr = field === "final" ? value : student.final;
-            const midtermVal = parseFloat(midtermStr);
-            const finalVal = parseFloat(finalStr);
-            if (!isNaN(midtermVal) && !isNaN(finalVal) && midtermStr !== "" && finalStr !== "") {
-               updatedStudent.average = ((midtermVal + finalVal) / 2).toFixed(2);
+          let updatedStudent = { ...student };
+          const trimmedValue = value ? String(value).trim() : "";
+          const lowerValue = trimmedValue.toLowerCase();
+          const allowedText = ["ud", "od"];
+
+          if (field === "midterm") {
+            // Allow any input to update the state temporarily
+            // Validation will happen on save
+            updatedStudent.midterm = trimmedValue; // Store raw string input
+            updatedStudent.midterm_status = null; // Clear status on input change
+
+            // If the input is exactly UD or OD (case-insensitive),
+            // auto-set the final status as well for immediate feedback,
+            // but the main validation is on save.
+            if (allowedText.includes(lowerValue)) {
+                 updatedStudent.midterm_status = lowerValue.toUpperCase();
+                 updatedStudent.midterm = null; // Clear numeric if it's UD/OD text
+                 updatedStudent.final_status = lowerValue.toUpperCase();
+                 updatedStudent.final = null; // Clear final numeric if midterm is UD/OD text
             } else {
-              updatedStudent.average = "";
+                // If not UD/OD text, try parsing as number for immediate feedback
+                const numValue = parseFloat(trimmedValue);
+                if (trimmedValue === "" || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                    updatedStudent.midterm = trimmedValue === "" ? null : numValue;
+                    updatedStudent.midterm_status = null;
+                } else {
+                    // If it's other text or invalid number, store the raw string
+                    updatedStudent.midterm = trimmedValue;
+                    updatedStudent.midterm_status = null;
+                }
+                 // Ensure final status is cleared if midterm is not UD/OD text
+                 if (allowedText.includes(String(student.midterm_status || "").toLowerCase())) {
+                     updatedStudent.final_status = null;
+                     // Do NOT clear final numeric value here, let the user input it
+                 }
             }
+
+
+          } else if (field === "final") {
+             // Allow any input to update the state temporarily
+             // Validation will happen on save
+             updatedStudent.final = trimmedValue; // Store raw string input
+             updatedStudent.final_status = null; // Clear status on input change
+
+             // If the input is exactly UD or OD (case-insensitive),
+             // set the final status for immediate feedback,
+             // but the main validation is on save.
+             if (allowedText.includes(lowerValue)) {
+                updatedStudent.final_status = lowerValue.toUpperCase();
+                updatedStudent.final = null; // Clear numeric if it's UD/OD text
+             } else {
+                 // If not UD/OD text, try parsing as number for immediate feedback
+                 const numValue = parseFloat(trimmedValue);
+                 if (trimmedValue === "" || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                    updatedStudent.final = trimmedValue === "" ? null : numValue;
+                    updatedStudent.final_status = null;
+                 } else {
+                    // If it's other text or invalid number, store the raw string
+                    updatedStudent.final = trimmedValue;
+                    updatedStudent.final_status = null;
+                 }
+             }
           }
+
+          // Average, Transmutation, Remarks are calculated in GradesInputTable based on midterm/final/status
           return updatedStudent;
         }
         return student;
@@ -308,22 +363,28 @@ const ManageGrades = () => {
     );
     setGradesChanged(true);
   };
-
   const handleSaveGrades = () => {
     setSaving(true);
-    
+
     // Prepare data for API call
     const gradesData = {
       course_id: selectedCourse.id,
       section_id: selectedSection.id,
       academic_year_id: activeTab === 'current' ? activeAcademicYear?.id : selectedHistoricalAy,
       semester_id: activeTab === 'current' ? activeSemester?.id : selectedHistoricalSem,
-      action: 'save',
-      students: students
+      action: 'save', // Or 'submit' if you add a submit button
+      students: students.map(student => ({
+          student_id: student.student_id,
+          midterm: student.midterm, // Send numeric value (can be null)
+          final: student.final,     // Send numeric value (can be null)
+          midterm_status: student.midterm_status, // Send status (can be null, 'UD', 'OD')
+          final_status: student.final_status,   // Send status (can be null, 'UD', 'OD')
+          // average, transmutation, remarks are calculated backend
+      }))
     };
-    
+
     // Call save grades API
-    fetch(`http://localhost/kld-advising/backend/api/faculty/save_grades.php${user?.id ? `?faculty_id=${user.id}` : ''}`, {
+    fetch(`${API_BASE_URL}/faculty/save_grades.php${user?.id ? `?faculty_id=${user.id}` : ''}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -332,7 +393,8 @@ const ManageGrades = () => {
     })
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Attempt to read error message from body
+        return response.json().then(err => { throw new Error(err.message || `HTTP error! status: ${response.status}`); });
       }
       return response.json();
     })
@@ -340,7 +402,16 @@ const ManageGrades = () => {
       if (data.success) {
         toast.success(data.message || "Grades saved successfully");
         setGradesChanged(false);
+        // Re-fetch students to get the backend-calculated average, transmutation, remarks
+        fetchStudents(selectedCourse.id, selectedSection.id);
       } else {
+        // Handle backend validation errors
+        if (data.errors && data.errors.length > 0) {
+             toast.error("Failed to save grades. See console for details.");
+             console.error("Backend validation errors:", data.errors);
+        } else {
+             toast.error(data.message || "Failed to save grades");
+        }
         throw new Error(data.message || "Failed to save grades");
       }
     })
@@ -353,109 +424,127 @@ const ManageGrades = () => {
     });
   };
 
-  const handleSubmitGrades = () => {
-    // Check if all required fields are entered
-    const allRequiredFieldsEntered = students.every(
-      (student) => 
-        student.midterm !== "" && 
-        student.final !== "" && 
-        !isNaN(parseFloat(student.midterm)) && 
-        !isNaN(parseFloat(student.final)) &&
-        student.remarks && student.remarks.trim() !== ""
-    );
-    
-    if (!allRequiredFieldsEntered) {
-      toast.error("Please enter valid Midterm, Final grades, and Remarks for all students before submitting.");
-      return;
+  // New function to handle file upload
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setIsUploading(true);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
+
+          let updatedStudentsCount = 0;
+          const allowedText = ["ud", "od"];
+
+          setStudents(prevStudents => {
+            const newStudents = prevStudents.map(student => {
+              const matchingRow = json.find(row =>
+                String(row["Student ID"]).trim() === String(student.student_id).trim()
+              );
+
+              if (matchingRow) {
+                let updated = { ...student };
+                let gradeUpdated = false;
+
+                // Process Midterm
+                if (matchingRow["Midterm"] !== undefined) {
+                  const midtermValue = String(matchingRow["Midterm"]).trim();
+                  const midtermLower = midtermValue.toLowerCase();
+
+                  if (allowedText.includes(midtermLower)) {
+                     updated.midterm_status = midtermLower.toUpperCase();
+                     updated.midterm = null;
+                     // Auto-set final status if midterm is UD/OD from file
+                     updated.final_status = midtermLower.toUpperCase();
+                     updated.final = null;
+                     gradeUpdated = true;
+                  } else {
+                    const numMidterm = parseFloat(midtermValue);
+                    if (midtermValue === "" || (!isNaN(numMidterm) && numMidterm >= 0 && numMidterm <= 100)) {
+                      updated.midterm = midtermValue === "" ? null : numMidterm;
+                      updated.midterm_status = null;
+                      gradeUpdated = true;
+                    } else {
+                       console.warn(`Skipping invalid Midterm value for student ${student.student_id}: ${midtermValue}`);
+                    }
+                  }
+                }
+
+                // Process Final (only if midterm wasn't set to text, as that auto-sets final)
+                // Also ensure we don't overwrite if midterm was UD/OD and already set final
+                if (matchingRow["Final"] !== undefined && !allowedText.includes(String(updated.midterm_status || "").toLowerCase())) {
+                   const finalValue = String(matchingRow["Final"]).trim();
+                   const finalLower = finalValue.toLowerCase();
+
+                   if (allowedText.includes(finalLower)) {
+                      updated.final_status = finalLower.toUpperCase();
+                      updated.final = null;
+                      gradeUpdated = true;
+                   } else {
+                      const numFinal = parseFloat(finalValue);
+                      if (finalValue === "" || (!isNaN(numFinal) && numFinal >= 0 && numFinal <= 100)) {
+                        updated.final = finalValue === "" ? null : numFinal;
+                        updated.final_status = null;
+                        gradeUpdated = true;
+                      } else {
+                         console.warn(`Skipping invalid Final value for student ${student.student_id}: ${finalValue}`);
+                      }
+                   }
+                }
+
+                // Average, Transmutation, Remarks are calculated in GradesInputTable based on midterm/final/status
+                if (gradeUpdated) {
+                    updatedStudentsCount++;
+                }
+                return updated;
+              }
+              return student;
+            });
+            if (updatedStudentsCount > 0) {
+              setGradesChanged(true);
+              toast.success(`${updatedStudentsCount} students' grades updated from file.`);
+            } else {
+              toast.info("No matching students or valid grades found in the file.");
+            }
+            return newStudents;
+          });
+
+        } catch (error) {
+          console.error("Error reading Excel file:", error);
+          toast.error("Failed to read Excel file. Please ensure it's a valid format.");
+        } finally {
+          setIsUploading(false);
+          // Clear the file input value to allow re-uploading the same file
+          event.target.value = null;
+        }
+      };
+      reader.readAsArrayBuffer(file);
     }
-    
-    setSubmitting(true);
-    
-    // Prepare data for API call
-    const gradesData = {
-      course_id: selectedCourse.id,
-      section_id: selectedSection.id,
-      academic_year_id: activeTab === 'current' ? activeAcademicYear?.id : selectedHistoricalAy,
-      semester_id: activeTab === 'current' ? activeSemester?.id : selectedHistoricalSem,
-      action: 'submit',
-      students: students
-    };
-    
-    // Call submit grades API
-    fetch(`http://localhost/kld-advising/backend/api/faculty/save_grades.php${user?.id ? `?faculty_id=${user.id}` : ''}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(gradesData)
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+
+  };
+
+  // Function to trigger the hidden file input
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Modify handleSectionChange to remove the call to check grade status
+  const handleSectionChange = (section) => {
+    resetAndProceed(() => {
+      setSelectedSection(section);
+      if (section && selectedCourse) {
+        fetchStudents(selectedCourse.id, section.id);
       }
-      return response.json();
-    })
-    .then(data => {
-      if (data.success) {
-        toast.success(data.message || "Grades submitted successfully");
-        setGradesChanged(false);
-        
-        // Refresh students data to get updated status
-        fetchStudents(selectedCourse.id, selectedSection.id);
-      } else {
-        throw new Error(data.message || "Failed to submit grades");
-      }
-    })
-    .catch(error => {
-      console.error("Error submitting grades:", error);
-      toast.error("Error: " + error.message);
-    })
-    .finally(() => {
-      setSubmitting(false);
     });
   };
 
-  // After the handleSectionChange function
-  // Check if grades are already submitted for this section
-  const checkGradeStatus = async (courseId, sectionId) => {
-    try {
-      const response = await fetch(`http://localhost/kld-advising/backend/api/faculty/get_grade_status.php?course_id=${courseId}&section_id=${sectionId}${user?.id ? `&faculty_id=${user.id}` : ''}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setCourseGradeStatus(data.status);
-        return data.status;
-      } else {
-        setCourseGradeStatus(null);
-        return null;
-      }
-    } catch (err) {
-      console.error("Error checking grade status:", err);
-      setCourseGradeStatus(null);
-      return null;
-    }
-  };
-
-  // Modify handleSectionChange to also check grade status
-  const handleSectionChange = (e) => {
-    const sectionId = e.target.value;
-    setSelectedSection(sections.find((section) => section.id === sectionId));
-    
-    if (sectionId && selectedCourse) {
-      fetchStudents(selectedCourse.id, sectionId);
-      checkGradeStatus(selectedCourse.id, sectionId);
-    }
-  };
 
   return (
     <SidebarProvider>
@@ -511,9 +600,9 @@ const ManageGrades = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {displayedCourses.map((course, index) => {
                             // Use index modulo 5 to cycle through 5 colors
-                            const colorIndex = index % 5; 
+                            const colorIndex = index % 5;
                             let bgColorClass;
-                            
+
                             // Apply different colors based on index
                             switch(colorIndex) {
                               case 0:
@@ -534,7 +623,7 @@ const ManageGrades = () => {
                               default:
                                 bgColorClass = "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-600";
                             }
-                            
+
                             return (
                               <div
                                 key={course.id}
@@ -573,8 +662,8 @@ const ManageGrades = () => {
                               .filter(ay => {
                                 // For current AY, only show if it has courses in previous semesters
                                 if (ay.year === activeAcademicYear?.year) {
-                                  return allCourses.some(course => 
-                                    course.ay === ay.year && 
+                                  return allCourses.some(course =>
+                                    course.ay === ay.year &&
                                     parseInt(course.semester_id) < parseInt(activeSemester?.id || 0)
                                   );
                                 }
@@ -591,7 +680,7 @@ const ManageGrades = () => {
                             <SelectValue placeholder={!selectedHistoricalAy ? "Select AY first" : "Select Semester"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {selectedHistoricalAy === activeAcademicYear?.year 
+                            {selectedHistoricalAy === activeAcademicYear?.year
                               ? semesters
                                   .filter(sem => sem.name !== activeSemester?.name)
                                   .map(sem => (
@@ -613,9 +702,9 @@ const ManageGrades = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {displayedCourses.map((course, index) => {
                               // Use index modulo 5 to cycle through 5 colors
-                              const colorIndex = index % 5; 
+                              const colorIndex = index % 5;
                               let bgColorClass;
-                              
+
                               // Apply different colors based on index
                               switch(colorIndex) {
                                 case 0:
@@ -636,7 +725,7 @@ const ManageGrades = () => {
                                 default:
                                   bgColorClass = "bg-sky-50 dark:bg-sky-900/30 border-sky-200 dark:border-sky-800 hover:border-sky-400 dark:hover:border-sky-600";
                               }
-                              
+
                               return (
                                 <div
                                   key={course.id}
@@ -691,7 +780,7 @@ const ManageGrades = () => {
                           key={section.id}
                           variant={selectedSection?.id === section.id ? "default" : "outline"}
                           className={`cursor-pointer text-sm py-1 px-2.5 ${selectedSection?.id === section.id ? 'bg-[#1b4b2a] hover:bg-[#1b4b2a]/90 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white' : ''}`}
-                          onClick={() => handleSectionSelect(section)}
+                          onClick={() => handleSectionChange(section)}
                         >
                           {section.name}
                         </Badge>
@@ -706,15 +795,24 @@ const ManageGrades = () => {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <CardTitle className="mb-2">Grades for: {selectedSection.name}</CardTitle>
-                          <CardDescription>Enter Midterm and Final grades (0-100).</CardDescription>
+                          <CardDescription>Enter Midterm and Final grades (0-100, UD, or OD).</CardDescription>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" onClick={handleSaveGrades} disabled={saving || !gradesChanged || submitting}>
-                            {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save</>}
+                          {/* Hidden file input */}
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            accept=".xls,.xlsx"
+                            style={{ display: 'none' }}
+                          />
+                          <Button variant="outline" onClick={triggerFileUpload} disabled={isUploading || loading}>
+                            {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : "Upload From Excel"}
                           </Button>
-                          <Button variant="green" onClick={handleSubmitGrades} disabled={submitting || !gradesChanged || saving}>
-                            {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : <><FileCheck className="h-4 w-4 mr-2" />Submit Grades</>}
+                          <Button variant="green" onClick={handleSaveGrades} disabled={saving || !gradesChanged}>
+                            {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save Grades</>}
                           </Button>
+
                         </div>
                       </div>
                     </CardHeader>
@@ -732,34 +830,7 @@ const ManageGrades = () => {
                   </Card>
                 )}
 
-                {selectedSection && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                    <h3 className="text-sm font-medium text-gray-700">Grade Status:</h3>
-                    <div className="mt-1">
-                      {courseGradeStatus === 'submitted' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Submitted
-                        </span>
-                      ) : courseGradeStatus === 'saved' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Saved (Not Submitted)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          Not Started
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
 
-                {courseGradeStatus === 'submitted' && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-md">
-                    <p className="text-sm text-yellow-700">
-                      These grades have been submitted. Contact the registrar if you need to make changes.
-                    </p>
-                  </div>
-                )}
               </div>
             )}
           </div>

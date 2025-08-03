@@ -15,7 +15,7 @@ import {
 import { Search, MoreHorizontal, UserCog, FileText, Mail } from "lucide-react";
 
 // Converted props from TypeScript interface to standard destructuring
-export default function StudentTable({ students = [], onAdviseStudent, sectionName }) {
+export default function StudentTable({ students = [], onAdviseStudent, sectionName, activeTab }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter students based on search query
@@ -65,7 +65,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                 {/* Added consistent padding */}
                 <TableHead className="px-3 py-2">Status</TableHead>
                 {/* Added consistent padding */}
-                <TableHead className="px-3 py-2">GPA</TableHead>
+                <TableHead className="px-3 py-2">Advising Status</TableHead>
                 {/* Added consistent padding */}
                 <TableHead className="px-3 py-2">Units</TableHead>
                 {/* Added consistent padding and alignment */}
@@ -95,7 +95,17 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                       </Badge>
                     </TableCell>
                     {/* Added consistent padding */}
-                    <TableCell className="px-3 py-2">{student.gpa}</TableCell>
+                    <TableCell className="px-3 py-2">
+                      <Badge
+                         variant={
+                           student.advising_status === "Done"
+                             ? "default" // Or a specific color for Done
+                             : "secondary" // Or a specific color for Pending
+                         }
+                      >
+                        {student.advising_status}
+                      </Badge>
+                    </TableCell>
                     {/* Added consistent padding */}
                     <TableCell className="px-3 py-2">{student.units}</TableCell>
                     {/* REVERTED: Actions Cell back to DropdownMenu */}
@@ -110,7 +120,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          {/* Advise item with setTimeout fix */}
+                        {activeTab === "current" && (
                           <DropdownMenuItem
                             onClick={() => {
                               setTimeout(() => {
@@ -121,7 +131,9 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                             <UserCog className="mr-2 h-4 w-4" />
                             <span>Advise</span>
                           </DropdownMenuItem>
-                          {/* Other menu items */}
+                        )}
+
+
                           <DropdownMenuItem>
                             <FileText className="mr-2 h-4 w-4" />
                             <span>View Records</span>

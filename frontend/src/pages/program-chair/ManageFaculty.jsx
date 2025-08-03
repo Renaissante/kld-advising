@@ -6,6 +6,7 @@ import { Search, Trash2, BookOpen, Users, Calendar, MoreHorizontal, Loader2, Che
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { API_BASE_URL } from '@/config/api'; 
 import {
   Dialog,
   DialogContent,
@@ -97,7 +98,7 @@ export default function ManageFaculty() {
       
       try {
         // Fetch programs assigned to the current program chair
-        const programResponse = await fetch(`http://localhost/kld-advising/backend/api/program/read_by_program_chair.php?id=${user.id}`);
+        const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
         const programData = await programResponse.json();
         
         if (!programResponse.ok) {
@@ -128,7 +129,7 @@ export default function ManageFaculty() {
       setError(null)
       try {
         // Adjust the URL to your actual backend endpoint
-        const response = await fetch("http://localhost/kld-advising/backend/api/program_chair/read_assignment.php")
+        const response = await fetch(`${API_BASE_URL}/program_chair/read_assignment.php`)
         if (!response.ok) {
           // Try to get error message from response body
           let errorMsg = `HTTP error! status: ${response.status}`;
@@ -223,7 +224,7 @@ export default function ManageFaculty() {
       console.log("Saving course assignment:", completeAssignmentData);
       
       // Call the API to assign the course
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/assign_course.php', {
+      const response = await fetch(`${API_BASE_URL}/program_chair/assign_course.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -290,7 +291,7 @@ export default function ManageFaculty() {
       console.log("Saving advisor assignment:", completeAssignmentData);
       
       // Call the API to assign the advisor
-      const response = await fetch('http://localhost/kld-advising/backend/api/program_chair/assign_advisor.php', {
+      const response = await fetch(`${API_BASE_URL}/program_chair/assign_advisor.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -373,7 +374,7 @@ export default function ManageFaculty() {
       setLoadingSections(true);
       try {
         // URL for all sections - used when assigning courses
-        let url = `http://localhost/kld-advising/backend/api/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+        let url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
         
         console.log("API URL:", url);
         
@@ -427,7 +428,7 @@ export default function ManageFaculty() {
     const fetchCourses = async () => {
       setLoadingCourses(true);
       try {
-        const response = await fetch("http://localhost/kld-advising/backend/api/course/read.php");
+        const response = await fetch(`${API_BASE_URL}/course/read.php`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -450,7 +451,7 @@ export default function ManageFaculty() {
     const fetchCurriculum = async () => {
       setLoadingCurriculum(true);
       try {
-        const response = await fetch("http://localhost/kld-advising/backend/api/curriculum/read.php");
+        const response = await fetch(`${API_BASE_URL}/curriculum/read.php`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -499,7 +500,7 @@ export default function ManageFaculty() {
           setLoadingCoursesForSection(true);
           
           // Construct URL with all necessary parameters
-          const url = new URL("http://localhost/kld-advising/backend/api/program_chair/get_courses_for_section.php");
+          const url = new URL(`${API_BASE_URL}/program_chair/get_courses_for_section.php`);
           
           // Add query parameters
           url.searchParams.append('section_id', assignment.sectionId);
@@ -794,7 +795,7 @@ export default function ManageFaculty() {
         setLoadingUnassignedSections(true);
         try {
           // URL for sections without advisors
-          const url = `http://localhost/kld-advising/backend/api/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor`;
+          const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor`;
           
           console.log("Fetching sections without advisors:", url);
           

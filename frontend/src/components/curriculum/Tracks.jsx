@@ -23,7 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-
+import { API_BASE_URL } from '@/config/api';
 // --- Define AddTrackDialog Outside ---
 const AddTrackDialog = ({ open, onOpenChange, programs, onAddSubmit, setError }) => {
   const [formValues, setFormValues] = useState({
@@ -247,7 +247,7 @@ const Tracks = () => {
     try {
       setIsLoading(true);
       
-      const programResponse = await fetch(`http://localhost/kld-advising/backend/api/program/read_by_program_chair.php?id=${user.id}`);
+      const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
       const programData = await programResponse.json();
       
       if (programData.message) {
@@ -260,7 +260,7 @@ const Tracks = () => {
       
       const assignedProgramIds = programData.map(program => program.id);
       
-      const tracksResponse = await fetch('http://localhost/kld-advising/backend/api/tracks/read.php');
+      const tracksResponse = await fetch(`${API_BASE_URL}/tracks/read.php`);
       const tracksData = await tracksResponse.json();
       
       if (tracksData.success) {
@@ -290,7 +290,7 @@ const Tracks = () => {
   const fetchElectives = async (trackId) => {
     try {
       setIsElectivesLoading(true);
-      const response = await fetch(`http://localhost/kld-advising/backend/api/elective_courses/read.php?track_id=${trackId}`);
+      const response = await fetch(`${API_BASE_URL}/elective_courses/read.php?track_id=${trackId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -320,7 +320,7 @@ const Tracks = () => {
 
   const handleAddTrack = async (formValues) => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/tracks/create.php', {
+      const response = await fetch(`${API_BASE_URL}/tracks/create.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formValues)
@@ -339,7 +339,7 @@ const Tracks = () => {
 
   const handleDeleteTrack = async (trackId) => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/tracks/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/tracks/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -375,7 +375,7 @@ const Tracks = () => {
   const handleEditTrack = async (formValues) => {
     if (!editTrack) return;
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/tracks/update.php', {
+      const response = await fetch(`${API_BASE_URL}/tracks/update.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -438,7 +438,7 @@ const Tracks = () => {
 
   const handleAddElective = async (formValues) => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/elective_courses/create.php', {
+      const response = await fetch(`${API_BASE_URL}/elective_courses/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -540,7 +540,7 @@ const Tracks = () => {
     try {
       setShowDeleteElectiveDialog(false);
       
-      const response = await fetch('http://localhost/kld-advising/backend/api/elective_courses/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/elective_courses/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -619,7 +619,7 @@ const Tracks = () => {
     if (!electiveToEdit) return;
 
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/elective_courses/update.php', {
+      const response = await fetch(`${API_BASE_URL}/elective_courses/update.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

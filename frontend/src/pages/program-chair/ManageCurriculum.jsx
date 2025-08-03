@@ -14,7 +14,7 @@ import { Trash2, SquarePlus, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import Tracks from "@/components/curriculum/Tracks";
-
+import { API_BASE_URL } from '@/config/api';
 const ProgramChairManageCurriculum = () => {
   const { user } = useAuth();
   const [selectedCurriculum, setSelectedCurriculum] = useState(null);
@@ -86,7 +86,7 @@ const ProgramChairManageCurriculum = () => {
       
       console.log("Fetching courses for curriculum:", curriculumId);
       
-      const response = await fetch(`http://localhost/kld-advising/backend/api/curriculum/get_courses.php?curriculum_id=${curriculumId}`);
+      const response = await fetch(`${API_BASE_URL}/curriculum/get_courses.php?curriculum_id=${curriculumId}`);
       
       const responseText = await response.text();
       console.log("Raw response from get_courses:", responseText);
@@ -132,8 +132,8 @@ const ProgramChairManageCurriculum = () => {
     const isUpdate = courseData.hasOwnProperty('id') && courseData.id != null; 
     const action = isUpdate ? 'Updating' : 'Adding';
     const apiUrl = isUpdate 
-      ? 'http://localhost/kld-advising/backend/api/curriculum/update_course.php' 
-      : 'http://localhost/kld-advising/backend/api/curriculum/add_course.php';
+      ? `${API_BASE_URL}/curriculum/update_course.php` 
+      : `${API_BASE_URL}/curriculum/add_course.php`;
 
     // --- DUPLICATE CHECK ---
     const existingCourses = curriculumCourses[curriculumToUse] || [];
@@ -215,7 +215,7 @@ const ProgramChairManageCurriculum = () => {
   // Function to handle deleting a course from a curriculum
   const handleDeleteCourseFromCurriculum = async (curriculumId, courseId) => {
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/curriculum/delete_course.php', {
+      const response = await fetch(`${API_BASE_URL}/curriculum/delete_course.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -245,7 +245,7 @@ const ProgramChairManageCurriculum = () => {
     if (!curriculumToDelete) return;
     
     try {
-      const response = await fetch('http://localhost/kld-advising/backend/api/curriculum/delete.php', {
+      const response = await fetch(`${API_BASE_URL}/curriculum/delete.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -352,7 +352,7 @@ const ProgramChairManageCurriculum = () => {
       };
 
       // Send request to API
-      const response = await fetch('http://localhost/kld-advising/backend/api/curriculum/create.php', {
+      const response = await fetch(`${API_BASE_URL}/curriculum/create.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -384,7 +384,7 @@ const ProgramChairManageCurriculum = () => {
     const fetchData = async () => {
       try {
         // Fetch academic years
-        const academicYearResponse = await fetch('http://localhost/kld-advising/backend/api/academic_year/read.php');
+        const academicYearResponse = await fetch(`${API_BASE_URL}/academic_year/read.php`);
         const academicYearData = await academicYearResponse.json();
         
         if (academicYearResponse.ok) {
@@ -396,7 +396,7 @@ const ProgramChairManageCurriculum = () => {
         }
 
         // Fetch semesters
-        const semesterResponse = await fetch('http://localhost/kld-advising/backend/api/semester/read.php');
+        const semesterResponse = await fetch(`${API_BASE_URL}/semester/read.php`);
         const semesterData = await semesterResponse.json();
         
         if (semesterResponse.ok) {
@@ -406,7 +406,7 @@ const ProgramChairManageCurriculum = () => {
         }
 
         // Fetch year levels
-        const yearLevelResponse = await fetch('http://localhost/kld-advising/backend/api/year_level/read.php');
+        const yearLevelResponse = await fetch(`${API_BASE_URL}/year_level/read.php`);
         const yearLevelData = await yearLevelResponse.json();
         
         if (yearLevelResponse.ok) {
@@ -442,7 +442,7 @@ const ProgramChairManageCurriculum = () => {
       
       try {
         // Fetch programs assigned to the current program chair
-        const programResponse = await fetch(`http://localhost/kld-advising/backend/api/program/read_by_program_chair.php?id=${user.id}`);
+        const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
         const programData = await programResponse.json();
         
         if (!programResponse.ok) {
@@ -456,7 +456,7 @@ const ProgramChairManageCurriculum = () => {
         const assignedProgramIds = programData.map(program => program.id);
         
         // Fetch curriculums after programs are loaded
-        const curriculumResponse = await fetch('http://localhost/kld-advising/backend/api/curriculum/read.php');
+        const curriculumResponse = await fetch(`${API_BASE_URL}/curriculum/read.php`);
         
         // DEBUG: Log the raw response
         console.log("Curriculum Response:", await curriculumResponse.clone().text());
@@ -563,7 +563,7 @@ const ProgramChairManageCurriculum = () => {
       }
       const newStatus = curriculumToUpdate.status === "Active" ? "Inactive" : "Active";
 
-      const response = await fetch('http://localhost/kld-advising/backend/api/curriculum/update_status.php', { // Assuming update.php handles status update
+      const response = await fetch(`${API_BASE_URL}/curriculum/update_status.php`, { // Assuming update.php handles status update
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

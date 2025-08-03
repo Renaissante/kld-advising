@@ -3,7 +3,7 @@ header("Content-Type: application/json");
 
 // Require your database connection file
 require_once "../../config/database.php";
-
+include_once '../../config/cors.php';
 // Enable error reporting
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -98,18 +98,19 @@ if ($dbRole === "admin") {
     $params[] = $dbRole;
 } elseif ($dbRole === "student") {
     $baseQuery = "
-    SELECT u.id AS user_id, s.student_id, u.email, u.role, s.name, 
-           p.name AS program, 
-           d.name AS department, 
-           sec.name AS section, 
+    SELECT u.id AS user_id, s.student_id, u.email, u.role, s.name,
+           p.name AS program,
+           d.name AS department,
+           sec.name AS section,
            e.name AS advisor
     FROM users u
     JOIN students s ON u.id = s.student_id
     JOIN programs p ON s.program_id = p.id
     JOIN departments d ON s.department_id = d.id
     JOIN sections sec ON s.section_id = sec.id
-    LEFT JOIN faculty f ON sec.advisor_id = f.employee_id  -- Fetch advisor from section
-    LEFT JOIN employees e ON f.employee_id = e.employee_id  -- Get advisor's name
+    LEFT JOIN section_advisors sa ON sec.id = sa.section_id  -- Join through the linking table
+    LEFT JOIN faculty f ON sa.advisor_id = f.employee_id    -- Join linking table to faculty
+    LEFT JOIN employees e ON f.employee_id = e.employee_id    -- Join faculty to employees for name
     WHERE u.role = ?";
 
 $countQuery = "
@@ -119,10 +120,10 @@ $countQuery = "
     JOIN programs p ON s.program_id = p.id
     JOIN departments d ON s.department_id = d.id
     JOIN sections sec ON s.section_id = sec.id
-    LEFT JOIN faculty f ON sec.advisor_id = f.employee_id  -- Fetch advisor from section
+    LEFT JOIN section_advisors sa ON sec.id = sa.section_id  -- Join through the linking table
+    LEFT JOIN faculty f ON sa.advisor_id = f.employee_id    -- Join linking table to faculty
     LEFT JOIN employees e ON f.employee_id = e.employee_id
     WHERE u.role = ?";
-
 
     $params[] = $dbRole;
 

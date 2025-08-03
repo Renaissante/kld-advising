@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActive } from "@/contexts/ActiveContext";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
+import { API_BASE_URL } from '@/config/api'; 
 const AdvisingPage = () => {
   const { user } = useAuth();
   const { activeAcademicYear, activeSemester, loading: activeLoading } = useActive();
@@ -36,131 +36,6 @@ const AdvisingPage = () => {
   const [students, setStudents] = useState([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [studentsError, setStudentsError] = useState(null);
-  
-  const previousGradesData = {
-    "2022-0001": [
-      { courseCode: "GEC4000", courseTitle: "Purposive Communications", grade: "1.50", units: 3 },
-      { courseCode: "GEC8000", courseTitle: "Science, Technology, and Society", grade: "2.00", units: 3 },
-      { courseCode: "GEE1000", courseTitle: "Living in the IT Era", grade: "5.00", units: 3 },
-      { courseCode: "NSTP1101", courseTitle: "National Service Training Program", grade: "1.25", units: 3 },
-      { courseCode: "PE1101", courseTitle: "PATHFIT 1", grade: "1.00", units: 2 },
-      { courseCode: "CCIS1101", courseTitle: "Introduction to Computing", grade: "1.75", units: 3 },
-      { courseCode: "CCIS1102", courseTitle: "Computer Programming 1", grade: "5.00", units: 3 },
-    ],
-    "2022-0002": [
-      { courseCode: "GEC4000", courseTitle: "Purposive Communications", grade: "1.25", units: 3 },
-      { courseCode: "GEC8000", courseTitle: "Science, Technology, and Society", grade: "1.50", units: 3 },
-      { courseCode: "GEE1000", courseTitle: "Living in the IT Era", grade: "1.75", units: 3 },
-      { courseCode: "NSTP1101", courseTitle: "National Service Training Program", grade: "1.00", units: 3 },
-      { courseCode: "PE1101", courseTitle: "PATHFIT 1", grade: "1.25", units: 2 },
-      { courseCode: "CCIS1101", courseTitle: "Introduction to Computing", grade: "1.50", units: 3 },
-      { courseCode: "CCIS1102", courseTitle: "Computer Programming 1", grade: "1.75", units: 3 },
-    ],
-    "2022-0003": [
-      { courseCode: "GEC4000", courseTitle: "Purposive Communications", grade: "2.00", units: 3 },
-      { courseCode: "GEC8000", courseTitle: "Science, Technology, and Society", grade: "2.25", units: 3 },
-      { courseCode: "GEE1000", courseTitle: "Living in the IT Era", grade: "1.75", units: 3 },
-      { courseCode: "NSTP1101", courseTitle: "National Service Training Program", grade: "1.50", units: 3 },
-      { courseCode: "PE1101", courseTitle: "PATHFIT 1", grade: "1.75", units: 2 },
-      { courseCode: "CCIS1101", courseTitle: "Introduction to Computing", grade: "2.00", units: 3 },
-      { courseCode: "CCIS1102", courseTitle: "Computer Programming 1", grade: "2.25", units: 3 },
-    ],
-    "2022-0004": [
-      { courseCode: "GEC4000", courseTitle: "Purposive Communications", grade: "1.00", units: 3 },
-      { courseCode: "GEC8000", courseTitle: "Science, Technology, and Society", grade: "1.25", units: 3 },
-      { courseCode: "GEE1000", courseTitle: "Living in the IT Era", grade: "1.50", units: 3 },
-      { courseCode: "NSTP1101", courseTitle: "National Service Training Program", grade: "1.00", units: 3 },
-      { courseCode: "PE1101", courseTitle: "PATHFIT 1", grade: "1.00", units: 2 },
-      { courseCode: "CCIS1101", courseTitle: "Introduction to Computing", grade: "1.25", units: 3 },
-      { courseCode: "CCIS1102", courseTitle: "Computer Programming 1", grade: "1.50", units: 3 },
-    ],
-    "2022-0005": [
-      { courseCode: "GEC4000", courseTitle: "Purposive Communications", grade: "2.25", units: 3 },
-      { courseCode: "GEC8000", courseTitle: "Science, Technology, and Society", grade: "2.50", units: 3 },
-      { courseCode: "GEE1000", courseTitle: "Living in the IT Era", grade: "2.00", units: 3 },
-      { courseCode: "NSTP1101", courseTitle: "National Service Training Program", grade: "1.75", units: 3 },
-      { courseCode: "PE1101", courseTitle: "PATHFIT 1", grade: "2.00", units: 2 },
-      { courseCode: "CCIS1101", courseTitle: "Introduction to Computing", grade: "2.25", units: 3 },
-      { courseCode: "CCIS1102", courseTitle: "Computer Programming 1", grade: "2.50", units: 3 },
-    ],
-  }
-  
-  const eligibleCoursesData = {
-    "2022-0001": [
-      { id: "course1", code: "CCIS1103", title: "Computer Programming 2", units: 3, prerequisite: "CCIS1102" },
-      { id: "course2", code: "CCIS1104", title: "Data Structures and Algorithms", units: 3, prerequisite: "CCIS1102" },
-      { id: "course3", code: "CCIS1105", title: "Discrete Structures", units: 3, prerequisite: "None" },
-      { id: "course4", code: "GEC1000", title: "Understanding the Self", units: 3, prerequisite: "None" },
-      { id: "course5", code: "GEC2000", title: "Readings in Philippine History", units: 3, prerequisite: "None" },
-      { id: "course6", code: "PE1102", title: "PATHFIT 2", units: 2, prerequisite: "PE1101" },
-      {
-        id: "course7",
-        code: "NSTP1102",
-        title: "National Service Training Program 2",
-        units: 3,
-        prerequisite: "NSTP1101",
-      },
-    ],
-    "2022-0002": [
-      { id: "course1", code: "CCIS1103", title: "Computer Programming 2", units: 3, prerequisite: "CCIS1102" },
-      { id: "course2", code: "CCIS1104", title: "Data Structures and Algorithms", units: 3, prerequisite: "CCIS1102" },
-      { id: "course3", code: "CCIS1105", title: "Discrete Structures", units: 3, prerequisite: "None" },
-      { id: "course4", code: "GEC1000", title: "Understanding the Self", units: 3, prerequisite: "None" },
-      { id: "course5", code: "GEC2000", title: "Readings in Philippine History", units: 3, prerequisite: "None" },
-      { id: "course6", code: "PE1102", title: "PATHFIT 2", units: 2, prerequisite: "PE1101" },
-      {
-        id: "course7",
-        code: "NSTP1102",
-        title: "National Service Training Program 2",
-        units: 3,
-        prerequisite: "NSTP1101",
-      },
-    ],
-    "2022-0003": [
-      { id: "course1", code: "CCIS1103", title: "Computer Programming 2", units: 3, prerequisite: "CCIS1102" },
-      { id: "course2", code: "CCIS1104", title: "Data Structures and Algorithms", units: 3, prerequisite: "CCIS1102" },
-      { id: "course3", code: "CCIS1105", title: "Discrete Structures", units: 3, prerequisite: "None" },
-      { id: "course4", code: "GEC1000", title: "Understanding the Self", units: 3, prerequisite: "None" },
-      { id: "course5", code: "GEC2000", title: "Readings in Philippine History", units: 3, prerequisite: "None" },
-      { id: "course6", code: "PE1102", title: "PATHFIT 2", units: 2, prerequisite: "PE1101" },
-      {
-        id: "course7",
-        code: "NSTP1102",
-        title: "National Service Training Program 2",
-        units: 3,
-        prerequisite: "NSTP1101",
-      },
-    ],
-    "2022-0004": [
-      { id: "course1", code: "CCIS1103", title: "Computer Programming 2", units: 3, prerequisite: "CCIS1102" },
-      { id: "course2", code: "CCIS1104", title: "Data Structures and Algorithms", units: 3, prerequisite: "CCIS1102" },
-      { id: "course3", code: "CCIS1105", title: "Discrete Structures", units: 3, prerequisite: "None" },
-      { id: "course4", code: "GEC1000", title: "Understanding the Self", units: 3, prerequisite: "None" },
-      { id: "course5", code: "GEC2000", title: "Readings in Philippine History", units: 3, prerequisite: "None" },
-      { id: "course6", code: "PE1102", title: "PATHFIT 2", units: 2, prerequisite: "PE1101" },
-      {
-        id: "course7",
-        code: "NSTP1102",
-        title: "National Service Training Program 2",
-        units: 3,
-        prerequisite: "NSTP1101",
-      },
-    ],
-    "2022-0005": [
-      { id: "course1", code: "CCIS1103", title: "Computer Programming 2", units: 3, prerequisite: "CCIS1102" },
-      { id: "course3", code: "CCIS1105", title: "Discrete Structures", units: 3, prerequisite: "None" },
-      { id: "course4", code: "GEC1000", title: "Understanding the Self", units: 3, prerequisite: "None" },
-      { id: "course5", code: "GEC2000", title: "Readings in Philippine History", units: 3, prerequisite: "None" },
-      { id: "course6", code: "PE1102", title: "PATHFIT 2", units: 2, prerequisite: "PE1101" },
-      {
-        id: "course7",
-        code: "NSTP1102",
-        title: "National Service Training Program 2",
-        units: 3,
-        prerequisite: "NSTP1101",
-      },
-    ],
-  }
 
   useEffect(() => {
     if (!user?.id) {
@@ -178,7 +53,7 @@ const AdvisingPage = () => {
       setAcademicYears([]);
       setSemesters([]);
       try {
-        const apiUrl = `http://localhost/kld-advising/backend/api/faculty/get_sections.php?faculty_id=${user.id}`;
+        const apiUrl = `${API_BASE_URL}/faculty/get_sections.php?faculty_id=${user.id}`;
         const response = await fetch(apiUrl);
 
         if (!response.ok) {
@@ -240,7 +115,7 @@ const AdvisingPage = () => {
       setIsLoadingStudents(true);
       setStudentsError(null);
       try {
-        const apiUrl = `http://localhost/kld-advising/backend/api/faculty/get_students_by_section.php?section_id=${selectedSection.id}&faculty_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+        const apiUrl = `${API_BASE_URL}/faculty/get_students_by_section.php?section_id=${selectedSection.id}&faculty_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
 
         console.log("Fetching students from:", apiUrl);
         const response = await fetch(apiUrl);
@@ -291,6 +166,16 @@ const AdvisingPage = () => {
     }
 
   }, [selectedSection, user, activeAcademicYear, activeSemester, activeLoading]);
+
+  // Modified function to update student status AND units after advising
+  const handleAdvisingComplete = (studentId, advisedUnits) => {
+    setStudents(prevStudents =>
+      prevStudents.map(student =>
+        student.id === studentId ? { ...student, advising_status: "Done", units: advisedUnits } : student
+      )
+    );
+  };
+
 
   const hasAvailableSections = useMemo(() => {
     if (!allSections || allSections.length === 0) {
@@ -363,9 +248,6 @@ const AdvisingPage = () => {
     setStudents([]);
     setStudentsError(null);
   };
-
-  const studentSpecificPreviousGrades = selectedStudent ? previousGradesData[selectedStudent.id] || [] : [];
-  const studentSpecificEligibleCourses = selectedStudent ? eligibleCoursesData[selectedStudent.id] || [] : [];
 
   const isLoading = isLoadingSections || activeLoading;
 
@@ -452,6 +334,7 @@ const AdvisingPage = () => {
                         students={students}
                 onAdviseStudent={handleAdviseStudent}
                 sectionName={selectedSection.name || ""}
+                activeTab={activeTab}
               />
                 )
             )}
@@ -465,8 +348,9 @@ const AdvisingPage = () => {
               isOpen={isAdvisingModalOpen}
               onClose={handleCloseModal}
               student={selectedStudent}
-              previousGradesData={studentSpecificPreviousGrades}
-              eligibleCoursesData={studentSpecificEligibleCourses}
+              activeAcademicYear={activeAcademicYear}
+              activeSemester={activeSemester}
+              onAdvisingComplete={handleAdvisingComplete}
             />
           </div>
         </div>

@@ -1,6 +1,6 @@
 <?php
 // Include CORS headers
-include_once '../../config/cors.php'; // Use cors.php from config
+include_once '../../config/cors.php';
 
 // Set headers for content type
 header("Content-Type: application/json; charset=UTF-8"); // Standard content type
@@ -115,17 +115,36 @@ if ($active_sem_id === false || $active_sem_id <= 0) {
 try {
     error_log("Fetching students for section $section_id, AY ID: $active_ay_id, Sem ID: $active_sem_id requested by faculty $faculty_id.");
 
-    // --- Fetch Students and Units of Courses Assigned to the Section ---
+    // --- Fetch Students, Units, and Advising Status ---
+    // NOTE: This query assumes you have a table named 'advised_courses'
+    // with columns 'student_id', 'academic_year_id', and 'semester_id'
+    // that records completed advising sessions.
+    // You may need to adjust the table name and column names based on your actual database schema.
     $sql = "SELECT
                 s.student_id AS id,
                 s.name,
                 s.status,
-                -- Subquery to calculate total units of courses ACTUALLY assigned to this section
+                -- Subquery to calculate total units of courses ACTUALLY advised for this student
                 (SELECT COALESCE(SUM(c.unit_lec + c.unit_lab), 0)
-                 FROM section_faculty sf
-                 JOIN courses c ON sf.course_id = c.id
-                 WHERE sf.section_id = s.section_id -- Match the student's section_id
-                ) AS units
+                 FROM advised_courses ac
+                 JOIN courses c ON ac.course_id = c.id
+                 WHERE ac.student_id = s.student_id
+                   AND ac.academic_year_id = :active_ay_id
+                   AND ac.semester_id = :active_sem_id
+                ) AS units,
+                -- Determine advising status
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM advised_courses ac
+                        WHERE ac.student_id = s.student_id
+                        AND ac.academic_year_id = :active_ay_id
+                        AND ac.semester_id = :active_sem_id
+                        -- Add any other conditions to determine 'Done' status, e.g., a 'status' column in advised_courses
+                        -- AND ac.status = 'Completed'
+                    ) THEN 'Done'
+                    ELSE 'Pending'
+                END AS advising_status
             FROM
                 students s
             WHERE
@@ -139,8 +158,11 @@ try {
         throw new PDOException("Failed to prepare student query: " . implode(" - ", $conn->errorInfo()));
     }
 
-    // Bind the section_id parameter
+    // Bind parameters
     $stmt->bindParam(':section_id', $section_id, PDO::PARAM_INT);
+    $stmt->bindParam(':active_ay_id', $active_ay_id, PDO::PARAM_INT); // Bind AY ID for advising status check AND units calculation
+    $stmt->bindParam(':active_sem_id', $active_sem_id, PDO::PARAM_INT); // Bind Semester ID for advising status check AND units calculation
+
 
     // Execute query
     $stmt->execute();
@@ -148,22 +170,22 @@ try {
     // Fetch all results
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $num = count($students);
-    // --- End Fetch Students and Units ---
+    // --- End Fetch Students, Units, and Advising Status ---
 
 
     // --- Send Response ---
     http_response_code(200); // OK
-    // Add GPA placeholder to each student object
-    $students_with_gpa = array_map(function($student) {
-        $student['gpa'] = null; // Add the GPA placeholder
+    // Modify student objects to ensure units is an integer and advising_status is included
+    $students_data = array_map(function($student) {
         $student['units'] = (int)$student['units']; // Ensure units is an integer
+        // advising_status is already included by the SQL query
         return $student;
     }, $students);
 
     echo json_encode(array(
         "success" => true,
         "count" => $num,
-        "data" => $students_with_gpa, // Send the modified array
+        "data" => $students_data, // Send the modified array
         "message" => ($num > 0) ? "Students retrieved successfully." : "No students found in this section."
     ));
     // --- End Send Response ---

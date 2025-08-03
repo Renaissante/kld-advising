@@ -1,6 +1,7 @@
 <?php
 // Set header to return JSON response
 header('Content-Type: application/json');
+include_once '../../config/cors.php';
 
 // Include database connection
 require_once '../db_connection.php'; // Adjust path as needed

@@ -1,5 +1,5 @@
 "use client"
-
+import { API_BASE_URL } from '@/config/api';
 import { useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -17,7 +17,8 @@ import {
   ListPlus,
   LogOut,
   Search,
-  NotebookPen
+  NotebookPen,
+  Archive
 } from "lucide-react"
 import {
   Sidebar,
@@ -59,7 +60,7 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("http://localhost/kld-advising/backend/api/auth/logout.php", {
+      const response = await fetch(`${API_BASE_URL}/auth/logout.php`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -99,6 +100,7 @@ export function AppSidebar() {
     { title: "Grades", url: "/faculty/grades", icon: BookA, roles: ["faculty"] },
     { title: "Advise", url: "/faculty/advise", icon: NotebookPen, roles: ["faculty"] },
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
+    { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
     { title: "Manage Faculty", url: "/program-chair/manage-faculty", icon: ListPlus, roles: ["programchair"] },
     { title: "Calendar", url: "", icon: Calendar, roles: ["admin", "faculty", "student", "dean", "programchair"] },
