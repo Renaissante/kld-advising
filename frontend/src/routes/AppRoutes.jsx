@@ -15,6 +15,7 @@ import ManageCurriculum from "@/pages/admin/ManageCurriculum";
 import StudentCurriculum from "@/pages/student/StudentCurriculum";
 import ManageFaculty from "@/pages/program-chair/ManageFaculty";
 import FacultyAssignment from "@/pages/program-chair/FacultyAssignment";
+import ManageSections from "@/pages/program-chair/ManageSections";
 import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 
 export default function AppRoutes() {
@@ -145,6 +146,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute role="programchair">
             <FacultyAssignment />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/program-chair/manage-sections"
+        element={
+          <ProtectedRoute role="programchair">
+            <ManageSections />
           </ProtectedRoute>
         }
       />

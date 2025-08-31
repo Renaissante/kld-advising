@@ -203,7 +203,7 @@ export default function FacultyAssignment() {
       console.log("Fetching sections for AY:", activeAcademicYear.id, "Sem:", activeSemester.id, "Programs:", assignedProgramIds);
       setLoadingSections(true);
       try {
-        const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+        const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&status=active`;
         const response = await fetch(url);
         if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
         const data = await response.json();
@@ -716,7 +716,7 @@ export default function FacultyAssignment() {
         setLoadingUnassignedSections(true);
         try {
           // URL for sections without advisors, filtered by AY and Sem
-          const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor`;
+          const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor&status=active`;
 
           console.log("Fetching sections without advisors for dialog:", url);
 

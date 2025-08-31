@@ -103,6 +103,7 @@ export function AppSidebar() {
     { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
     { title: "Manage Faculty", url: "/program-chair/manage-faculty", icon: ListPlus, roles: ["programchair"] },
+    { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
     { title: "Calendar", url: "", icon: Calendar, roles: ["admin", "faculty", "student", "dean", "programchair"] },
   ];
 

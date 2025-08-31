@@ -7,13 +7,11 @@ if (!isset($conn)) {
     die("Database connection failed.");
 }
 
-// header("Access-Control-Allow-Origin: *");
-// header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-// header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
 
 try {
 
-    $query = "SELECT id, name, program_id, year_level_id FROM sections";
+    $query = "SELECT id, name, program_id, year_level_id, academic_year_id, semester_id FROM sections";
     $stmt = $conn->prepare($query);
     $stmt->execute();
     

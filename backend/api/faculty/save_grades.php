@@ -258,34 +258,25 @@ try {
 
         // --- WebSocket Notification for Advisor ---
         $advisorEmployeeId = null;
-        // Query to get the advisor ID for the section
-        // Assuming 'sections' table has an 'advisor_employee_id' column
-        // Corrected query to use section_id column
+      
         $sqlGetAdvisor = "SELECT advisor_id FROM section_advisors WHERE section_id = :section_id LIMIT 1";
         $stmtGetAdvisor = $conn->prepare($sqlGetAdvisor);
         $stmtGetAdvisor->bindParam(':section_id', $sectionId, PDO::PARAM_INT);
         $stmtGetAdvisor->execute();
         $advisorRow = $stmtGetAdvisor->fetch(PDO::FETCH_ASSOC);
 
-        // Log to PHP error log
-        // error_log("PHP Log: Checking advisor query result...");
-        // error_log("PHP Log: Advisor row fetched: " . json_encode($advisorRow));
-
+        
 
         if ($advisorRow && !empty($advisorRow['advisor_id'])) {
             $advisorEmployeeId = $advisorRow['advisor_id'];
-            // Log to PHP error log
-            // error_log("PHP Log: Advisor Employee ID found: " . $advisorEmployeeId);
-
+            
 
             require dirname(__DIR__, 3) . '/vendor/autoload.php'; 
 
             try {
                 $client = new WebSocket\Client("ws://192.168.18.6:8080");
 
-                // Get course name and section name for the message
-                // Join with courses and sections tables to get names
-                // Corrected: Changed c.course_name to c.title AS course_name
+              
                 $sqlDetails = "SELECT c.course_code, c.course_title AS course_name, s.name as section_name
                                FROM section_faculty sf
                                JOIN courses c ON sf.course_id = c.id

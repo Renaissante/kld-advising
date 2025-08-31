@@ -22,6 +22,8 @@ import {
 import { PlusSquare } from "lucide-react";
 import eventService from "@/services/eventService";
 import { API_BASE_URL } from '@/config/api';
+import { useActive } from "@/contexts/ActiveContext";
+
 export function CreateAccountModal({onAccountCreated}) {
 
   const [departments, setDepartments] = useState([]);
@@ -49,6 +51,8 @@ export function CreateAccountModal({onAccountCreated}) {
   const [entryYear, setEntryYear] = useState("");
 
   const [entryYearName, setEntryYearName] = useState("");
+
+  const { activeAcademicYear, activeSemester } = useActive();
 
   const selectedDepartment = departments.find((dept) => dept.name === department);
   const departmentId = selectedDepartment ? selectedDepartment.id : null;
@@ -622,9 +626,19 @@ export function CreateAccountModal({onAccountCreated}) {
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
                     <SelectContent>
-                      {programId && yearLevelId ? (
+                      {console.log('Program ID:', programId, 'Year Level ID:', yearLevelId, 'Active Academic Year:', activeAcademicYear, 'Active Semester:', activeSemester)}
+                      {console.log('All Sections:', sections)}
+                      {programId && yearLevelId && activeAcademicYear && activeSemester ? (
                         sections
-                          .filter((sec) => sec.program_id === programId && sec.year_level_id === yearLevelId)
+                          .filter((sec) => {
+                            console.log('Filtering section:', sec.name, 'Program ID Match:', sec.program_id === programId, 'Year Level ID Match:', sec.year_level_id === yearLevelId, 'Academic Year ID Match:', sec.academic_year_id === activeAcademicYear.id, 'Semester ID Match:', sec.semester_id === activeSemester.id);
+                            return (
+                              sec.program_id === programId && 
+                              sec.year_level_id === yearLevelId &&
+                              sec.academic_year_id === activeAcademicYear.id &&
+                              sec.semester_id === activeSemester.id
+                            );
+                          })
                           .map((sec) => (
                             <SelectItem key={sec.id} value={sec.name}>
                               {sec.name}
