@@ -8,6 +8,7 @@ header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once '../../config/database.php';
+include_once '../audit/log_activity.php';
 
 $data = json_decode(file_get_contents("php://input"));
 
@@ -17,7 +18,8 @@ if (!isset($data->name) || empty($data->name) ||
     !isset($data->program_id) || empty($data->program_id) ||
     !isset($data->year_level_id) || empty($data->year_level_id) ||
     !isset($data->academic_year_id) || empty($data->academic_year_id) ||
-    !isset($data->semester_id) || empty($data->semester_id)) {
+    !isset($data->semester_id) || empty($data->semester_id) ||
+    !isset($data->user_id) || empty($data->user_id)) {
     http_response_code(400);
     echo json_encode(array("message" => "Incomplete or invalid data provided."));
     exit();
@@ -69,6 +71,14 @@ try {
     $stmt->bindParam(':semester_id', $semester_id);
 
     if ($stmt->execute()) {
+        $sectionId = $conn->lastInsertId(); // Get the ID of the newly created section
+        
+        // Get user ID from request data
+        $userId = $data->user_id;
+        $ipAddress = $_SERVER['REMOTE_ADDR']; // Get the client's IP address
+
+        logActivity($userId, 'create_section', "Created section: {$name}", 'Section', $sectionId, null, null, $ipAddress);
+
         http_response_code(201); // Created
         echo json_encode(array("message" => "Section created successfully."));
     } else {

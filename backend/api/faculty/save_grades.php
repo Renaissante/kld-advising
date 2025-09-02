@@ -1,7 +1,7 @@
 <?php
 // Include CORS headers
 include_once '../../config/cors.php';
-
+require_once "../audit/log_activity.php";
 // Set headers for content type
 header("Content-Type: application/json; charset=UTF-8");
 

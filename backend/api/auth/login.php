@@ -3,6 +3,7 @@
 session_start();
 require_once "../../config/database.php";
 include_once '../../config/cors.php';
+require_once "../audit/log_activity.php";
 
 // header("Access-Control-Allow-Origin: *");
 // header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
@@ -35,7 +36,9 @@ try {
     if ($user && $password === $user['password_hash']) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['role'] = $user['role'];
-
+        // Log successful login
+        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+        logActivity($user['id'], 'login', 'User logged in successfully', 'user', $user['id'], null, null, $ipAddress);
         echo json_encode([
             "success" => true,
             "id" => $user['id'],
@@ -45,12 +48,15 @@ try {
             "student_id" => $user['student_id'] // ✅ Include student_id
         ]);
     } else {
+        
         if (!$user) {
+          
             echo json_encode([
                 "success" => false,
                 "error" => "User not found"
             ]);
         } else {
+         
             echo json_encode([
                 "success" => false,
                 "error" => "Invalid password"

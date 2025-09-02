@@ -1,7 +1,8 @@
 <?php
 session_start();
 include_once '../../config/cors.php';
-
+require_once "../../config/database.php";
+require_once "../audit/log_activity.php";
 // Clear previous output to prevent header issues
 if (ob_get_length()) ob_end_clean();
 
@@ -18,6 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+$ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+$userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+if ($userId) {
+    logActivity($userId, 'logout', 'User logged out successfully', 'user', $userId, null, null, $ipAddress);
+}
 // Destroy the session
 $_SESSION = [];
 session_destroy();

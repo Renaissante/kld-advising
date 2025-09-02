@@ -8,6 +8,7 @@ header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once '../../config/database.php';
+include_once '../audit/log_activity.php';
 
 $data = json_decode(file_get_contents("php://input"));
 
@@ -16,7 +17,8 @@ if (!isset($data->id) || empty($data->id) ||
     !isset($data->name) || empty($data->name) ||
     !isset($data->capacity) || !is_numeric($data->capacity) ||
     !isset($data->program_id) || empty($data->program_id) ||
-    !isset($data->year_level_id) || empty($data->year_level_id)) {
+    !isset($data->year_level_id) || empty($data->year_level_id) ||
+    !isset($data->user_id) || empty($data->user_id)) {
     http_response_code(400);
     echo json_encode(array("message" => "Incomplete or invalid data provided."));
     exit();
@@ -27,8 +29,28 @@ $name = $data->name;
 $capacity = $data->capacity;
 $program_id = $data->program_id;
 $year_level_id = $data->year_level_id;
+$user_id = $data->user_id;
 
 try {
+    // Fetch old section details for auditing
+    $get_old_details_query = "SELECT name, capacity, program_id, year_level_id FROM sections WHERE id = :id LIMIT 1";
+    $get_old_details_stmt = $conn->prepare($get_old_details_query);
+    $get_old_details_stmt->bindParam(':id', $id);
+    $get_old_details_stmt->execute();
+    $old_section_details = $get_old_details_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$old_section_details) {
+        http_response_code(404);
+        echo json_encode(array("message" => "Section not found."));
+        exit();
+    }
+
+    // Store old values
+    $old_name = $old_section_details['name'];
+    $old_capacity = $old_section_details['capacity'];
+    $old_program_id = $old_section_details['program_id'];
+    $old_year_level_id = $old_section_details['year_level_id'];
+
     // Check for duplicate active section name for the same academic context, excluding the current section being updated
     $check_query = "SELECT id FROM sections 
                     WHERE name = :name 
@@ -84,6 +106,22 @@ try {
 
     if ($stmt->execute()) {
         if ($stmt->rowCount() > 0) {
+            $ipAddress = $_SERVER['REMOTE_ADDR'];
+
+            // Log changes for each field
+            if ($old_name !== $name) {
+                logActivity($user_id, 'update_section', "Updated section name from '{$old_name}' to '{$name}'", 'Section', $id, $old_name, $name, $ipAddress);
+            }
+            if ((int)$old_capacity !== (int)$capacity) {
+                logActivity($user_id, 'update_section', "Updated section capacity from {$old_capacity} to {$capacity}", 'Section', $id, (string)$old_capacity, (string)$capacity, $ipAddress);
+            }
+            if ((int)$old_program_id !== (int)$program_id) {
+                logActivity($user_id, 'update_section', "Updated section program ID from '{$old_program_id}' to '{$program_id}'", 'Section', $id, (string)$old_program_id, (string)$program_id, $ipAddress);
+            }
+            if ((int)$old_year_level_id !== (int)$year_level_id) {
+                logActivity($user_id, 'update_section', "Updated section year level ID from '{$old_year_level_id}' to '{$year_level_id}'", 'Section', $id, (string)$old_year_level_id, (string)$year_level_id, $ipAddress);
+            }
+
             http_response_code(200);
             echo json_encode(array("message" => "Section updated successfully."));
         } else {

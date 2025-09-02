@@ -263,6 +263,7 @@ export default function ManageSections() {
           year_level_id: newSection.yearLevel,
           academic_year_id: activeAcademicYear.id,
           semester_id: activeSemester.id,
+          user_id: user.id, // Include the user ID
         }),
       });
 
@@ -328,7 +329,7 @@ export default function ManageSections() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ section_id: sectionId }),
+        body: JSON.stringify({ section_id: sectionId, user_id: user.id }),
       });
 
       const data = await response.json();
@@ -363,7 +364,7 @@ export default function ManageSections() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ section_id: sectionId, status: newStatus }),
+        body: JSON.stringify({ section_id: sectionId, status: newStatus, user_id: user.id }),
       });
 
       if (!response.ok) {
@@ -414,6 +415,7 @@ export default function ManageSections() {
           capacity: editedSection.capacity,
           program_id: editedSection.program,
           year_level_id: editedSection.yearLevel,
+          user_id: user.id, // Include the user ID
         }),
       });
 

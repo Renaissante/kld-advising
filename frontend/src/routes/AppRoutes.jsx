@@ -3,6 +3,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import LoginPage from "@/pages/auth/LoginPage";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import ManageUsers from "@/pages/admin/ManageUsers";
+import AuditTrail from "@/pages/admin/AuditTrail";
 import StudentHome from "@/pages/student/StudentHome";
 import FacultyHome from "@/pages/faculty/FacultyHome";
 import AdvisingPage from "@/pages/faculty/AdvisingPage";
@@ -57,6 +58,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute role="admin">
             <ManageCurriculum />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/audit-trail"
+        element={
+          <ProtectedRoute role="admin">
+            <AuditTrail />
           </ProtectedRoute>
         }
       />
