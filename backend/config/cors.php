@@ -2,7 +2,7 @@
 // Define your list of allowed origins
 $allowed_origins = [
     "http://localhost:5173", // For local development on the server machine
-    "http://10.31.4.173:5173" // For accessing from other devices on the local network
+    "http://192.168.18.6:5173" // For accessing from other devices on the local network
  
 ];
 

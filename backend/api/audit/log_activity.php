@@ -38,7 +38,7 @@ function logActivity($userId, $action, $description, $entityType, $entityId = nu
         // Attempt to send notification via WebSocket
         try {
             require dirname(__DIR__, 3) . '/vendor/autoload.php';
-            $client = new WebSocket\Client("ws://10.31.4.173:8080");
+            $client = new WebSocket\Client("ws://192.168.18.6:8080");
 
             $auditData = [
                 'user_id' => $userId,
