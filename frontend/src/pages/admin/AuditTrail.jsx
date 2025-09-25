@@ -66,7 +66,7 @@ const AuditTrail = () => {
 
     useEffect(() => {
         // Establish WebSocket connection
-        wsRef.current = new WebSocket('ws://192.168.18.6:8080');
+        wsRef.current = new WebSocket('ws://10.31.4.173:8080');
 
         wsRef.current.onopen = () => {
             console.log('WebSocket Connected');

@@ -1,119 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import { Table, TableHead, TableRow, TableHeader, TableCell, TableBody, TableFooter } from "@/components/ui/table";
-import { Card, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Calendar, FileText, Download, Eye, X } from "lucide-react"
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/App-sidebar';
 import Header from '@/components/layout/Header';
+import StudentAdvisingForms from './StudentAdvisingForms';
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { useAuth } from '@/hooks/useAuth';
+import { API_BASE_URL } from '@/config/api';
 import { Skeleton } from "@/components/ui/skeleton"; 
 
-const StudentAdvisingRecords = () => {
-  // Dummy data for advising records - replace with actual fetched data
-  const [advisingRecords, setAdvisingRecords] = useState([
-    {
-      id: 1,
-      courseCode: "CS101",
-      courseTitle: "Introduction to CS",
-      grade: "1.75",
-      prerequisite: "PCIS101",
-      courseCodeAndTitle: "CS101 - Intro to Computing",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 2,
-      courseCode: "MATH201",
-      courseTitle: "Calculus I",
-      grade: "2.00",
-      prerequisite: "MATH100",
-      courseCodeAndTitle: "MATH201 - Calculus I",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 3,
-      courseCode: "PHY101",
-      courseTitle: "Physics I",
-      grade: "1.50",
-      prerequisite: "MATH101",
-      courseCodeAndTitle: "PHY101 - General Physics",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 4,
-      courseCode: "ENG101",
-      courseTitle: "English Comp.",
-      grade: "1.25",
-      prerequisite: "",
-      courseCodeAndTitle: "ENG101 - English Composition",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 5,
-      courseCode: "FIL101",
-      courseTitle: "Filipino",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "FIL101 - Komunikasyon",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 6,
-      courseCode: "PE1",
-      courseTitle: "Physical Ed. 1",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "PE1 - Physical Education 1",
-      units: "2",
-      adviserSignature: ""
-    },
-    {
-      id: 7,
-      courseCode: "NSTP1",
-      courseTitle: "NSTP 1",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "NSTP1 - National Service",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 8,
-      courseCode: "NSTP1",
-      courseTitle: "NSTP 1",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "NSTP1 - National Service",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 9,
-      courseCode: "NSTP1",
-      courseTitle: "NSTP 1",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "NSTP1 - National Service",
-      units: "3",
-      adviserSignature: ""
-    },
-    {
-      id: 10,
-      courseCode: "NSTP1",
-      courseTitle: "NSTP 1",
-      grade: "1.00",
-      prerequisite: "",
-      courseCodeAndTitle: "NSTP1 - National Service",
-      units: "3",
-      adviserSignature: ""
-    },
-  ]);
+// Mock data for demonstration
+// const advisingRecords = [
+//   {
+//     id: 1,
+//     title: "Course Planning Form",
+//     academicYear: "2024-2025",
+//     semester: "Fall",
+//     submittedDate: "2024-08-15",
+//     advisor: "Dr. Smith",
+//   },
+//   {
+//     id: 2,
+//     title: "Degree Audit Review",
+//     academicYear: "2024-2025",
+//     semester: "Fall",
+//     submittedDate: "2024-09-01",
+//     advisor: "Dr. Johnson",
+//   },
+//   {
+//     id: 3,
+//     title: "Course Planning Form",
+//     academicYear: "2023-2024",
+//     semester: "Spring",
+//     submittedDate: "2024-01-20",
+//     advisor: "Dr. Smith",
+//   },]
 
+export default function StudentAdvisingRecords() {
+  const { user } = useAuth();
+  const [showForm, setShowForm] = useState(false);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState(null);
+  const [advisingPeriods, setAdvisingPeriods] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchAdvisingPeriods = async () => {
+      if (!user || !user.student_id) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/student/read_distinct_advising_periods.php?student_id=${user.student_id}`);
+        
+        // Add console.log for the student_id being used in the API call
+        console.log("Fetching advising periods for student_id:", user.student_id);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setAdvisingPeriods(data);
+        console.log("Fetched advising periods:", data); // Add console.log here
+      } catch (error) {
+        console.error("Error fetching advising periods:", error);
+        setError("Failed to load advising records.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdvisingPeriods();
+  }, [user]);
+
+  const handleViewRecord = (academicYearName, semesterName) => {
+    setSelectedAcademicYear(academicYearName);
+    setSelectedSemester(semesterName);
+    setShowForm(true);
+  };
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <main className="w-full">
+          <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
+          <div className="container mx-auto p-6 max-w-6xl">
+            <Skeleton className="h-6 w-1/2 mb-4" />
+            <Skeleton className="h-4 w-1/3 mb-8" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </SidebarProvider>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500 p-4">Error: {error}</div>;
+  }
 
   return (
     <SidebarProvider>
@@ -122,109 +118,75 @@ const StudentAdvisingRecords = () => {
       <main className="w-full">
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
 
-        <div className="p-2"> {/* Reduced padding */}
-          <div className="max-w-4xl mx-auto"> {/* Reduced max-width */}
-            <div className="border rounded-md p-2 shadow-sm"> {/* Reduced padding and shadow */}
-              <div className="mb-2"> {/* Reduced margin-bottom */}
-              
-                <Table className="border">
-                  <TableHeader>
-                    
-                    <TableRow>   
-                      <TableHead colSpan={4} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Name : ESPIRITU, RANIEL VILLAFUERTE</TableHead>
-                      <TableHead colSpan={3} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Student No : KLD-22-000291</TableHead>            
-                    </TableRow>
-                    
-                    <TableRow>   
-                      <TableHead colSpan={2} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Institute : IMACS</TableHead>
-                      <TableHead colSpan={2} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Program/Year/Section : BSIS 301</TableHead>
-                      <TableHead colSpan={3} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Status :</TableHead>            
-                    </TableRow>
-                    
-                    <TableRow>
-                      <TableHead colSpan={4} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">LAST ENROLLMENT : 2nd Term, AY 2024-2025</TableHead>
-                      <TableHead colSpan={3} className="text-left border-b border-r px-2 py-1 text-xs font-normal h-6">CURRENT ENROLLMENT : 1st Term, AY 2025-2026</TableHead>
-                    </TableRow>
-                  
-                    <TableRow>
-                      <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Course Code</TableHead>
-                      <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Title</TableHead>
-                      <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Grade</TableHead>
-                      <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Pre-requisite</TableHead>
-                      <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Code and Title</TableHead>
-                      <TableHead className="w-[5%] text-center border-b border-r px-2 py-1 text-xs">Units</TableHead>
-                      <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Adviser's Signature</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {advisingRecords.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="text-left border-r px-2 py-1 text-xs">{record.courseCode}</TableCell>
-                        <TableCell className="text-left border-r px-2 py-1 text-xs">{record.courseTitle}</TableCell>
-                        <TableCell className="text-center border-r px-2 py-1 text-xs">{record.grade}</TableCell>
-                        <TableCell className="text-left border-r px-2 py-1 text-xs">{record.prerequisite}</TableCell>
-                        <TableCell className="text-left border-r px-2 py-1 text-xs">{record.courseCodeAndTitle}</TableCell>
-                        <TableCell className="text-center border-r px-2 py-1 text-xs">{record.units}</TableCell>
-                        <TableCell className="text-center px-2 py-1 text-xs">{record.adviserSignature}</TableCell>
-                      </TableRow>
-                    ))}
-                      <TableRow>
-                          <TableCell colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Failed course/s</TableCell>
-                          <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
-                          <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs"></TableCell> 
-                          <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
-                      </TableRow>
+        <div className="container mx-auto p-6 max-w-6xl">
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold text-[#1b4b2a]">Academic Advising Records</h1>
+            <p className="text-muted-foreground">
+              Browse and access your advising forms.
+            </p>
+          </div>
 
-                      <TableRow>
-                      <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Code</TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Title</TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Term</TableCell>
-                      <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">AY</TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    </TableRow>
+          {/* Records Grid */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {advisingPeriods.map((record) => (
+              <Card key={`${record.academic_year_id}-${record.semester_id}`} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg mb-1">Advising Form</CardTitle>
+                      <CardDescription className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4" />
+                        {record.academic_year_name} • {record.semester_name}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <div className="text-sm">
+                      <p className="text-muted-foreground mb-1">Advisor</p>
+                      <p className="font-medium">{record.advisor_name || "N/A"}</p>
+                    </div>
 
-                    <TableRow>
-                      <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6"></TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    </TableRow>
+                    <div className="text-sm">
+                      <p className="text-muted-foreground mb-1">Submission</p>
+                      <p className="font-medium">{record.latest_advising_date ? new Date(record.latest_advising_date).toLocaleDateString() : "N/A"}</p>
+                    </div>
 
-                    <TableRow>
-                      <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6"></TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    </TableRow>
-
-                  </TableBody>
-
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">Total number of units earned : 21 Units</TableCell>
-                      <TableCell colSpan={4} className="text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Total number of units to be enrolled : 16 Units</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">Student's Signature : </TableCell>
-                      <TableCell colSpan={4} className="text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Adviser's Printed Name : RANDOLPH M. BALLERAS</TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                    <div className="flex gap-2 pt-2">
+                      <Button size="sm" variant="outline" className="flex-1 bg-transparent" onClick={() => handleViewRecord(record.academic_year_name, record.semester_name)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        <Download className="h-4 w-4" />
+                      </Button>
               </div>
             </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
+
+        <Dialog open={showForm} onOpenChange={setShowForm}>
+          <DialogContent className="max-w-[90vw] md:max-w-screen-lg max-h-[90vh] overflow-y-auto" showCloseButton={false}>
+            <DialogHeader className="sticky top-0 bg-background pb-2 z-10 flex flex-row items-start justify-between">
+              <div>
+                <DialogTitle className="text-lg md:text-xl">Advising Form</DialogTitle>
+                <DialogDescription className="text-sm md:text-base mt-1">
+                  {selectedAcademicYear} {selectedSemester}
+                </DialogDescription>
+              </div>
+              <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </DialogHeader>
+            <StudentAdvisingForms academicYear={selectedAcademicYear} semester={selectedSemester} />
+          </DialogContent>
+        </Dialog>
       </main>
     </SidebarProvider>
   )
 }
-
-export default StudentAdvisingRecords

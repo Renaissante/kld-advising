@@ -1,0 +1,212 @@
+import React, { useState, useEffect } from 'react';
+import { Table, TableHead, TableRow, TableHeader, TableCell, TableBody, TableFooter } from "@/components/ui/table";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE_URL } from '@/config/api';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const StudentAdvisingForms = ({ academicYear, semester }) => {
+  const { user } = useAuth();
+  const [advisingRecords, setAdvisingRecords] = useState([]);
+  const [studentProfile, setStudentProfile] = useState(null); // New state for student profile
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchAdvisedCourses = async () => {
+      if (!user || !user.student_id || !academicYear || !semester) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/student/read_advised_courses.php?student_id=${user.student_id}&academic_year=${academicYear}&semester=${semester}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setAdvisingRecords(data);
+      } catch (error) {
+        console.error("Error fetching advised courses:", error);
+        setError("Failed to load advising records.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdvisedCourses();
+  }, [user, academicYear, semester]);
+
+  // New useEffect to fetch student profile
+  useEffect(() => {
+    const fetchStudentProfile = async () => {
+      if (!user || !user.student_id) {
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE_URL}/student/read_student_advising_profile.php?student_id=${user.student_id}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setStudentProfile(data);
+      } catch (error) {
+        console.error("Error fetching student profile:", error);
+      }
+    };
+    fetchStudentProfile();
+  }, [user]);
+
+  if (loading || !studentProfile) { // Also check if studentProfile is loaded
+    return (
+      <div className="p-2">
+        <div className="max-w-5xl mx-auto">
+          <div className="border rounded-md p-2 shadow-sm">
+            <div className="mb-2 overflow-x-auto">
+              <Skeleton className="w-full h-64" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500 p-4">Error: {error}</div>;
+  }
+
+  // Destructure student profile for easier access
+  const { student_name, student_number, institute_name, program_year_section, student_status, last_enrollment_period, total_units_earned } = studentProfile;
+
+  return (
+    <div> {/* Reduced padding */}
+      <div className="max-w-5xl mx-auto"> {/* Reduced max-width */}
+        <div className="border rounded-md p-2 shadow-sm"> {/* Reduced padding and shadow */}
+          <div className="mb-2 overflow-x-auto"> {/* Reduced margin-bottom and added overflow-x-auto */}
+            <Table className="border">
+              <TableHeader>
+                
+                <TableRow>   
+                  <TableHead colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Name : {student_name}</TableHead>
+                  <TableHead colSpan={3} className="w-[40%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Student No : {student_number}</TableHead>            
+                </TableRow>
+                
+                <TableRow>   
+                  <TableHead colSpan={2} className="w-[30%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Institute : {institute_name}</TableHead>
+                  <TableHead colSpan={2} className="w-[30%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Program/Year/Section : {program_year_section}</TableHead>
+                  <TableHead colSpan={3} className="w-[40%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">Status : {student_status}</TableHead>            
+                </TableRow>
+                
+                <TableRow>
+                  <TableHead colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">LAST ENROLLMENT : {last_enrollment_period}</TableHead>
+                  <TableHead colSpan={3} className="w-[40%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">CURRENT ENROLLMENT : {academicYear} {semester}</TableHead>
+                </TableRow>
+              
+                <TableRow>
+                  <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Course Code</TableHead>
+                  <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Title</TableHead>
+                  <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Grade</TableHead>
+                  <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Pre-requisite</TableHead>
+                  <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Code and Title</TableHead>
+                  <TableHead className="w-[5%] text-center border-b border-r px-2 py-1 text-xs">Units</TableHead>
+                  <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Adviser's Signature</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {advisingRecords.length > 0 ? (
+                  advisingRecords.map((record) => (
+                    <TableRow key={record.advised_course_id}>
+                      <TableCell className="w-[12.5%] text-left border-r px-2 py-1 text-xs">{record.course_code}</TableCell>
+                      <TableCell className="w-[25%] text-left border-r px-2 py-1 text-xs">{record.course_title}</TableCell>
+                      <TableCell className="w-[10%] text-center border-r px-2 py-1 text-xs">{record.grade}</TableCell>
+                      <TableCell className="w-[12.5%] text-left border-r px-2 py-1 text-xs">{record.prerequisite_code ? `${record.prerequisite_code} - ${record.prerequisite_title || ""}` : 'N/A'}</TableCell>
+                      <TableCell className="w-[25%] text-left border-r px-2 py-1 text-xs">{record.course_code} - {record.course_title}</TableCell>
+                      <TableCell className="w-[5%] text-center border-r px-2 py-1 text-xs">{record.units}</TableCell>
+                      <TableCell className="w-[10%] text-center px-2 py-1 text-xs"></TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
+                      No advising records found for this academic year and semester.
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {advisingRecords.filter(record => record.remarks === "Failed").length > 0 && (
+                  <>
+                    <TableRow>
+                        <TableCell colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Failed course/s</TableCell>
+                        <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
+                        <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs"></TableCell> 
+                        <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
+                    </TableRow>
+
+                    <TableRow>
+                      <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Code</TableCell>
+                      <TableCell className="w-[25%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Title</TableCell>
+                      <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Grade</TableHead>
+                      <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Term</TableCell>
+                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">AY</TableCell>
+                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    </TableRow>
+
+                    {advisingRecords.filter(record => record.remarks === "Failed").map((failedRecord) => (
+                      <TableRow key={`failed-${failedRecord.advised_course_id}`}>
+                        <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">{failedRecord.course_code}</TableCell>
+                        <TableCell className="w-[25%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.course_title}</TableCell>
+                        <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.grade || "N/A"}</TableCell>
+                        <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.semester_name}</TableCell>
+                        <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.academic_year_name}</TableCell>
+                        <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                        <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                )}
+
+                {/* Placeholder rows for Failed courses if none exist */}
+                {advisingRecords.filter(record => record.remarks === "Failed").length === 0 && ([...Array(3)].map((_, i) => (
+                  <TableRow key={`empty-failed-${i}`}>
+                    <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6"></TableCell>
+                    <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                    <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
+                  </TableRow>
+                )))}
+
+              </TableBody>
+
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="w-[47.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">Total number of units enrolled : {advisingRecords.reduce((sum, record) => sum + (record.units || 0), 0)} Units</TableCell>
+                  <TableCell colSpan={4} className="w-[52.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Total number of units to be enrolled : 16 Units</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={3} className="w-[47.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">Student's Signature : </TableCell>
+                  <TableCell colSpan={4} className="w-[52.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Adviser's Printed Name : {advisingRecords[0]?.advisor_name.toUpperCase() || "N/A"}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={3} className="w-[47.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6"></TableCell>
+                  <TableCell colSpan={4} className="w-[52.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Student's Printed Name : {advisingRecords[0]?.student_name.toUpperCase() || "N/A"}</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default StudentAdvisingForms;
