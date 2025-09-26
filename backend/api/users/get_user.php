@@ -9,156 +9,98 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Get query parameters
-$role = $_GET['role'] ?? '';
 $search = $_GET['search'] ?? '';
 $page = (int)($_GET['page'] ?? 1);
 $pageSize = (int)($_GET['pageSize'] ?? 5);
 $offset = ($page - 1) * $pageSize;
 
-// Map frontend roles to database roles
-$roleMap = [
-    "system_admin" => "admin",
-    "dean" => "dean",
-    "program_chair" => "programchair",
-    "faculty" => "faculty",
-    "student" => "student"
-];
-$dbRole = $roleMap[$role] ?? null;
-
+// Initialize params array after removing role-specific logic
 $params = [];
 $searchClause = '';
 $likeQuery = "%" . strtolower($search) . "%";
 
-$baseQuery = "";
-$countQuery = "";
-
-if ($dbRole === "admin") {
-    $baseQuery = "
-        SELECT u.id, e.employee_id, u.email, u.role, e.name
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        WHERE u.role = ?";
-    $countQuery = "
-        SELECT COUNT(*) as count
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        WHERE u.role = ?";
-    $params[] = $dbRole;
-} elseif ($dbRole === "dean") {
-    $baseQuery = "
-        SELECT u.id, e.employee_id, u.email, u.role, e.name, dept.name AS department
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN deans d ON e.employee_id = d.employee_id
-        JOIN departments dept ON d.department = dept.id
-        WHERE u.role = ?";
-    $countQuery = "
-        SELECT COUNT(*) as count
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN deans d ON e.employee_id = d.employee_id
-        JOIN departments dept ON d.department = dept.id
-        WHERE u.role = ?";
-    $params[] = $dbRole;
-} elseif ($dbRole === "programchair") {
-    $baseQuery = "
-        SELECT u.id, e.employee_id, u.email, u.role, e.name, d.name AS department, prog.name AS program
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN program_chairs p ON e.employee_id = p.employee_id
-        JOIN departments d ON p.department = d.id
-        JOIN programs prog ON p.program = prog.id  -- Join with programs to get the name
-        WHERE u.role = ?";
-    
-    $countQuery = "
-        SELECT COUNT(*) as count
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN program_chairs p ON e.employee_id = p.employee_id
-        JOIN departments d ON p.department = d.id
-        JOIN programs prog ON p.program = prog.id  -- Join with programs to get the name
-        WHERE u.role = ?";
-    
-    $params[] = $dbRole;
-} elseif ($dbRole === "faculty") {
-    $baseQuery = "
-        SELECT u.id, e.employee_id, u.email, u.role, e.name, f.specialization, d.name AS department
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN faculty f ON e.employee_id = f.employee_id
-        JOIN departments d ON f.department = d.id
-        WHERE u.role = ?";
-    $countQuery = "
-        SELECT COUNT(*) as count
-        FROM users u
-        JOIN employees e ON u.id = e.employee_id
-        JOIN faculty f ON e.employee_id = f.employee_id
-        JOIN departments d ON f.department = d.id
-        WHERE u.role = ?";
-    $params[] = $dbRole;
-} elseif ($dbRole === "student") {
-    $baseQuery = "
-    SELECT u.id AS user_id, s.student_id, u.email, u.role, s.name,
-           p.name AS program,
-           d.name AS department,
-           sec.name AS section,
-           e.name AS advisor
+$baseQuery = "
+    SELECT
+        u.id,
+        COALESCE(e.employee_id, s.student_id) AS KLD_ID,
+        u.email,
+        u.role,
+        COALESCE(e.name, s.name) AS name,
+        d.name AS department,
+        prog.name AS program,
+        yl.level AS year_level,
+        f.specialization,
+        sec.name AS section,
+        d.id AS department_id,
+        prog.id AS program_id,
+        yl.id AS year_level_id,
+        sec.id AS section_id,
+        adv_f.employee_id AS advisor_id,
+        adv_e.name AS advisor
     FROM users u
-    JOIN students s ON u.id = s.student_id
-    JOIN programs p ON s.program_id = p.id
-    JOIN departments d ON s.department_id = d.id
-    JOIN sections sec ON s.section_id = sec.id
-    LEFT JOIN section_advisors sa ON sec.id = sa.section_id  -- Join through the linking table
-    LEFT JOIN faculty f ON sa.advisor_id = f.employee_id    -- Join linking table to faculty
-    LEFT JOIN employees e ON f.employee_id = e.employee_id    -- Join faculty to employees for name
-    WHERE u.role = ?";
+    LEFT JOIN employees e ON u.id = e.employee_id
+    LEFT JOIN students s ON u.id = s.student_id
+    LEFT JOIN deans dn ON e.employee_id = dn.employee_id
+    LEFT JOIN program_chairs pc ON e.employee_id = pc.employee_id
+    LEFT JOIN faculty f ON e.employee_id = f.employee_id
+    LEFT JOIN departments d ON COALESCE(dn.department, pc.department, f.department, s.department_id) = d.id
+    LEFT JOIN programs prog ON COALESCE(pc.program, s.program_id) = prog.id
+    LEFT JOIN year_levels yl ON s.year_level_id = yl.id
+    LEFT JOIN sections sec ON s.section_id = sec.id
+    LEFT JOIN section_advisors sa ON sec.id = sa.section_id
+    LEFT JOIN faculty adv_f ON sa.advisor_id = adv_f.employee_id
+    LEFT JOIN employees adv_e ON adv_f.employee_id = adv_e.employee_id
+    WHERE u.status = 'active'
+";
 
 $countQuery = "
-    SELECT COUNT(*) as count
+    SELECT COUNT(DISTINCT u.id) as count
     FROM users u
-    JOIN students s ON u.id = s.student_id
-    JOIN programs p ON s.program_id = p.id
-    JOIN departments d ON s.department_id = d.id
-    JOIN sections sec ON s.section_id = sec.id
-    LEFT JOIN section_advisors sa ON sec.id = sa.section_id  -- Join through the linking table
-    LEFT JOIN faculty f ON sa.advisor_id = f.employee_id    -- Join linking table to faculty
-    LEFT JOIN employees e ON f.employee_id = e.employee_id
-    WHERE u.role = ?";
-
-    $params[] = $dbRole;
-
-} else {
-   
-    $baseQuery = "
-        SELECT u.id, COALESCE(e.employee_id, s.student_id) AS employee_id, u.email, u.role, 
-               COALESCE(e.name, s.name) AS name
-        FROM users u
-        LEFT JOIN employees e ON u.id = e.employee_id
-        LEFT JOIN students s ON u.id = s.student_id";
-    
-    $countQuery = "SELECT COUNT(*) as count FROM users u";
-}
-
+    LEFT JOIN employees e ON u.id = e.employee_id
+    LEFT JOIN students s ON u.id = s.student_id
+    LEFT JOIN deans dn ON e.employee_id = dn.employee_id
+    LEFT JOIN program_chairs pc ON e.employee_id = pc.employee_id
+    LEFT JOIN faculty f ON e.employee_id = f.employee_id
+    LEFT JOIN departments d ON COALESCE(dn.department, pc.department, f.department, s.department_id) = d.id
+    LEFT JOIN programs prog ON COALESCE(pc.program, s.program_id) = prog.id
+    LEFT JOIN year_levels yl ON s.year_level_id = yl.id
+    LEFT JOIN sections sec ON s.section_id = sec.id
+    LEFT JOIN section_advisors sa ON sec.id = sa.section_id
+    LEFT JOIN faculty adv_f ON sa.advisor_id = adv_f.employee_id
+    LEFT JOIN employees adv_e ON adv_f.employee_id = adv_e.employee_id
+    WHERE u.status = 'active'
+";
 
 if (!empty($search)) {
-    $searchClause = " AND (LOWER(u.email) LIKE ? OR LOWER(e.name) LIKE ? OR LOWER(CAST(e.employee_id AS CHAR)) LIKE ?)";
+    $searchClause = " AND (LOWER(u.email) LIKE ? OR LOWER(COALESCE(e.name, s.name)) LIKE ? OR LOWER(COALESCE(CAST(e.employee_id AS CHAR), CAST(s.student_id AS CHAR))) LIKE ?";
+    // Add search conditions for other relevant columns
+    $searchClause .= " OR LOWER(u.role) LIKE ?";
+    $searchClause .= " OR LOWER(d.name) LIKE ?"; // Department name
+    $searchClause .= " OR LOWER(prog.name) LIKE ?"; // Program name
+    $searchClause .= " OR LOWER(yl.level) LIKE ?"; // Year Level
+    $searchClause .= " OR LOWER(f.specialization) LIKE ?"; // Specialization
+    $searchClause .= " OR LOWER(sec.name) LIKE ?"; // Section name
+    $searchClause .= " OR LOWER(adv_e.name) LIKE ?"; // Advisor name
+    $searchClause .= ")"; // Close the parenthesis
     $baseQuery .= $searchClause;
     $countQuery .= $searchClause;
-    array_push($params, $likeQuery, $likeQuery, $likeQuery);
+    array_push($params, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery);
 }
 
-
-$baseQuery .= " LIMIT $pageSize OFFSET $offset";
+$baseQuery .= "
+    ORDER BY u.id
+    LIMIT $pageSize OFFSET $offset
+";
 
 try {
-   
     $stmt = $conn->prepare($baseQuery);
     $stmt->execute($params);
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  
     $stmtCount = $conn->prepare($countQuery);
-    $stmtCount->execute($params);
+    // Remove pageSize and offset from count query parameters
+    $countParams = $params;
+    $stmtCount->execute($countParams);
     $countResult = $stmtCount->fetch(PDO::FETCH_ASSOC);
     $totalCount = $countResult['count'] ?? 0;
     $totalPages = max(ceil($totalCount / $pageSize), 1);

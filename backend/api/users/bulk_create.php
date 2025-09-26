@@ -33,7 +33,7 @@ $defaultPassword = password_hash('123456', PASSWORD_BCRYPT); // Default password
 try {
     switch ($role) {
         case 'faculty':
-            $requiredHeaders = ['KLD ID', 'Name', 'Email', 'Department', 'Specialization'];
+            $requiredHeaders = ['KLD ID', 'Name', 'Email', 'Department'];
 
             foreach ($users as $userData) {
                 $conn->beginTransaction();
@@ -61,7 +61,7 @@ try {
                 $name = $userData->Name;
                 $email = $userData->Email;
                 $departmentName = $userData->Department;
-                $specialization = $userData->Specialization;
+                
                 $dob = null; // DOB is not in Excel, set to null
 
                 try {
@@ -109,11 +109,11 @@ try {
                     $stmtEmployee->execute();
 
                     // Insert into faculty table
-                    $sqlFaculty = "INSERT INTO faculty (employee_id, specialization, department)
-                                    VALUES (:employee_id, :specialization, :department)";
+                    $sqlFaculty = "INSERT INTO faculty (employee_id, department)
+                                    VALUES (:employee_id, :department)";
                     $stmtFaculty = $conn->prepare($sqlFaculty);
                     $stmtFaculty->bindParam(':employee_id', $userId);
-                    $stmtFaculty->bindParam(':specialization', $specialization);
+                    
                     $stmtFaculty->bindParam(':department', $departmentId);
                     $stmtFaculty->execute();
 

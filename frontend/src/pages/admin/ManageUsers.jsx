@@ -23,37 +23,27 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EditAccountModal } from "@/components/forms/EditAccountModal";
 
 
 import * as XLSX from "xlsx"; // Import the xlsx library
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-// ... existing imports ...
-
-const roleHeadingMap = {
-  system_admin: "System Admins",
-  dean: "Deans",
-  program_chair: "Program Chairs",
-  faculty: "Faculty",
-  student: "Students",
-};
 
 const ManageUsers = () => {
 
   const [usersData, setUsersData] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState("system_admin");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
-  const heading = roleHeadingMap[selectedRole];
+  const heading = "All Users"; // Heading remains unified
 
   const [isUploading, setIsUploading] = useState(false); // New state for upload loading
 
@@ -62,6 +52,13 @@ const ManageUsers = () => {
   const [parsedExcelData, setParsedExcelData] = useState(null);
   const [parsedExcelRole, setParsedExcelRole] = useState(null);
 
+  // State for edit modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [userToEdit, setUserToEdit] = useState(null);
+
+  // State for archive confirmation dialog
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [userToArchive, setUserToArchive] = useState(null);
 
   // Reference for the hidden file input
   const fileInputRef = useRef(null);
@@ -70,7 +67,7 @@ const ManageUsers = () => {
   const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams({
-        role: selectedRole,
+        // Removed role from params as the table now displays all users by default
         search: searchQuery,
         page: currentPage,
         pageSize,
@@ -87,6 +84,7 @@ const ManageUsers = () => {
       const data = await response.json();
 
       if (data && Array.isArray(data.users)) {
+        // Filter to show only active users by default
         setUsersData(data.users);
         setTotalPages(data.totalPages || 1);
       } else {
@@ -104,7 +102,7 @@ const ManageUsers = () => {
       setUsersData([]);
       setTotalPages(1);
     }
-  }, [selectedRole, searchQuery, currentPage, pageSize]);
+  }, [searchQuery, currentPage, pageSize]); // Removed selectedRole from dependencies
 
 
   useEffect(() => {
@@ -127,22 +125,18 @@ const ManageUsers = () => {
         // Check if the message is a generic notification from the backend
         if (message.type === 'backend_event' && message.payload && message.payload.event) { // Changed type to backend_event
           const eventType = message.payload.event;
-          const eventRole = message.payload.role; // Get the role from the payload
+          const eventRole = message.payload.role; 
+          const eventAction = message.payload.action; // Get the action (create, update, delete)
 
           console.log(`Received notification event: ${eventType} for role: ${eventRole}`);
 
           // Handle different backend events
-          if (eventType === 'user_created' || eventType === 'bulk_user_created') { // Handle both single and bulk creation events
-            // If a user was created and the created user's role matches the currently selected role
-            if (selectedRole === eventRole) {
-              console.log(`User(s) created with role ${eventRole}. Refetching data for ${selectedRole}.`);
-              fetchData(); // Call the fetchData function to refresh the user list
-              // Optionally show a toast notification for bulk upload summary
-              if (eventType === 'bulk_user_created' && message.payload.message) {
-                   toast.info(message.payload.message);
-              }
-            } else {
-               console.log(`User(s) created with role ${eventRole}, but current view is ${selectedRole}. No refetch needed.`);
+          // If any user related event occurs, refetch data as the table now shows all users
+          if (eventType === 'user_created' || eventType === 'bulk_user_created' || eventType === 'user_updated' || eventType === 'user_deleted') {
+            console.log(`User event (${eventType}) detected. Refetching all user data.`);
+            fetchData(); // Call the fetchData function to refresh the user list
+            if (eventType === 'bulk_user_created' && message.payload.message) {
+                toast.info(message.payload.message);
             }
           }
 
@@ -185,7 +179,7 @@ const ManageUsers = () => {
     // --- End WebSocket Connection ---
     // --- End WebSocket Connection ---
 
-  }, [fetchData, selectedRole]); // Add fetchData and selectedRole to the dependency array
+  }, [fetchData]); // Removed selectedRole from dependency array
 
   // Function to send the parsed data to the backend
   const sendDataToBackend = useCallback(async (dataToSend, roleToSend) => {
@@ -270,18 +264,20 @@ const ManageUsers = () => {
 
 
         // Define expected headers based on the selected role
+        // Determine which role is being uploaded based on the file content or an explicit selection
+        // For now, let's assume the user will pick the role from the dropdown when uploading.
+        // This part needs adjustment if we want to infer role from headers or add a separate role selector for upload.
+        let roleForUpload = fileInputRef.current.dataset.uploadRole; // Get role from dataset
+ 
         let expectedHeaders = [];
-        if (selectedRole === 'faculty') {
-          expectedHeaders = ['KLD ID', 'Name', 'Email', 'Department', 'Specialization'];
-        } else if (selectedRole === 'student') {
-          // Updated required headers for students based on backend requirements
-          expectedHeaders = ['KLD ID', 'First Name', 'Last Name', 'Email', 'Department', 'Program', 'Year Level', 'Section', 'Entry Year'];
+        if (roleForUpload === 'faculty') {
+            expectedHeaders = ['KLD ID', 'Name', 'Email', 'Department'];
+        } else if (roleForUpload === 'student') {
+            expectedHeaders = ['KLD ID', 'First Name', 'Last Name', 'Email', 'Department', 'Program', 'Year Level', 'Section', 'Entry Year'];
         } else {
-          // This case should be prevented by disabling the button, but good for safety
-          toast.error(`Bulk upload is not supported for the ${roleHeadingMap[selectedRole]} role.`);
-          // setIsUploading(false); // Don't set loading here
-          event.target.value = null;
-          return;
+            toast.error("Bulk upload is not supported for this user type.");
+            event.target.value = null;
+            return;
         }
 
         console.log("Checking if JSON is empty..."); // Log 4e
@@ -308,7 +304,7 @@ const ManageUsers = () => {
 
         if (missingHeaders.length > 0) {
           console.log("Missing headers found:", missingHeaders); // Log 4j
-          toast.error(`Missing required columns for ${roleHeadingMap[selectedRole]}: ${missingHeaders.join(', ')}. Please check your Excel file headers.`);
+          toast.error(`Missing required columns for ${roleForUpload}: ${missingHeaders.join(', ')}. Please check your Excel file headers.`);
           // setIsUploading(false); // Don't set loading here
           event.target.value = null;
           return;
@@ -323,11 +319,11 @@ const ManageUsers = () => {
         // }
 
 
-        console.log(`Parsed Excel Data for role "${selectedRole}":`, json); // Log the parsed data
+        console.log(`Parsed Excel Data for role "${roleForUpload}":`, json); // Log the parsed data
 
         // --- Data parsed successfully, show confirmation dialog ---
         setParsedExcelData(json);
-        setParsedExcelRole(selectedRole);
+        setParsedExcelRole(roleForUpload);
         setShowConfirmDialog(true);
         // Do NOT clear the file input here, wait until after fetch completes or dialog is cancelled
         // Do NOT set isUploading to false here
@@ -345,32 +341,64 @@ const ManageUsers = () => {
     reader.readAsArrayBuffer(file);
   };
 
-  // Function to trigger the hidden file input
-  const triggerFileUpload = () => {
-    console.log("triggerFileUpload called"); // Log 1
-    if (fileInputRef.current) {
-      console.log("fileInputRef.current exists, clicking..."); // Log 2
-      fileInputRef.current.click();
-    } else {
-      console.log("fileInputRef.current is null"); // Log if ref is null
+  const handleEditUser = (user) => {
+    setUserToEdit(user);
+    setShowEditModal(true);
+  };
+
+  const handleArchiveUser = (user) => {
+    setUserToArchive(user);
+    setShowArchiveConfirm(true);
+  };
+
+  const confirmArchiveUser = async () => {
+    if (!userToArchive) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/archive_user.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: userToArchive.id }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        fetchData(); // Refresh user list after archiving
+      } else {
+        toast.error(result.message || "Failed to archive user.");
+      }
+    } catch (error) {
+      console.error("Error archiving user:", error);
+      toast.error("Network error or server unavailable.");
+    } finally {
+      setShowArchiveConfirm(false);
+      setUserToArchive(null);
     }
   };
 
   // Determine if the upload button should be disabled
-  const isUploadDisabled = isUploading || ['system_admin', 'dean', 'program_chair'].includes(selectedRole);
-
-
+  const isUploadDisabled = isUploading;
+ 
+  const handleRoleSelectForUpload = (role) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.dataset.uploadRole = role; // Store the selected role in a data attribute
+      fileInputRef.current.click();
+    }
+  };
+ 
   return (
     <SidebarProvider>
-     
       <Toaster />
       <AppSidebar />
       <main className="w-full">
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
-
+ 
         <div className="mt-4 w-full flex flex-col md:flex-row justify-between px-0 p-4 md:p-6 mb-4 space-y-3 md:space-y-0">
           <div className="flex space-x-2">
-            {/* Pass fetchData as a prop so the modal can trigger a refresh */}
             <CreateAccountModal onAccountCreated={fetchData} />
             <SearchArea
               value={searchQuery}
@@ -380,9 +408,8 @@ const ManageUsers = () => {
               }}
             />
           </div>
-
-          <div className="flex space-x-2"> {/* Added space-x-2 for gap */}
-            {/* Hidden file input */}
+ 
+          <div className="flex space-x-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -390,40 +417,30 @@ const ManageUsers = () => {
               accept=".xls,.xlsx"
               style={{ display: 'none' }}
             />
-            {/* Button to trigger file upload */}
-            <Button
-              variant="outline"
-              onClick={triggerFileUpload}
-              disabled={isUploadDisabled} // Use the disabled state
-              title={isUploadDisabled && selectedRole !== 'faculty' && selectedRole !== 'student' ? `Bulk upload is not available for ${roleHeadingMap[selectedRole]}` : ''} // Add tooltip
-            >
-              {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : "Upload From Excel"}
-            </Button>
-            <Select
-              value={selectedRole}
-              onValueChange={(value) => {
-                setSelectedRole(value);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="system_admin">System Admin</SelectItem>
-                <SelectItem value="dean">Deans</SelectItem>
-                <SelectItem value="program_chair">Program Chairs</SelectItem>
-                <SelectItem value="faculty">Faculty</SelectItem>
-                <SelectItem value="student">Students</SelectItem>
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={isUploadDisabled}
+                  title={isUploadDisabled ? `Uploading...` : ''}
+                >
+                  {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : "Upload From Excel"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Select User Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleRoleSelectForUpload('faculty')}>Faculty</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleRoleSelectForUpload('student')}>Student</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
+ 
         <div className="px-3 md:px-8">
-          <UserTable heading={heading} data={usersData} role={selectedRole} />
+          <UserTable heading={heading} data={usersData} role={null} onEdit={handleEditUser} onArchive={handleArchiveUser} />
         </div>
-
+ 
         <div className="w-full flex justify-end p-3 md:p-4 mb-5">
           <PaginationComponent
             currentPage={currentPage}
@@ -431,18 +448,17 @@ const ManageUsers = () => {
             onPageChange={(page) => setCurrentPage(page)}
           />
         </div>
-
+ 
         <Separator />
-
-        {/* Confirmation Dialog */}
+ 
+      
         <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm Bulk User Creation</AlertDialogTitle>
               <AlertDialogDescription>
-                You are about to create {parsedExcelData ? parsedExcelData.length : 0} {parsedExcelRole} accounts from the Excel file.
+                You are about to create {parsedExcelData ? parsedExcelData.length : 0} {parsedExcelRole} accounts from the Excel file. Please ensure the data is correct.
                 <br />
-                Please ensure the data is correct.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -468,10 +484,38 @@ const ManageUsers = () => {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Edit Account Modal */}
+        {userToEdit && (
+          <EditAccountModal
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            userData={userToEdit}
+            onAccountUpdated={fetchData}
+          />
+        )}
 
+        {/* Archive Confirmation Dialog */}
+        <AlertDialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Archive User</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to archive user "{userToArchive?.name}" ({userToArchive?.KLD_ID})?
+                This action will mark the user as archived, and they will no longer appear in the active user list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowArchiveConfirm(false);
+                setUserToArchive(null);
+              }}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmArchiveUser}>Archive</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </SidebarProvider>
   );
 };
-
+ 
 export default ManageUsers;
