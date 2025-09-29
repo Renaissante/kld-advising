@@ -13,6 +13,7 @@ $search = $_GET['search'] ?? '';
 $page = (int)($_GET['page'] ?? 1);
 $pageSize = (int)($_GET['pageSize'] ?? 5);
 $offset = ($page - 1) * $pageSize;
+$status = $_GET['status']; // Added status parameter
 
 // Initialize params array after removing role-specific logic
 $params = [];
@@ -25,6 +26,7 @@ $baseQuery = "
         COALESCE(e.employee_id, s.student_id) AS KLD_ID,
         u.email,
         u.role,
+        u.status,
         COALESCE(e.name, s.name) AS name,
         d.name AS department,
         prog.name AS program,
@@ -50,7 +52,7 @@ $baseQuery = "
     LEFT JOIN section_advisors sa ON sec.id = sa.section_id
     LEFT JOIN faculty adv_f ON sa.advisor_id = adv_f.employee_id
     LEFT JOIN employees adv_e ON adv_f.employee_id = adv_e.employee_id
-    WHERE u.status = 'active'
+    WHERE u.status = ?
 ";
 
 $countQuery = "
@@ -68,7 +70,7 @@ $countQuery = "
     LEFT JOIN section_advisors sa ON sec.id = sa.section_id
     LEFT JOIN faculty adv_f ON sa.advisor_id = adv_f.employee_id
     LEFT JOIN employees adv_e ON adv_f.employee_id = adv_e.employee_id
-    WHERE u.status = 'active'
+    WHERE u.status = ?
 ";
 
 if (!empty($search)) {
@@ -87,6 +89,8 @@ if (!empty($search)) {
     array_push($params, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery);
 }
 
+array_unshift($params, $status); // Add status as the first parameter for both queries
+
 $baseQuery .= "
     ORDER BY u.id
     LIMIT $pageSize OFFSET $offset
@@ -99,7 +103,7 @@ try {
 
     $stmtCount = $conn->prepare($countQuery);
     // Remove pageSize and offset from count query parameters
-    $countParams = $params;
+    $countParams = $params; // $params now includes $status, which is correct for count query
     $stmtCount->execute($countParams);
     $countResult = $stmtCount->fetch(PDO::FETCH_ASSOC);
     $totalCount = $countResult['count'] ?? 0;

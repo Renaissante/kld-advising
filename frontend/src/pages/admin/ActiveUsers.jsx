@@ -68,6 +68,7 @@ const ManageUsers = () => {
     try {
       const params = new URLSearchParams({
         // Removed role from params as the table now displays all users by default
+        status : 'active',
         search: searchQuery,
         page: currentPage,
         pageSize,

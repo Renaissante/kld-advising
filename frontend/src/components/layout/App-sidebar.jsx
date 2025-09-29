@@ -8,7 +8,7 @@ import {
   Users,
   Calendar,
   Settings,
-  ChevronDown,
+  ChevronRight,
   LayoutDashboard,
   ClipboardList,
   UserCog,
@@ -92,10 +92,12 @@ export function AppSidebar() {
     }
   };
 
-
   const items = [
     { title: "Dashboard", url: getRoleSpecificHomeUrl(role), icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
-    { title: "Users", url: "/admin/users", icon: Users, roles: ["admin"] },
+    { title: "Users", icon: Users, roles: ["admin"], subItems: [
+      { title: "Active Users", url: "/admin/users/active-users", icon: Users },
+      { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
+    ] },
     { title: "Curriculum Data", url: "/admin/curriculum", icon: Inbox, roles: ["admin"] },
     { title: "Grades", url: "/faculty/grades", icon: BookA, roles: ["faculty"] },
     { title: "Advise", url: "/faculty/advise", icon: NotebookPen, roles: ["faculty"] },
@@ -108,6 +110,11 @@ export function AppSidebar() {
     { title: "Calendar", url: "", icon: Calendar, roles: ["admin", "faculty", "student", "dean", "programchair"] },
   ];
 
+  // Check if any subitem is active
+  const isSubmenuActive = (item) => {
+    if (!item.subItems) return false;
+    return item.subItems.some(subItem => location.pathname === subItem.url);
+  };
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -130,54 +137,121 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <TooltipProvider>
-              {items
+                {items
                   .filter((item) => item.roles.includes(role))
                   .map((item) => {
                     const isActive = location.pathname === item.url;
+                    const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(isSubmenuActive(item));
+                    
                     return (
                       <SidebarMenuItem key={item.title}>
-                        {state === 'collapsed' ? (
-                          <Tooltip delayDuration={0}>
-                            <TooltipTrigger asChild>
-                              <SidebarMenuButton asChild isActive={isActive}>
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (item.onClick) {
-                                      item.onClick();
-                                    } else if (item.url) {
-                                      navigate(item.url);
-                                    }
-                                  }}
-                                  className="flex items-center space-x-2 w-full text-left"
-                                  disabled={!item.url && !item.onClick}
-                                >
-                                  <item.icon className="h-4 w-4" />
-                                </button>
-                              </SidebarMenuButton>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" align="center">
-                              {item.title}
-                            </TooltipContent>
-                          </Tooltip>
+                        {item.subItems ? (
+                          // Submenu logic
+                          state === 'collapsed' ? (
+                            // Collapsed state: Show dropdown with tooltip
+                            <DropdownMenu>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <SidebarMenuButton isActive={isActive}>
+                                      <item.icon className="h-4 w-4" />
+                                    </SidebarMenuButton>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" align="center">
+                                  {item.title}
+                                </TooltipContent>
+                              </Tooltip>
+                              <DropdownMenuContent side="right" align="start" className="w-48">
+                                {item.subItems.map((subItem) => (
+                                  <DropdownMenuItem 
+                                    key={subItem.title} 
+                                    onClick={() => navigate(subItem.url)}
+                                  >
+                                    <span>{subItem.title}</span>
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            // Expanded state: Show collapsible
+                            <Collapsible open={isCollapsibleOpen} onOpenChange={setIsCollapsibleOpen}>
+                              <CollapsibleTrigger asChild className="group">
+                                <SidebarMenuButton isActive={isActive} className="w-full">
+                                  <div className="flex items-center space-x-2 w-full text-left">
+                                    <item.icon className="h-4 w-4" />
+                                    <span>{item.title}</span>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                                </SidebarMenuButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="ml-4 border-l border-[#1a4027]">
+                                {item.subItems.map((subItem) => {
+                                  const isSubItemActive = location.pathname === subItem.url;
+                                  return (
+                                    <SidebarMenuItem key={subItem.title}>
+                                      <SidebarMenuButton asChild isActive={isSubItemActive} className="h-auto py-1 pl-4">
+                                        <button
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate(subItem.url);
+                                          }}
+                                          className="w-full text-left"
+                                        >
+                                          <span>{subItem.title}</span>
+                                        </button>
+                                      </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                  );
+                                })}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )
                         ) : (
-                          <SidebarMenuButton asChild isActive={isActive}>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                if (item.onClick) {
-                                  item.onClick();
-                                } else if (item.url) {
-                                  navigate(item.url);
-                                }
-                              }}
-                              className="flex items-center space-x-2 w-full text-left"
-                              disabled={!item.url && !item.onClick}
-                            >
-                              <item.icon className="h-4 w-4" />
-                              <span>{item.title}</span>
-                            </button>
-                          </SidebarMenuButton>
+                          // Regular menu item logic
+                          state === 'collapsed' ? (
+                            <Tooltip delayDuration={0}>
+                              <TooltipTrigger asChild>
+                                <SidebarMenuButton asChild isActive={isActive}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (item.onClick) {
+                                        item.onClick();
+                                      } else if (item.url) {
+                                        navigate(item.url);
+                                      }
+                                    }}
+                                    className="flex items-center space-x-2 w-full text-left"
+                                    disabled={!item.url && !item.onClick}
+                                  >
+                                    <item.icon className="h-4 w-4" />
+                                  </button>
+                                </SidebarMenuButton>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" align="center">
+                                {item.title}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <SidebarMenuButton asChild isActive={isActive}>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (item.onClick) {
+                                    item.onClick();
+                                  } else if (item.url) {
+                                    navigate(item.url);
+                                  }
+                                }}
+                                className="flex items-center space-x-2 w-full text-left"
+                                disabled={!item.url && !item.onClick}
+                              >
+                                <item.icon className="h-4 w-4" />
+                                <span>{item.title}</span>
+                              </button>
+                            </SidebarMenuButton>
+                          )
                         )}
                       </SidebarMenuItem>
                     )

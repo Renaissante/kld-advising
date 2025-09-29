@@ -2,7 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import LoginPage from "@/pages/auth/LoginPage";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
-import ManageUsers from "@/pages/admin/ManageUsers";
+import ActiveUsers from "@/pages/admin/ActiveUsers";
+import ArchivedUsers from "@/pages/admin/ArchivedUsers";
 import AuditTrail from "@/pages/admin/AuditTrail";
 import StudentHome from "@/pages/student/StudentHome";
 import FacultyHome from "@/pages/faculty/FacultyHome";
@@ -45,10 +46,19 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/admin/users"
+        path="/admin/users/active-users"
         element={
           <ProtectedRoute role="admin">
-            <ManageUsers />
+            <ActiveUsers />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users/archived-users"
+        element={
+          <ProtectedRoute role="admin">
+            <ArchivedUsers />
           </ProtectedRoute>
         }
       />

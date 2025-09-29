@@ -1,9 +1,9 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Edit, Archive } from "lucide-react";
+import { Trash2, Edit, Archive, History } from "lucide-react"; // Import History icon
 
-export function UserTable({ heading = "Users", data, role, onEdit, onArchive }) {
+export function UserTable({ heading = "Users", data, role, onEdit, onArchive, onRestore }) {
 
   // Define universal column width
   const colWidth = "w-1/8"; // Adjusted for more columns
@@ -20,7 +20,7 @@ export function UserTable({ heading = "Users", data, role, onEdit, onArchive }) 
         </TableHeader>
         <TableBody>
           {data.map((user) => (
-            <TableRow key={user.id}><TableCell className="text-sm">{user.KLD_ID}</TableCell><TableCell className="text-sm">{user.name}</TableCell><TableCell className="text-sm break-all">{user.email}</TableCell><TableCell className="text-sm">{user.role}</TableCell>{/* Conditional rendering for role-specific data */}<TableCell className="text-sm">{user.department || 'N/A'}</TableCell><TableCell className="text-sm">{user.program || 'N/A'}</TableCell><TableCell className="text-sm">{user.section || 'N/A'}</TableCell><TableCell className="text-sm">{user.advisor || 'N/A'}</TableCell><TableCell className="text-right "><div className="flex justify-end gap-2"><Button size="icon" variant="outline" className="p-2" onClick={() => onEdit(user)}><Edit size={24} /></Button><Button size="icon" variant="destructive" className="p-2" onClick={() => onArchive(user)}><Archive size={24} /></Button></div></TableCell></TableRow>
+            <TableRow key={user.id}><TableCell className="text-sm">{user.KLD_ID}</TableCell><TableCell className="text-sm">{user.name}</TableCell><TableCell className="text-sm break-all">{user.email}</TableCell><TableCell className="text-sm">{user.role}</TableCell>{/* Conditional rendering for role-specific data */}<TableCell className="text-sm">{user.department || 'N/A'}</TableCell><TableCell className="text-sm">{user.program || 'N/A'}</TableCell><TableCell className="text-sm">{user.section || 'N/A'}</TableCell><TableCell className="text-sm">{user.advisor || 'N/A'}</TableCell><TableCell className="text-right "><div className="flex justify-end gap-2">{user.status !== 'archived' && (<Button size="icon" variant="outline" className="p-2" onClick={() => onEdit(user)}><Edit size={24} /></Button>)}{user.status === 'archived' ? (<Button size="icon" variant="default" className="p-2" onClick={() => onRestore(user)}><History size={24} /></Button>) : (<Button size="icon" variant="destructive" className="p-2" onClick={() => onArchive(user)}><Archive size={24} /></Button>)}</div></TableCell></TableRow>
           ))}
         </TableBody>
       </Table>
