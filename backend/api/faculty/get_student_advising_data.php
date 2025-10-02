@@ -34,9 +34,15 @@ if (!$facultyId && isset($_SESSION['user_id'])) {
     $facultyId = $_SESSION['user_id'];
 
     // Also verify role if available in session
-    if (isset($_SESSION['role']) && $_SESSION['role'] !== 'faculty') {
+    if (isset($_SESSION['user_roles'])) {
+        if (!in_array('faculty', $_SESSION['user_roles'])) {
+            http_response_code(403);
+            echo json_encode(array("success" => false, "message" => "Forbidden: User is not a faculty member"));
+            exit();
+        }
+    } else {
         http_response_code(403);
-        echo json_encode(array("success" => false, "message" => "Forbidden: User is not a faculty member"));
+        echo json_encode(array("success" => false, "message" => "Forbidden: User roles not found in session"));
         exit();
     }
 }

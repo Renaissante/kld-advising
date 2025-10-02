@@ -439,7 +439,7 @@ const ManageUsers = () => {
         </div>
  
         <div className="px-3 md:px-8">
-          <UserTable heading={heading} data={usersData} role={null} onEdit={handleEditUser} onArchive={handleArchiveUser} />
+          <UserTable heading={heading} data={usersData} onEdit={handleEditUser} onArchive={handleArchiveUser} /> {/* Removed role prop */}
         </div>
  
         <div className="w-full flex justify-end p-3 md:p-4 mb-5">

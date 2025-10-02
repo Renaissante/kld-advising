@@ -1,6 +1,6 @@
 "use client"
 import { API_BASE_URL } from '@/config/api';
-import { useState } from "react"
+import { useState, useContext } from "react" // Import useContext
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen,
@@ -18,7 +18,8 @@ import {
   LogOut,
   Search,
   NotebookPen,
-  Archive
+  Archive,
+  Check
 } from "lucide-react"
 import {
   Sidebar,
@@ -41,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel
 } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
@@ -49,39 +51,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
 export function AppSidebar() {
   const [activeItem, setActiveItem] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const user = JSON.parse(localStorage.getItem("user"));
-  const role = user?.role;
+  const { user, activeRole, setActiveRole, logout } = useContext(AuthContext); // Use AuthContext
+  
   const { state, setOpen } = useSidebar();
 
-  const handleLogout = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/logout.php`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      localStorage.removeItem("user");
-      localStorage.removeItem("sidebarOpen");
-      navigate("/login");
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
+  // Handle logout using AuthContext's logout function
+  const handleLogout = () => {
+    logout(); // Call the logout function from AuthContext
   };
 
   const getRoleSpecificHomeUrl = (role) => {
+    console.log("AppSidebar: getRoleSpecificHomeUrl for role:", role);
     switch (role) {
       case "admin": return "/admin/dashboard";
       case "faculty": return "/faculty/home";
@@ -93,7 +79,7 @@ export function AppSidebar() {
   };
 
   const items = [
-    { title: "Dashboard", url: getRoleSpecificHomeUrl(role), icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
+    { title: "Dashboard", url: getRoleSpecificHomeUrl(activeRole), icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
     { title: "Users", icon: Users, roles: ["admin"], subItems: [
       { title: "Active Users", url: "/admin/users/active-users", icon: Users },
       { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
@@ -114,6 +100,12 @@ export function AppSidebar() {
   const isSubmenuActive = (item) => {
     if (!item.subItems) return false;
     return item.subItems.some(subItem => location.pathname === subItem.url);
+  };
+
+  const handleRoleSelectAndNavigate = (newRole) => {
+    setActiveRole(newRole);
+    localStorage.setItem("activeRole", JSON.stringify(newRole)); // Synchronously update localStorage
+    navigate(getRoleSpecificHomeUrl(newRole));
   };
 
   return (
@@ -138,7 +130,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <TooltipProvider>
                 {items
-                  .filter((item) => item.roles.includes(role))
+                  .filter((item) => item.roles.includes(activeRole)) // Filter by activeRole
                   .map((item) => {
                     const isActive = location.pathname === item.url;
                     const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(isSubmenuActive(item));
@@ -163,6 +155,7 @@ export function AppSidebar() {
                                 </TooltipContent>
                               </Tooltip>
                               <DropdownMenuContent side="right" align="start" className="w-48">
+                                <ul>
                                 {item.subItems.map((subItem) => (
                                   <DropdownMenuItem 
                                     key={subItem.title} 
@@ -171,6 +164,7 @@ export function AppSidebar() {
                                     <span>{subItem.title}</span>
                                   </DropdownMenuItem>
                                 ))}
+                                </ul>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : (
@@ -186,6 +180,7 @@ export function AppSidebar() {
                                 </SidebarMenuButton>
                               </CollapsibleTrigger>
                               <CollapsibleContent className="ml-4 border-l border-[#1a4027]">
+                                <ul>
                                 {item.subItems.map((subItem) => {
                                   const isSubItemActive = location.pathname === subItem.url;
                                   return (
@@ -204,6 +199,7 @@ export function AppSidebar() {
                                     </SidebarMenuItem>
                                   );
                                 })}
+                                </ul>
                               </CollapsibleContent>
                             </Collapsible>
                           )
@@ -270,26 +266,40 @@ export function AppSidebar() {
             >
               <Avatar className="h-8 w-8 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:hidden rounded-md">
                 <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                <AvatarFallback className="bg-[#1e5631] text-white rounded-md">PC</AvatarFallback>
+                <AvatarFallback className="bg-[#1e5631] text-white rounded-md">{user?.email[0]?.toUpperCase() || 'U'}</AvatarFallback>
               </Avatar>
               <Avatar className="h-8 w-8 group-data-[collapsible=icon]:block hidden rounded-md">
-                <AvatarFallback className="bg-[#1e5631] text-white rounded-md">PC</AvatarFallback>
+                <AvatarFallback className="bg-[#1e5631] text-white rounded-md">{user?.email[0]?.toUpperCase() || 'U'}</AvatarFallback>
               </Avatar>
               <div
                 className="flex flex-col items-start text-sm group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:hidden"
               >
-                <span className="font-medium whitespace-nowrap">Program Chair</span>
-                <span className="text-xs text-gray-400 whitespace-nowrap">admin@example.edu</span>
+                <span className="font-medium whitespace-nowrap capitalize">{activeRole || 'No Role'}</span>
+                <span className="text-xs text-gray-400 whitespace-nowrap">{user?.email}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Active Role: {activeRole ? activeRole.charAt(0).toUpperCase() + activeRole.slice(1) : 'N/A'}</DropdownMenuLabel>
+            {user?.roles.length > 1 && (
+                <DropdownMenuSeparator />
+            )}
+            {user?.roles.length > 1 && user.roles.map((roleOption) => (
+                activeRole !== roleOption && (
+                    <DropdownMenuItem key={roleOption} onClick={() => handleRoleSelectAndNavigate(roleOption)} className="capitalize">
+                        <UserCog className="mr-2 h-4 w-4" />
+                        <span>Switch to {roleOption}</span>
+                    </DropdownMenuItem>
+                )
+            ))}
+            <DropdownMenuSeparator />
             <DropdownMenuItem>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

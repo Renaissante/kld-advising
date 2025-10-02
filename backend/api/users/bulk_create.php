@@ -87,16 +87,35 @@ try {
                     }
                     $departmentId = $departmentRow['id'];
 
-                    // Insert into users table
-                    $sqlUser = "INSERT INTO users (id, email, password_hash, role, created_at)
-                                VALUES (:id, :email, :password_hash, :role, NOW())";
+                    // Get the role_id for 'faculty'
+                    $sqlGetRoleId = "SELECT id FROM roles WHERE role_name = :role_name";
+                    $stmtGetRoleId = $conn->prepare($sqlGetRoleId);
+                    $roleNameToInsert = 'faculty';
+                    $stmtGetRoleId->bindParam(':role_name', $roleNameToInsert);
+                    $stmtGetRoleId->execute();
+                    $roleRow = $stmtGetRoleId->fetch(PDO::FETCH_ASSOC);
+
+                    if (!$roleRow) {
+                        throw new Exception("Role 'faculty' not found in roles table.");
+                    }
+                    $roleId = $roleRow['id'];
+
+                    // Insert into users table (without role column)
+                    $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
+                                VALUES (:id, :email, :password_hash, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
-                    $userRole = 'faculty';
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
                     $stmtUser->bindParam(':password_hash', $defaultPassword);
-                    $stmtUser->bindParam(':role', $userRole);
+                    // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
+
+                    // Insert into user_roles table
+                    $sqlUserRole = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
+                    $stmtUserRole = $conn->prepare($sqlUserRole);
+                    $stmtUserRole->bindParam(':user_id', $userId);
+                    $stmtUserRole->bindParam(':role_id', $roleId);
+                    $stmtUserRole->execute();
 
                     // Insert into employees table
                     $sqlEmployee = "INSERT INTO employees (employee_id, name, dob, department_id, created_at)
@@ -279,16 +298,35 @@ try {
                          }
                     }
 
+                    // Get the role_id for 'student'
+                    $sqlGetRoleId = "SELECT id FROM roles WHERE role_name = :role_name";
+                    $stmtGetRoleId = $conn->prepare($sqlGetRoleId);
+                    $roleNameToInsert = 'student';
+                    $stmtGetRoleId->bindParam(':role_name', $roleNameToInsert);
+                    $stmtGetRoleId->execute();
+                    $roleRow = $stmtGetRoleId->fetch(PDO::FETCH_ASSOC);
 
-                    // Insert into users table
-                    $sqlUser = "INSERT INTO users (id, email, password_hash, role, created_at)
-                                VALUES (:id, :email, :password_hash, :role, NOW())";
+                    if (!$roleRow) {
+                        throw new Exception("Role 'student' not found in roles table.");
+                    }
+                    $roleId = $roleRow['id'];
+
+                    // Insert into users table (without role column)
+                    $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
+                                VALUES (:id, :email, :password_hash, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
                     $stmtUser->bindParam(':password_hash', $defaultPassword);
-                    $stmtUser->bindParam(':role', $userRole);
+                    // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
+
+                    // Insert into user_roles table
+                    $sqlUserRole = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
+                    $stmtUserRole = $conn->prepare($sqlUserRole);
+                    $stmtUserRole->bindParam(':user_id', $userId);
+                    $stmtUserRole->bindParam(':role_id', $roleId);
+                    $stmtUserRole->execute();
 
                     // Insert into students table
                     $sqlStudent = "INSERT INTO students (student_id, name, department_id, year_level_id, section_id, program_id, entry_year_id, curriculum_id, created_at)
@@ -363,7 +401,7 @@ try {
             'type' => 'backend_event',
             'payload' => [
                 'event' => 'bulk_user_created',
-                'role' => $role,
+                'role' => $role, // Keep original role for reporting purposes
                 'processedCount' => $processedCount,
                 'failedCount' => $failedCount,
                 'message' => $responseMessage

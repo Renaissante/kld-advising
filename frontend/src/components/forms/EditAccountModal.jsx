@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/config/api";
 import { useActive } from "@/contexts/ActiveContext";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 
 export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }) {
   console.log('EditAccountModal received userData:', userData); // Re-add this line for debugging
@@ -28,11 +29,13 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
     KLD_ID: "",
     name: "",
     email: "",
+    // role: "", // Removed role from formData
     department_id: "",
     program_id: "",
     year_level_id: "",
     section_id: "",
     advisor_id: "",
+    // specialization: "", // Added specialization for faculty
   });
   const [departments, setDepartments] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -40,6 +43,8 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
   const [sections, setSections] = useState([]);
   const [facultyAdvisors, setFacultyAdvisors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState([]); // New state for all available roles
+  const [selectedRoles, setSelectedRoles] = useState([]); // New state for roles selected for the user
 
   const { activeAcademicYear, activeSemester } = useActive();
 
@@ -47,6 +52,7 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
   const [filteredSections, setFilteredSections] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
 
+  // Initialize formData and selectedRoles when userData changes
   useEffect(() => {
     if (userData) {
       setFormData({
@@ -54,16 +60,24 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
         KLD_ID: userData.KLD_ID || "",
         name: userData.name || "",
         email: userData.email || "",
-        role: userData.role || "", // Re-add role to formData for conditional rendering
+        // role: userData.role || "", // Removed role from formData
         department_id: userData.department_id ? String(userData.department_id) : "",
         program_id: userData.program_id ? String(userData.program_id) : "",
         year_level_id: userData.year_level_id ? String(userData.year_level_id) : "",
         section_id: userData.section_id ? String(userData.section_id) : "",
         advisor_id: userData.advisor_id ? String(userData.advisor_id) : "",
+        // specialization: userData.specialization || "", // Initialize specialization
       });
+      // Initialize selectedRoles from userData.roles (comma-separated string)
+      if (userData.roles) {
+        setSelectedRoles(userData.roles.split(',').map(role => role.trim()));
+      } else {
+        setSelectedRoles([]);
+      }
     }
   }, [userData]);
 
+  // Fetch all dropdown data and available roles
   useEffect(() => {
     const fetchDropdownData = async () => {
       try {
@@ -74,6 +88,7 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
           sectionsRes,
           facultyRes,
           academicYearRes,
+          rolesRes, // New: fetch all roles
         ] = await Promise.all([
           fetch(`${API_BASE_URL}/users/departments.php`),
           fetch(`${API_BASE_URL}/users/programs.php`),
@@ -81,15 +96,17 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
           fetch(`${API_BASE_URL}/users/sections.php`),
           fetch(`${API_BASE_URL}/program_chair/read_assignment.php`), // Corrected endpoint for faculty advisors
           fetch(`${API_BASE_URL}/academic_year/read.php`),
+          fetch(`${API_BASE_URL}/users/roles.php`), // New endpoint for roles
         ]);
 
-        const [departmentsData, programsData, yearLevelsData, sectionsData, facultyData, academicYearData] = await Promise.all([
+        const [departmentsData, programsData, yearLevelsData, sectionsData, facultyData, academicYearData, rolesData] = await Promise.all([
           departmentsRes.json(),
           programsRes.json(),
           yearLevelsRes.json(),
           sectionsRes.json(),
           facultyRes.json(),
           academicYearRes.json(),
+          rolesRes.json(), // Parse roles data
         ]);
 
         setDepartments(departmentsData);
@@ -98,6 +115,8 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
         setSections(sectionsData);
         setFacultyAdvisors(facultyData);
         setAcademicYears(academicYearData);
+        setAvailableRoles(rolesData); // Set available roles
+
       } catch (error) {
         console.error("Error fetching dropdown data:", error);
         toast.error("Failed to load necessary data for editing.");
@@ -153,17 +172,29 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
     }
   };
 
+  // Handle role checkbox changes
+  const handleRoleCheckboxChange = (roleName, isChecked) => {
+    setSelectedRoles((prev) => {
+      if (isChecked) {
+        return [...prev, roleName];
+      } else {
+        return prev.filter((role) => role !== roleName);
+      }
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+      const payload = { ...formData, roles: selectedRoles }; // Send roles array in payload
       const response = await fetch(`${API_BASE_URL}/users/update_user.php`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -183,6 +214,9 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
       setIsLoading(false);
     }
   };
+
+  // Helper to check if a user has a specific role (for conditional rendering)
+  const userHasRole = (roleName) => userData.roles && userData.roles.includes(roleName);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -229,7 +263,26 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
             />
           </div>
 
-          {(userData.role === "faculty" || userData.role === "programchair" || userData.role === "dean") && (
+          {/* Role Management Section */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="roles">
+              Roles
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {availableRoles.map((role) => (
+                <div key={role.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`role-${role.id}`}
+                    checked={selectedRoles.includes(role.name)}
+                    onCheckedChange={(checked) => handleRoleCheckboxChange(role.name, checked)}
+                  />
+                  <Label htmlFor={`role-${role.id}`}>{role.name}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {(selectedRoles.includes("faculty") || selectedRoles.includes("programchair") || selectedRoles.includes("dean") || selectedRoles.includes("admin")) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="department_id">
                 Department
@@ -255,7 +308,7 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
           )}
 
           {/* Conditionally render Program for student and programchair */}
-          {(userData.role === "student" || userData.role === "programchair") && (
+          {(selectedRoles.includes("student") || selectedRoles.includes("programchair")) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="program_id">
                 Program
@@ -287,7 +340,7 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
           )}
 
           {/* Conditionally render Year Level, Section, and Advisor ONLY for student */}
-          {userData.role === "student" && (
+          {selectedRoles.includes("student") && (
             <>
               <div className="flex gap-4">
                 <div className="flex flex-col gap-2 w-1/2">
@@ -365,6 +418,21 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
               </div>
             </>
           )}
+
+          {/* Conditionally render Specialization for faculty */}
+          {/* {selectedRoles.includes("faculty") && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="specialization">
+                Specialization
+              </Label>
+              <Input
+                id="specialization"
+                value={formData.specialization}
+                onChange={handleChange}
+                placeholder="e.g., Software Engineering, Data Science"
+              />
+            </div>
+          )} */}
 
           <DialogFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose} className="w-auto">

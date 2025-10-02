@@ -253,44 +253,48 @@ export default function FacultyAssignment() {
     setIsEditAssignmentDialogOpen(true)
   }
 
-  const handleDeleteAssignment = (assignment) => {
-    console.log("Attempting to delete assignment:", assignment)
+  const handleArchiveAssignment = (assignment) => {
+    console.log("Attempting to archive assignment:", assignment)
     setAssignmentToDelete(assignment)
     setShowDeleteDialog(true)
   }
 
-  const confirmDeleteAssignment = async () => {
+  const confirmArchiveAssignment = async () => {
     if (!assignmentToDelete) return;
-    const toastId = toast.loading("Deleting assignment...");
+    const toastId = toast.loading("Archiving assignment...");
     try {
-      // --- API Call for Deletion ---
-      const response = await fetch(`${API_BASE_URL}/program_chair/delete_assignment.php`, { // Replace with your actual delete endpoint
-        method: 'DELETE', // Or POST if using body for ID
+      // --- API Call for Archiving ---
+      const response = await fetch(`${API_BASE_URL}/program_chair/archive_assignment.php`, { // Use archive endpoint
+        method: 'POST', // Changed to POST
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignment_id: assignmentToDelete.assignment_id })
       });
       const data = await response.json();
       toast.dismiss(toastId);
       if (response.ok) {
-        toast.success("Assignment deleted successfully");
+        toast.success("Assignment archived successfully", {
+          id: `delete-assignment-success-${assignmentToDelete.assignment_id}-${Date.now()}`
+        });
         // --- Direct State Update ---
-        setAssignedCourses(prevCourses => prevCourses.filter(a => a.assignment_id !== assignmentToDelete.assignment_id));
-        // Optionally update facultyInfo counts
-        setFacultyInfo(prevInfo => ({
-          ...prevInfo,
-          sectionsAssigned: Math.max(0, (prevInfo.sectionsAssigned || 0) - 1) // Decrement count
-        }));
+        // Re-fetch data to reflect archived status
+        await fetchFacultyData();
         // --- End Direct State Update ---
         setShowDeleteDialog(false);
         setAssignmentToDelete(null);
       } else {
-        console.error("Error deleting assignment:", data.message);
-        toast.error("Failed to delete assignment", { description: data.message || "Please try again." });
+        console.error("Error archiving assignment:", data.message);
+        toast.error("Failed to archive assignment", { 
+          id: `delete-assignment-error-${assignmentToDelete.assignment_id}-${Date.now()}`,
+          description: data.message || "Please try again." 
+        });
       }
     } catch (error) {
       toast.dismiss(toastId);
-      console.error("Error in delete API call:", error);
-      toast.error("Network error", { description: "Could not delete assignment." });
+      console.error("Error in archive API call:", error);
+      toast.error("Network error", {
+        id: `delete-assignment-network-error-${assignmentToDelete.assignment_id}-${Date.now()}`,
+        description: "Could not archive assignment."
+      });
     }
   }
 
@@ -319,31 +323,36 @@ export default function FacultyAssignment() {
       if (response.ok) {
         toast.dismiss(toastId);
         toast.success("Course assigned successfully", {
+          id: `assign-course-success-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
           description: `${data.course_code || 'Course'} assigned to ${data.section_name || 'section'}`
         });
 
         // --- Direct State Update ---
         // Ensure 'data' from API contains all necessary fields for the table row
-        const newAssignmentEntry = {
-          assignment_id: data.assignment_id, // CRITICAL: API must return the new ID
-          course_id: data.course_id,
-          course_code: data.course_code,
-          course_title: data.course_title,
-          section_id: data.section_id,
-          section_name: data.section_name,
-          year_level: data.year_level, // Ensure API returns these
-          semester: data.semester,     // Ensure API returns these
-        };
+        // const newAssignmentEntry = {
+        //   assignment_id: data.assignment_id, // CRITICAL: API must return the new ID
+        //   course_id: data.course_id,
+        //   course_code: data.course_code,
+        //   course_title: data.course_title,
+        //   section_id: data.section_id,
+        //   section_name: data.section_name,
+        //   year_level: data.year_level, // Ensure API returns these
+        //   semester: data.semester,     // Ensure API returns these
+        // };
 
-        // Add the new assignment to the local state
-        setAssignedCourses(prevCourses => [...prevCourses, newAssignmentEntry]);
+        // // Add the new assignment to the local state
+        // setAssignedCourses(prevCourses => [...prevCourses, newAssignmentEntry]);
 
-        // Optionally update facultyInfo counts displayed in the card
-        setFacultyInfo(prevInfo => ({
-          ...prevInfo,
-          sectionsAssigned: (prevInfo.sectionsAssigned || 0) + 1 // Increment count
-        }));
+        // // Optionally update facultyInfo counts displayed in the card
+        // setFacultyInfo(prevInfo => ({
+        //   ...prevInfo,
+        //   sectionsAssigned: (prevInfo.sectionsAssigned || 0) + 1 // Increment count
+        // }));
         // --- End Direct State Update ---
+
+        // --- Refetch Data ---
+        await fetchFacultyData();
+        // --- End Refetch Data ---
 
         setIsAssignDialogOpen(false); // Close the dialog
 
@@ -351,6 +360,7 @@ export default function FacultyAssignment() {
         toast.dismiss(toastId);
         console.error("Error assigning course:", data.message);
         toast.error("Failed to assign course", {
+          id: `assign-course-error-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
           description: data.message || "Error assigning the course. Please try again."
         });
       }
@@ -358,6 +368,7 @@ export default function FacultyAssignment() {
       if (toastId) toast.dismiss(toastId);
       console.error("Error in API call:", error);
       toast.error("Network error", {
+        id: `assign-course-network-error-${facultyInfo.faculty_id}-${Date.now()}`,
         description: "Connection problem. Please check your network and try again."
       });
     }
@@ -388,7 +399,9 @@ export default function FacultyAssignment() {
       const data = await response.json();
       toast.dismiss(toastId);
       if (response.ok) {
-        toast.success("Assignment updated successfully");
+        toast.success("Assignment updated successfully", {
+          id: `edit-assignment-success-${selectedAssignment.assignment_id}-${Date.now()}`
+        });
         // --- Direct State Update ---
         // Fetch updated details from response (assuming API returns the updated object)
         const updatedAssignmentEntry = {
@@ -410,12 +423,18 @@ export default function FacultyAssignment() {
         setNewAssignment({ courseId: "", sectionId: "", semesterId: "" });
       } else {
         console.error("Error updating assignment:", data.message);
-        toast.error("Failed to update assignment", { description: data.message || "Please try again." });
+        toast.error("Failed to update assignment", {
+          id: `edit-assignment-error-${selectedAssignment.assignment_id}-${Date.now()}`,
+          description: data.message || "Please try again."
+        });
       }
     } catch (error) {
       toast.dismiss(toastId);
       console.error("Error in update API call:", error);
-      toast.error("Network error", { description: "Could not update assignment." });
+      toast.error("Network error", {
+        id: `edit-assignment-network-error-${selectedAssignment.assignment_id}-${Date.now()}`,
+        description: "Could not update assignment."
+      });
     }
   }
 
@@ -437,7 +456,9 @@ export default function FacultyAssignment() {
           const data = await response.json();
           toast.dismiss(toastId);
           if (response.ok) {
-              toast.success("Advisee section unassigned successfully");
+              toast.success("Advisee section unassigned successfully", {
+                id: `unassign-advisee-success-${facultyInfo.faculty_id}-${advisee.section_id}-${Date.now()}`
+              });
               // --- Direct State Update ---
               setAdvisees(prevAdvisees => prevAdvisees.filter(a => a.student_db_id !== advisee.student_db_id));
               // Update facultyInfo counts
@@ -450,12 +471,18 @@ export default function FacultyAssignment() {
               // --- End Direct State Update ---
           } else {
               console.error("Error unassigning advisee:", data.message);
-              toast.error("Failed to unassign advisee", { description: data.message || "Please try again." });
+              toast.error("Failed to unassign advisee", {
+                id: `unassign-advisee-error-${facultyInfo.faculty_id}-${advisee.section_id}-${Date.now()}`,
+                description: data.message || "Please try again."
+              });
           }
       } catch (error) {
           toast.dismiss(toastId);
           console.error("Error in unassign advisee API call:", error);
-          toast.error("Network error", { description: "Could not unassign advisee." });
+          toast.error("Network error", {
+            id: `unassign-advisee-network-error-${facultyInfo.faculty_id}-${Date.now()}`,
+            description: "Could not unassign advisee."
+          });
       }
   }
 
@@ -535,9 +562,9 @@ export default function FacultyAssignment() {
     </Dialog>
   )
 
-  const DeleteConfirmationDialog = ({ open, onOpenChange }) => (
+  const ArchiveConfirmationDialog = ({ open, onOpenChange }) => (
     <Dialog open={open} onOpenChange={(isOpen) => { onOpenChange(isOpen); if (!isOpen) setAssignmentToDelete(null); }}>
-      <DialogPortal><DialogContent><DialogHeader><DialogTitle>Confirm Delete</DialogTitle></DialogHeader><p>Are you sure you want to remove this course assignment?</p><p className="text-sm text-muted-foreground">{assignmentToDelete && `${assignmentToDelete.course_code} - ${assignmentToDelete.course_title} (${assignmentToDelete.section_name})`}</p><DialogFooter className="flex justify-between"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button variant="destructive" onClick={confirmDeleteAssignment}>Delete</Button></DialogFooter></DialogContent></DialogPortal>
+      <DialogPortal><DialogContent><DialogHeader><DialogTitle>Confirm Archive</DialogTitle></DialogHeader><p>Are you sure you want to archive this course assignment?</p><p className="text-sm text-muted-foreground">{assignmentToDelete && `${assignmentToDelete.course_code} - ${assignmentToDelete.course_title} (${assignmentToDelete.section_name})`}</p><DialogFooter className="flex justify-between"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button variant="destructive" onClick={confirmArchiveAssignment}>Archive</Button></DialogFooter></DialogContent></DialogPortal>
     </Dialog>
   )
 
@@ -934,11 +961,11 @@ export default function FacultyAssignment() {
         toast.dismiss(toastId);
         // Assuming the API returns the section name for the description
         toast.success("Advisor assigned successfully", {
+          id: `assign-advisee-success-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${Date.now()}`,
           description: `${facultyInfo.faculty_name} assigned to advise ${data.section_name || 'section'}`
         });
 
         // --- Refetch Data ---
-        // Refetch all data for this faculty to ensure advisee list and counts are updated correctly.
         await fetchFacultyData();
         // --- End Refetch Data ---
 
@@ -948,6 +975,7 @@ export default function FacultyAssignment() {
         toast.dismiss(toastId);
         console.error("Error assigning advisor:", data.message);
         toast.error("Failed to assign advisor", {
+          id: `assign-advisee-error-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${Date.now()}`,
           description: data.message || "Error assigning the advisor. Please try again."
         });
       }
@@ -955,6 +983,7 @@ export default function FacultyAssignment() {
       if (toastId) toast.dismiss(toastId);
       console.error("Error in assign advisor API call:", error);
       toast.error("Network error", {
+        id: `assign-advisee-network-error-${facultyInfo.faculty_id}-${Date.now()}`,
         description: "Connection problem. Please check your network and try again."
       });
     }
@@ -1026,7 +1055,7 @@ export default function FacultyAssignment() {
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
         <div className="w-full">
           <ValidationDialog open={showValidationDialog} onOpenChange={setShowValidationDialog} />
-          <DeleteConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
+          <ArchiveConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
 
           <AssignCourseDialog
             open={isAssignDialogOpen}
@@ -1194,7 +1223,7 @@ export default function FacultyAssignment() {
                                 <Button size="icon" variant="outline" className="p-2 h-8 w-8" onClick={() => handleEditAssignment(assignment)} aria-label="Edit Assignment">
                                   <Edit size={16} />
                                 </Button>
-                                <Button size="icon" variant="destructive" className="p-2 h-8 w-8" onClick={() => handleDeleteAssignment(assignment)} aria-label="Delete Assignment">
+                                <Button size="icon" variant="destructive" className="p-2 h-8 w-8" onClick={() => handleArchiveAssignment(assignment)} aria-label="Archive Assignment">
                                   <Trash2 size={16} />
                                 </Button>
                               </div>

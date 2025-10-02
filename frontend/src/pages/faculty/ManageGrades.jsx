@@ -47,7 +47,8 @@ const ManageGrades = () => {
 
   // Fetch faculty courses
   const fetchCourses = useCallback(async () => {
-    if (!user || user.role !== 'faculty') return;
+    // if (!user || user.role !== 'faculty') return; // Commented out strict role check
+    if (!user) return; // Only check for user existence
 
     setCoursesLoading(true);
     setError(null);

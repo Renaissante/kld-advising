@@ -49,8 +49,8 @@ try {
     $conn->beginTransaction();
 
  
-    $sql = "INSERT INTO users (id, email, password_hash, role, created_at) 
-            VALUES (:id, :email, :password_hash, :role, NOW())";
+    $sql = "INSERT INTO users (id, email, password_hash, created_at) 
+            VALUES (:id, :email, :password_hash, NOW())";
     $stmt = $conn->prepare($sql);
 
 
@@ -60,10 +60,28 @@ try {
     $stmt->bindParam(':id', $userId);
     $stmt->bindParam(':email', $data->email);
     $stmt->bindParam(':password_hash', $defaultPassword);
-    $stmt->bindParam(':role', $data->role);
+    // $stmt->bindParam(':role', $data->role); // Removed as role is now in user_roles
     $stmt->execute();
 
-    
+    // Get the role_id for 'faculty'
+    $sqlGetRoleId = "SELECT id FROM roles WHERE role_name = :role_name";
+    $stmtGetRoleId = $conn->prepare($sqlGetRoleId);
+    $roleName = 'faculty'; // Assuming the role for this file is always 'faculty'
+    $stmtGetRoleId->bindParam(':role_name', $roleName);
+    $stmtGetRoleId->execute();
+    $roleRow = $stmtGetRoleId->fetch(PDO::FETCH_ASSOC);
+
+    if (!$roleRow) {
+        throw new Exception("Role 'faculty' not found in roles table.");
+    }
+    $roleId = $roleRow['id'];
+
+    // Insert into user_roles table
+    $sqlUserRole = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
+    $stmtUserRole = $conn->prepare($sqlUserRole);
+    $stmtUserRole->bindParam(':user_id', $userId);
+    $stmtUserRole->bindParam(':role_id', $roleId);
+    $stmtUserRole->execute();
 
   
     $sql = "SELECT id FROM departments WHERE name = :department";

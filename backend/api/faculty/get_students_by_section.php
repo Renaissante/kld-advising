@@ -32,28 +32,36 @@ if (!isset($_GET['faculty_id'])) {
 }
 $faculty_id = $_GET['faculty_id']; // Use the passed faculty ID
 
-// Fetch user role from DB based on faculty_id to verify permissions
+// Fetch user roles from DB based on faculty_id to verify permissions
 try {
-    $role_query = "SELECT role FROM users WHERE id = :faculty_id LIMIT 1";
+    $role_query = "SELECT r.role_name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :faculty_id";
     $role_stmt = $conn->prepare($role_query);
     if ($role_stmt === false) {
          throw new PDOException("Failed to prepare role query: " . implode(" - ", $conn->errorInfo()));
     }
     $role_stmt->bindParam(':faculty_id', $faculty_id);
     $role_stmt->execute();
-    $user_data = $role_stmt->fetch(PDO::FETCH_ASSOC);
+    $user_roles = $role_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
 
-    if (!$user_data) {
+    if (empty($user_roles)) {
         http_response_code(403); // Forbidden
-        error_log("Forbidden access attempt: Invalid faculty_id provided: " . $faculty_id);
-        echo json_encode(array("success" => false, "message" => "Forbidden: Invalid faculty identifier."));
+        error_log("Forbidden access attempt: Invalid faculty_id or no roles found for user: " . $faculty_id);
+        echo json_encode(array("success" => false, "message" => "Forbidden: Invalid faculty identifier or no roles assigned."));
         exit();
     }
 
     $allowedRoles = ['faculty', 'dean', 'programchair']; // Define allowed roles
-    if (!in_array($user_data['role'], $allowedRoles)) {
+    $hasPermission = false;
+    foreach ($user_roles as $role_name) {
+        if (in_array($role_name, $allowedRoles)) {
+            $hasPermission = true;
+            break;
+        }
+    }
+
+    if (!$hasPermission) {
         http_response_code(403); // Forbidden
-        error_log("Forbidden access attempt by user ID: " . $faculty_id . " with role: " . $user_data['role']);
+        error_log("Forbidden access attempt by user ID: " . $faculty_id . " with roles: " . implode(', ', $user_roles));
         echo json_encode(array("success" => false, "message" => "Forbidden: User does not have permission to view students for this section."));
         exit();
     }

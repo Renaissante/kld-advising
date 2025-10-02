@@ -25,8 +25,8 @@ $baseQuery = "
         u.id,
         COALESCE(e.employee_id, s.student_id) AS KLD_ID,
         u.email,
-        u.role,
         u.status,
+        GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles, /* ADDED: Get all roles as comma-separated string */
         COALESCE(e.name, s.name) AS name,
         d.name AS department,
         prog.name AS program,
@@ -42,6 +42,8 @@ $baseQuery = "
     FROM users u
     LEFT JOIN employees e ON u.id = e.employee_id
     LEFT JOIN students s ON u.id = s.student_id
+    LEFT JOIN user_roles ur ON u.id = ur.user_id /* ADDED JOIN */
+    LEFT JOIN roles r ON ur.role_id = r.id      /* ADDED JOIN */
     LEFT JOIN deans dn ON e.employee_id = dn.employee_id
     LEFT JOIN program_chairs pc ON e.employee_id = pc.employee_id
     LEFT JOIN faculty f ON e.employee_id = f.employee_id
@@ -60,6 +62,8 @@ $countQuery = "
     FROM users u
     LEFT JOIN employees e ON u.id = e.employee_id
     LEFT JOIN students s ON u.id = s.student_id
+    LEFT JOIN user_roles ur ON u.id = ur.user_id /* ADDED JOIN */
+    LEFT JOIN roles r ON ur.role_id = r.id      /* ADDED JOIN */
     LEFT JOIN deans dn ON e.employee_id = dn.employee_id
     LEFT JOIN program_chairs pc ON e.employee_id = pc.employee_id
     LEFT JOIN faculty f ON e.employee_id = f.employee_id
@@ -76,7 +80,7 @@ $countQuery = "
 if (!empty($search)) {
     $searchClause = " AND (LOWER(u.email) LIKE ? OR LOWER(COALESCE(e.name, s.name)) LIKE ? OR LOWER(COALESCE(CAST(e.employee_id AS CHAR), CAST(s.student_id AS CHAR))) LIKE ?";
     // Add search conditions for other relevant columns
-    $searchClause .= " OR LOWER(u.role) LIKE ?";
+    $searchClause .= " OR LOWER(r.role_name) LIKE ?"; /* MODIFIED: Search by role_name from roles table */
     $searchClause .= " OR LOWER(d.name) LIKE ?"; // Department name
     $searchClause .= " OR LOWER(prog.name) LIKE ?"; // Program name
     $searchClause .= " OR LOWER(yl.level) LIKE ?"; // Year Level
@@ -92,6 +96,7 @@ if (!empty($search)) {
 array_unshift($params, $status); // Add status as the first parameter for both queries
 
 $baseQuery .= "
+    GROUP BY u.id, KLD_ID, u.email, u.status, name, department, program, year_level, specialization, section, department_id, program_id, year_level_id, section_id, advisor_id, advisor /* ADDED GROUP BY */
     ORDER BY u.id
     LIMIT $pageSize OFFSET $offset
 ";

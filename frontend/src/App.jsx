@@ -22,9 +22,10 @@ const App = () => {
 
 // New component to handle the WebSocket connection and notifications
 const WebSocketHandler = () => {
-  const { user } = useAuth(); // Access the authenticated user
+  const { user, activeRole } = useAuth(); // Access the authenticated user and activeRole
 
   console.log("WebSocketHandler rendered. User:", user); // Log user state on render
+  console.log("WebSocketHandler rendered. activeRole:", activeRole); // LOG activeRole
 
   useEffect(() => {
     console.log("WebSocketHandler useEffect running. User:", user); // Log when effect runs

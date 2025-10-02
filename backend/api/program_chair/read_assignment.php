@@ -29,23 +29,19 @@ try {
     // --- CORRECTED Main Faculty Query ---
     // Select from employees first, then join users and departments
     $query = "SELECT
-                e.employee_id as faculty_id, -- Use employee_id from employees table, aliased as faculty_id
+                e.employee_id as faculty_id,
                 u.email,
-                u.role,
+                GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles,
                 e.name as faculty_name,
                 d.name as department_name
-              FROM
-                employees e
-              -- Join users ON employees.employee_id = users.id
-              JOIN
-                users u ON e.employee_id = u.id
-              -- Join departments ON employees.department_id = departments.id (This join was correct)
-              JOIN
-                departments d ON e.department_id = d.id
-              WHERE
-                u.role IN ('faculty', 'programchair', 'dean') -- Added 'advisor' based on schema enum, adjust if needed
-              ORDER BY
-                e.name";
+              FROM employees e
+              JOIN users u ON e.employee_id = u.id
+              LEFT JOIN user_roles ur ON u.id = ur.user_id
+              LEFT JOIN roles r ON ur.role_id = r.id
+              JOIN departments d ON e.department_id = d.id
+              WHERE r.role_name IN ('faculty', 'programchair', 'dean', 'advisor')
+              GROUP BY e.employee_id, u.email, e.name, d.name
+              ORDER BY e.name";
 
     // Use $conn
     $stmt = $conn->prepare($query);
@@ -68,7 +64,7 @@ try {
             // --- Calculate Sections Assigned (section_faculty uses faculty_id) --- This query is OK
             $sections_assigned_query = "SELECT COUNT(sf.section_id) as count
                                         FROM section_faculty sf
-                                        WHERE sf.faculty_id = :faculty_id";
+                                        WHERE sf.faculty_id = :faculty_id AND sf.status = 'active'"; // Added status filter
             $sections_assigned_stmt = $conn->prepare($sections_assigned_query);
             if ($sections_assigned_stmt === false) throw new PDOException("Failed to prepare sections_assigned query: " . implode(" - ", $conn->errorInfo()));
             $sections_assigned_stmt->bindParam(':faculty_id', $faculty_id);

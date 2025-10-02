@@ -43,28 +43,54 @@ try {
     
     $section = $section_stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Check if the user exists and has an eligible role (not admin or student)
-    $user_query = "SELECT u.id, u.email, u.role, e.name, e.department_id
-                  FROM users u
-                  LEFT JOIN employees e ON u.id = e.employee_id
-                  WHERE u.id = :user_id";
-                     
-    $user_stmt = $conn->prepare($user_query);
-    $user_stmt->bindParam(':user_id', $data->faculty_id);
-    $user_stmt->execute();
-    
-    if ($user_stmt->rowCount() === 0) {
+    // Check if the faculty exists as an employee
+    $employee_query = "SELECT e.employee_id, e.name, d.name as department_name
+                       FROM employees e
+                       JOIN departments d ON e.department_id = d.id
+                       WHERE e.employee_id = :faculty_id";
+    $employee_stmt = $conn->prepare($employee_query);
+    $employee_stmt->bindParam(':faculty_id', $data->faculty_id);
+    $employee_stmt->execute();
+
+    if ($employee_stmt->rowCount() === 0) {
         http_response_code(404);
-        echo json_encode(array("message" => "User not found"));
+        echo json_encode(array("message" => "Faculty not found as an employee."));
+        exit();
+    }
+    $employee_info = $employee_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Check if the user exists and has an eligible role
+    $user_roles_query = "SELECT r.role_name
+                         FROM users u
+                         JOIN user_roles ur ON u.id = ur.user_id
+                         JOIN roles r ON ur.role_id = r.id
+                         WHERE u.id = :user_id";
+                     
+    $user_roles_stmt = $conn->prepare($user_roles_query);
+    $user_roles_stmt->bindParam(':user_id', $data->faculty_id);
+    $user_roles_stmt->execute();
+    
+    if ($user_roles_stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(array("message" => "User roles not found."));
         exit();
     }
     
-    $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+    $user_roles = $user_roles_stmt->fetchAll(PDO::FETCH_COLUMN, 0); // Fetch just role names
     
-    // Check if user has an eligible role (not admin or student)
-    if ($user['role'] === 'admin' || $user['role'] === 'student') {
+    $is_eligible_advisor = false;
+    $allowed_advisor_roles = ['faculty', 'program_chair', 'dean'];
+
+    foreach ($user_roles as $role) {
+        if (in_array($role, $allowed_advisor_roles)) {
+            $is_eligible_advisor = true;
+            break;
+        }
+    }
+
+    if (!$is_eligible_advisor) {
         http_response_code(400);
-        echo json_encode(array("message" => "User with role '" . $user['role'] . "' cannot be assigned as an advisor"));
+        echo json_encode(array("message" => "User does not have an eligible role to be assigned as an advisor."));
         exit();
     }
     
@@ -99,7 +125,7 @@ try {
             "section_id" => $data->section_id,
             "section_name" => $section["name"],
             "previous_advisor" => $existing["advisor_name"],
-            "new_advisor" => $user["name"],
+            "new_advisor" => $employee_info["name"],
             "replaced" => true
         ));
     } 
@@ -122,8 +148,8 @@ try {
             "program" => $section["program_name"],
             "year_level" => $section["year_level"],
             "advisor_id" => $data->faculty_id,
-            "advisor_name" => $user["name"],
-            "advisor_email" => $user["email"]
+            "advisor_name" => $employee_info["name"],
+            "advisor_email" => "N/A" // Email is not directly available from this query
         ));
     }
     

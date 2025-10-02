@@ -34,16 +34,24 @@ if (!$advisorId && isset($_SESSION['user_id'])) {
     $advisorId = $_SESSION['user_id'];
 
     // Also verify role if available
-    if (isset($_SESSION['role'])) {
-        $allowedRoles = ['faculty', 'dean', 'programchair']; // Define allowed roles
-        if (!in_array($_SESSION['role'], $allowedRoles)) { // Check if the user's role is NOT in the allowed list
+    if (isset($_SESSION['user_roles'])) {
+        $allowedRoles = ['faculty', 'dean', 'programchair', 'advisor']; // Define allowed roles, added 'advisor'
+        $hasPermission = false;
+        foreach ($_SESSION['user_roles'] as $userRole) {
+            if (in_array($userRole, $allowedRoles)) {
+                $hasPermission = true;
+                break;
+            }
+        }
+
+        if (!$hasPermission) {
             http_response_code(403);
             echo json_encode(array("success" => false, "message" => "Forbidden: User does not have permission to view assigned sections"));
             exit();
         }
     } else {
         http_response_code(403);
-        echo json_encode(array("success" => false, "message" => "Forbidden: User role not found in session"));
+        echo json_encode(array("success" => false, "message" => "Forbidden: User roles not found in session"));
         exit();
     }
 }

@@ -43,13 +43,16 @@ try {
     $faculty_info_query = "SELECT
                                 e.employee_id as faculty_id,
                                 u.email,
-                                u.role,
+                                GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles,
                                 e.name as faculty_name,
                                 d.name as department_name
                            FROM employees e
                            JOIN users u ON e.employee_id = u.id
+                           LEFT JOIN user_roles ur ON u.id = ur.user_id
+                           LEFT JOIN roles r ON ur.role_id = r.id
                            JOIN departments d ON e.department_id = d.id
-                           WHERE e.employee_id = :faculty_id"; // Use the specific ID
+                           WHERE e.employee_id = :faculty_id
+                           GROUP BY e.employee_id, u.email, e.name, d.name";
 
     $faculty_stmt = $conn->prepare($faculty_info_query);
     if ($faculty_stmt === false) throw new PDOException("Failed to prepare faculty_info query: " . implode(" - ", $conn->errorInfo()));
@@ -97,7 +100,7 @@ try {
                                    JOIN sections sec ON sf.section_id = sec.id
                                    LEFT JOIN year_levels yl ON sec.year_level_id = yl.id -- !! VERIFY JOIN COLUMN !!
                                    LEFT JOIN semesters sem ON sec.semester_id = sem.semester_id -- !! VERIFY JOIN COLUMN !!
-                                   WHERE sf.faculty_id = :faculty_id
+                                   WHERE sf.faculty_id = :faculty_id AND sf.status = 'active'
                                    ORDER BY sem.semester_id, sec.name, c.course_code"; // Example ordering
 
         $courses_stmt = $conn->prepare($assigned_courses_query);

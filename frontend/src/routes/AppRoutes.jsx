@@ -19,8 +19,17 @@ import ManageFaculty from "@/pages/program-chair/ManageFaculty";
 import FacultyAssignment from "@/pages/program-chair/FacultyAssignment";
 import ManageSections from "@/pages/program-chair/ManageSections";
 import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
+import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
+import { useContext } from "react"; // Import useContext
+import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
 export default function AppRoutes() {
+  const { user, activeRole } = useContext(AuthContext); // Access user and activeRole
+
+  console.log("AppRoutes: Rendering."); // LOG
+  console.log("AppRoutes: User", user); // LOG
+  console.log("AppRoutes: activeRole", activeRole); // LOG
+
   return (
     <Routes>
       
@@ -35,11 +44,20 @@ export default function AppRoutes() {
         }
       />
 
+      {/* New Role Selection Route */}
+      <Route
+        path="/role-selection"
+        element={
+          <ErrorBoundary>
+            <RoleSelectionPage />
+          </ErrorBoundary>
+        }
+      />
   
       <Route
         path="/admin/dashboard"
         element={
-          <ProtectedRoute role="admin">
+          <ProtectedRoute requiredRoles="admin">
             <AdminDashboard />
           </ProtectedRoute>
         }
@@ -48,7 +66,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/users/active-users"
         element={
-          <ProtectedRoute role="admin">
+          <ProtectedRoute requiredRoles="admin">
             <ActiveUsers />
           </ProtectedRoute>
         }
@@ -57,7 +75,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/users/archived-users"
         element={
-          <ProtectedRoute role="admin">
+          <ProtectedRoute requiredRoles="admin">
             <ArchivedUsers />
           </ProtectedRoute>
         }
@@ -66,7 +84,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/curriculum"
         element={
-          <ProtectedRoute role="admin">
+          <ProtectedRoute requiredRoles="admin">
             <ManageCurriculum />
           </ProtectedRoute>
         }
@@ -75,7 +93,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/audit-trail"
         element={
-          <ProtectedRoute role="admin">
+          <ProtectedRoute requiredRoles="admin">
             <AuditTrail />
           </ProtectedRoute>
         }
@@ -84,7 +102,7 @@ export default function AppRoutes() {
       <Route
         path="/faculty/grades"
         element={
-          <ProtectedRoute role="faculty">
+          <ProtectedRoute requiredRoles="faculty">
             <ManageGrades />
           </ProtectedRoute>
         }
@@ -93,7 +111,7 @@ export default function AppRoutes() {
       <Route
         path="/faculty/advise"
         element={
-          <ProtectedRoute role="faculty">
+          <ProtectedRoute requiredRoles="faculty">
             <AdvisingPage />
           </ProtectedRoute>
         }
@@ -102,7 +120,7 @@ export default function AppRoutes() {
       <Route
         path="/student/home"
         element={
-          <ProtectedRoute role="student">
+          <ProtectedRoute requiredRoles="student">
             <StudentHome />
           </ProtectedRoute>
         }
@@ -111,7 +129,7 @@ export default function AppRoutes() {
       <Route
         path="/student/advising-records"
         element={
-          <ProtectedRoute role="student">
+          <ProtectedRoute requiredRoles="student">
             <StudentAdvisingRecords />
           </ProtectedRoute>
         }
@@ -120,7 +138,7 @@ export default function AppRoutes() {
       <Route
         path="/student/curriculum"
         element={
-          <ProtectedRoute role="student">
+          <ProtectedRoute requiredRoles="student">
             <StudentCurriculum />
           </ProtectedRoute>
         }
@@ -128,7 +146,7 @@ export default function AppRoutes() {
       <Route
         path="/faculty/home"
         element={
-          <ProtectedRoute role="faculty">
+          <ProtectedRoute requiredRoles="faculty">
             <FacultyHome />
           </ProtectedRoute>
         }
@@ -136,7 +154,7 @@ export default function AppRoutes() {
       <Route
         path="/program-chair/home"
         element={
-          <ProtectedRoute role="programchair">
+          <ProtectedRoute requiredRoles="programchair">
             <ProgramChairHome />
           </ProtectedRoute>
         }
@@ -146,7 +164,7 @@ export default function AppRoutes() {
       <Route
         path="/program-chair/curriculum"
         element={
-          <ProtectedRoute role="programchair">
+          <ProtectedRoute requiredRoles="programchair">
             <ProgramChairManageCurriculum />
           </ProtectedRoute>
         }
@@ -155,7 +173,7 @@ export default function AppRoutes() {
       <Route
         path="/program-chair/manage-faculty"
         element={
-          <ProtectedRoute role="programchair">
+          <ProtectedRoute requiredRoles="programchair">
             <ManageFaculty />
           </ProtectedRoute>
         }
@@ -164,7 +182,7 @@ export default function AppRoutes() {
       <Route
         path="/program-chair/faculty-assignment/:facultyId"
         element={
-          <ProtectedRoute role="programchair">
+          <ProtectedRoute requiredRoles="programchair">
             <FacultyAssignment />
           </ProtectedRoute>
         }
@@ -173,7 +191,7 @@ export default function AppRoutes() {
       <Route
         path="/program-chair/manage-sections"
         element={
-          <ProtectedRoute role="programchair">
+          <ProtectedRoute requiredRoles="programchair">
             <ManageSections />
           </ProtectedRoute>
         }
@@ -182,14 +200,14 @@ export default function AppRoutes() {
       <Route
         path="/dean/home"
         element={
-          <ProtectedRoute role="dean">
+          <ProtectedRoute requiredRoles="dean">
             <DeanHome />
           </ProtectedRoute>
         }
       />
 
      
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* <Route path="*" element={<Navigate to="/login" replace />} /> */}
     </Routes>
   );
 }

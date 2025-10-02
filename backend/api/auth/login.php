@@ -20,11 +20,15 @@ $password = isset($data["password"]) ? trim($data["password"]) : "";
 try {
     // ✅ Fetch user details and include employee_id (if exists)
     $query = "
-        SELECT u.id, u.email, u.password_hash, u.role, e.employee_id, s.student_id
+        SELECT u.id, u.email, u.password_hash, e.employee_id, s.student_id,
+               GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles_list
         FROM users u
         LEFT JOIN employees e ON u.id = e.employee_id
         LEFT JOIN students s ON u.id = s.student_id
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
         WHERE u.email = :email
+        GROUP BY u.id, u.email, u.password_hash, e.employee_id, s.student_id
     ";
 
     $stmt = $conn->prepare($query);
@@ -35,7 +39,9 @@ try {
     // --- INSECURE PASSWORD COMPARISON (FOR TESTING ONLY) ---
     if ($user && $password === $user['password_hash']) {
         $_SESSION['user_id'] = $user['id'];
-        $_SESSION['role'] = $user['role'];
+        
+        $roles_array = explode(',', $user['roles_list']);
+        $_SESSION['user_roles'] = $roles_array; // Store all roles as an array
         // Log successful login
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
         logActivity($user['id'], 'login', 'User logged in successfully', 'user', $user['id'], null, null, $ipAddress);
@@ -43,7 +49,7 @@ try {
             "success" => true,
             "id" => $user['id'],
             "email" => $user['email'],
-            "role" => $user['role'],
+            "roles" => $roles_array, // Return all roles
             "employee_id" => $user['employee_id'], // ✅ Include employee_id
             "student_id" => $user['student_id'] // ✅ Include student_id
         ]);

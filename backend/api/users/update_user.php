@@ -16,9 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = json_decode(file_get_contents("php://input"));
 
 // KLD_ID is effectively the user ID, name and role are also required for conditional updates
-if (empty($data->id) || empty($data->email) || empty($data->name) || empty($data->role)) {
+if (empty($data->id) || empty($data->email) || empty($data->name) || !isset($data->roles) || !is_array($data->roles)) {
     http_response_code(400);
-    echo json_encode(array("message" => "Unable to update user. Data is incomplete. Missing required fields (id, email, name, role)."));
+    echo json_encode(array("message" => "Unable to update user. Data is incomplete. Missing required fields (id, email, name, and roles array)."));
     exit();
 }
 
@@ -41,8 +41,74 @@ try {
         error_log("Users table updated for ID: " . $data->KLD_ID);
     }
 
-    // 2. Conditionally update other tables based on role
-    if ($data->role === "student") {
+    // --- Handle User Roles --- START
+    $current_roles_query = "SELECT r.role_name, r.id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :user_id";
+    $current_roles_stmt = $conn->prepare($current_roles_query);
+    $current_roles_stmt->bindParam(':user_id', $data->KLD_ID); // Use new KLD_ID
+    $current_roles_stmt->execute();
+    $existing_roles_data = $current_roles_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $existing_role_names = array_column($existing_roles_data, 'role_name');
+    $existing_role_ids_map = array_column($existing_roles_data, 'id', 'role_name'); // Map role_name to role_id
+
+    $new_roles_from_frontend = $data->roles; // Array of role names from frontend
+
+    // Get all role_ids from the roles table
+    $all_roles_query = "SELECT id, role_name FROM roles";
+    $all_roles_stmt = $conn->query($all_roles_query);
+    $all_roles_map = []; // Map role_name to id
+    while ($row = $all_roles_stmt->fetch(PDO::FETCH_ASSOC)) {
+        $all_roles_map[$row['role_name']] = $row['id'];
+    }
+
+    // Roles to Add
+    foreach ($new_roles_from_frontend as $new_role_name) {
+        if (!in_array($new_role_name, $existing_role_names)) {
+            if (isset($all_roles_map[$new_role_name])) {
+                $role_id_to_add = $all_roles_map[$new_role_name];
+                $insert_user_role_query = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
+                $insert_user_role_stmt = $conn->prepare($insert_user_role_query);
+                $insert_user_role_stmt->bindParam(':user_id', $data->KLD_ID);
+                $insert_user_role_stmt->bindParam(':role_id', $role_id_to_add);
+                $insert_user_role_stmt->execute();
+                if ($insert_user_role_stmt->rowCount() > 0) {
+                    $changesMade = true;
+                    error_log("Added role {$new_role_name} to user {$data->KLD_ID}");
+                }
+            } else {
+                error_log("Attempted to add non-existent role: {$new_role_name}");
+            }
+        }
+    }
+
+    // Roles to Remove
+    foreach ($existing_role_names as $existing_role_name) {
+        if (!in_array($existing_role_name, $new_roles_from_frontend)) {
+            if (isset($existing_role_ids_map[$existing_role_name])) {
+                $role_id_to_remove = $existing_role_ids_map[$existing_role_name];
+                $delete_user_role_query = "DELETE FROM user_roles WHERE user_id = :user_id AND role_id = :role_id";
+                $delete_user_role_stmt = $conn->prepare($delete_user_role_query);
+                $delete_user_role_stmt->bindParam(':user_id', $data->KLD_ID);
+                $delete_user_role_stmt->bindParam(':role_id', $role_id_to_remove);
+                $delete_user_role_stmt->execute();
+                if ($delete_user_role_stmt->rowCount() > 0) {
+                    $changesMade = true;
+                    error_log("Removed role {$existing_role_name} from user {$data->KLD_ID}");
+                }
+            }
+        }
+    }
+    // --- Handle User Roles --- END
+
+    // 2. Conditionally update other tables based on *current* roles after updates
+    // Re-fetch current roles to ensure we're working with the latest set after role changes
+    $current_roles_stmt = $conn->prepare($current_roles_query);
+    $current_roles_stmt->bindParam(':user_id', $data->KLD_ID);
+    $current_roles_stmt->execute();
+    $current_user_roles_after_update = array_column($current_roles_stmt->fetchAll(PDO::FETCH_ASSOC), 'role_name');
+
+    // Now use in_array() checks against $current_user_roles_after_update
+    if (in_array("student", $current_user_roles_after_update)) {
         $student_query = "UPDATE students SET
                             name = :name,
                             department_id = :department_id,
@@ -151,7 +217,19 @@ try {
             }
         }
 
-    } elseif ($data->role === "faculty" || $data->role === "programchair" || $data->role === "dean" || $data->role === "admin") {
+    }
+
+    // Update employees table if the user has any employee-related roles
+    $employee_roles = ["faculty", "programchair", "dean", "admin"];
+    $has_employee_role = false;
+    foreach ($employee_roles as $emp_role) {
+        if (in_array($emp_role, $current_user_roles_after_update)) {
+            $has_employee_role = true;
+            break;
+        }
+    }
+
+    if ($has_employee_role) {
         $employee_query = "UPDATE employees SET
                                 name = :name,
                                 department_id = :department_id
@@ -170,119 +248,120 @@ try {
             $changesMade = true;
             error_log("Employees table updated for name and department for ID: " . $data->KLD_ID . ", Department ID: " . $department_id_employee);
         }
-
-        // Update program_chairs table if role is programchair
-        if ($data->role === "programchair") {
-            // Fetch current department and program for program chair
-            $current_pc_data_query = "SELECT department, program FROM program_chairs WHERE employee_id = :employee_id";
-            $current_pc_data_stmt = $conn->prepare($current_pc_data_query);
-            $current_pc_data_stmt->bindParam(':employee_id', $data->KLD_ID); // Use KLD_ID as employee_id
-            $current_pc_data_stmt->execute();
-            $current_pc_data = $current_pc_data_stmt->fetch(PDO::FETCH_ASSOC);
-
-            $current_department_in_db = $current_pc_data['department'] ?? null;
-            $current_program_in_db = $current_pc_data['program'] ?? null;
-
-            $new_department_id_from_frontend = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null;
-            $new_program_id_from_frontend = isset($data->program_id) && $data->program_id !== "" ? $data->program_id : null;
-
-            // Determine if department was changed from frontend. This handles both changing to a new ID or clearing it.
-            $department_changed_in_frontend = ($new_department_id_from_frontend !== null && $new_department_id_from_frontend !== $current_department_in_db) ||
-                                              ($new_department_id_from_frontend === null && $current_department_in_db !== null);
-
-            // Determine final department_id_pc
-            $department_id_pc = $new_department_id_from_frontend ?? $current_department_in_db; // Use new if provided, else keep old
-
-            // Determine final program_id_pc (set to null if department changed and program is empty)
-            if ($department_changed_in_frontend && ($new_program_id_from_frontend === null || $new_program_id_from_frontend === "")) {
-                // If department changed and no program selected in frontend for new department,
-                // we cannot set to NULL due to NOT NULL constraint. Throw an error.
-                error_log("Program Chair Update failed: Department changed and program cleared. Program is NOT NULL.");
-                throw new Exception("Program cannot be empty when changing department for a Program Chair. Please select a program.");
-            } else {
-                $program_id_pc = $new_program_id_from_frontend ?? $current_program_in_db; // Use new if provided, else keep old
-            }
-            
-            error_log("Program Chair Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_pc . ", Program ID=" . $program_id_pc);
-            
-            // Removed explicit validation here, let PDO handle NOT NULL exceptions
-
-            $program_chair_query = "UPDATE program_chairs SET program = :program, department = :department WHERE employee_id = :employee_id";
-            $program_chair_stmt = $conn->prepare($program_chair_query);
-            $program_chair_stmt->bindParam(':program', $program_id_pc);
-            $program_chair_stmt->bindParam(':department', $department_id_pc);
-            $program_chair_stmt->bindParam(':employee_id', $data->KLD_ID);
-            $program_chair_stmt->execute();
-            if ($program_chair_stmt->rowCount() > 0) {
-                $changesMade = true;
-                error_log("Program Chairs table updated for ID: " . $data->KLD_ID);
-            } else {
-                error_log("Program Chairs table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_pc . " and program: " . $program_id_pc);
-            }
-        }
-
-        // Update deans table if role is dean
-        if ($data->role === "dean") {
-            // Fetch current department for dean
-            $current_dean_data_query = "SELECT department FROM deans WHERE employee_id = :employee_id";
-            $current_dean_data_stmt = $conn->prepare($current_dean_data_query);
-            $current_dean_data_stmt->bindParam(':employee_id', $data->KLD_ID);
-            $current_dean_data_stmt->execute();
-            $current_dean_data = $current_dean_data_stmt->fetch(PDO::FETCH_ASSOC);
-
-            $department_id_dean = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : ($current_dean_data['department'] ?? null);
-
-            error_log("Dean Update: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_dean);
-
-            if ($department_id_dean === null) {
-                error_log("Dean update failed: Department ID is null for NOT NULL field.");
-            } else {
-                $dean_query = "UPDATE deans SET department = :department WHERE employee_id = :employee_id";
-                $dean_stmt = $conn->prepare($dean_query);
-                $dean_stmt->bindParam(':department', $department_id_dean);
-                $dean_stmt->bindParam(':employee_id', $data->KLD_ID);
-                $dean_stmt->execute();
-                if ($dean_stmt->rowCount() > 0) {
-                    $changesMade = true;
-                    error_log("Deans table updated for ID: " . $data->KLD_ID);
-                } else {
-                    error_log("Deans table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_dean);
-                }
-            }
-        }
-
-        // Update faculty table if role is faculty
-        if ($data->role === "faculty") {
-            // Fetch current department for faculty
-            $current_faculty_data_query = "SELECT department FROM faculty WHERE employee_id = :employee_id";
-            $current_faculty_data_stmt = $conn->prepare($current_faculty_data_query);
-            $current_faculty_data_stmt->bindParam(':employee_id', $data->KLD_ID);
-            $current_faculty_data_stmt->execute();
-            $current_faculty_data = $current_faculty_data_stmt->fetch(PDO::FETCH_ASSOC);
-
-            $department_id_faculty = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : ($current_faculty_data['department'] ?? null);
-
-            error_log("Faculty Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_faculty);
-            
-            // Removed explicit validation here, let PDO handle NOT NULL exceptions
-
-            $faculty_query = "UPDATE faculty SET department = :department WHERE employee_id = :employee_id";
-            $faculty_stmt = $conn->prepare($faculty_query);
-            $faculty_stmt->bindParam(':department', $department_id_faculty);
-            $faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
-            $faculty_stmt->execute();
-            if ($faculty_stmt->rowCount() > 0) {
-                $changesMade = true;
-                error_log("Faculty table updated for ID: " . $data->KLD_ID);
-            } else {
-                error_log("Faculty table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_faculty);
-            }
-        }
-
-        // Note: Specialization for faculty is not in the EditAccountModal formData
-        // If it were, it would be handled here.
-
     }
+
+    // Update program_chairs table if role is programchair
+    if (in_array("programchair", $current_user_roles_after_update)) {
+        // Fetch current department and program for program chair
+        $current_pc_data_query = "SELECT department, program FROM program_chairs WHERE employee_id = :employee_id";
+        $current_pc_data_stmt = $conn->prepare($current_pc_data_query);
+        $current_pc_data_stmt->bindParam(':employee_id', $data->KLD_ID); // Use KLD_ID as employee_id
+        $current_pc_data_stmt->execute();
+        $current_pc_data = $current_pc_data_stmt->fetch(PDO::FETCH_ASSOC);
+
+        $current_department_in_db = $current_pc_data['department'] ?? null;
+        $current_program_in_db = $current_pc_data['program'] ?? null;
+
+        $new_department_id_from_frontend = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null;
+        $new_program_id_from_frontend = isset($data->program_id) && $data->program_id !== "" ? $data->program_id : null;
+
+        // Determine if department was changed from frontend. This handles both changing to a new ID or clearing it.
+        $department_changed_in_frontend = ($new_department_id_from_frontend !== null && $new_department_id_from_frontend !== $current_department_in_db) ||
+                                          ($new_department_id_from_frontend === null && $current_department_in_db !== null);
+
+        // Determine final department_id_pc
+        $department_id_pc = $new_department_id_from_frontend ?? $current_department_in_db; // Use new if provided, else keep old
+
+        // Determine final program_id_pc (set to null if department changed and program is empty)
+        if ($department_changed_in_frontend && ($new_program_id_from_frontend === null || $new_program_id_from_frontend === "")) {
+            // If department changed and no program selected in frontend for new department,
+            // we cannot set to NULL due to NOT NULL constraint. Throw an error.
+            error_log("Program Chair Update failed: Department changed and program cleared. Program is NOT NULL.");
+            throw new Exception("Program cannot be empty when changing department for a Program Chair. Please select a program.");
+        } else {
+            $program_id_pc = $new_program_id_from_frontend ?? $current_program_in_db; // Use new if provided, else keep old
+        }
+        
+        error_log("Program Chair Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_pc . ", Program ID=" . $program_id_pc);
+        
+        // Removed explicit validation here, let PDO handle NOT NULL exceptions
+
+        $program_chair_query = "UPDATE program_chairs SET program = :program, department = :department WHERE employee_id = :employee_id";
+        $program_chair_stmt = $conn->prepare($program_chair_query);
+        $program_chair_stmt->bindParam(':program', $program_id_pc);
+        $program_chair_stmt->bindParam(':department', $department_id_pc);
+        $program_chair_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $program_chair_stmt->execute();
+        if ($program_chair_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Program Chairs table updated for ID: " . $data->KLD_ID);
+        } else {
+            error_log("Program Chairs table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_pc . " and program: " . $program_id_pc);
+        }
+    }
+
+    // Update deans table if role is dean
+    if (in_array("dean", $current_user_roles_after_update)) {
+        // Fetch current department for dean
+        $current_dean_data_query = "SELECT department FROM deans WHERE employee_id = :employee_id";
+        $current_dean_data_stmt = $conn->prepare($current_dean_data_query);
+        $current_dean_data_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $current_dean_data_stmt->execute();
+        $current_dean_data = $current_dean_data_stmt->fetch(PDO::FETCH_ASSOC);
+
+        $department_id_dean = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : ($current_dean_data['department'] ?? null);
+
+        error_log("Dean Update: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_dean);
+
+        if ($department_id_dean === null) {
+            error_log("Dean update failed: Department ID is null for NOT NULL field.");
+        } else {
+            $dean_query = "UPDATE deans SET department = :department WHERE employee_id = :employee_id";
+            $dean_stmt = $conn->prepare($dean_query);
+            $dean_stmt->bindParam(':department', $department_id_dean);
+            $dean_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $dean_stmt->execute();
+            if ($dean_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Deans table updated for ID: " . $data->KLD_ID);
+            } else {
+                error_log("Deans table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_dean);
+            }
+        }
+    }
+
+    // Update faculty table if role is faculty
+    if (in_array("faculty", $current_user_roles_after_update)) {
+        // Fetch current department for faculty
+        $current_faculty_data_query = "SELECT department, specialization FROM faculty WHERE employee_id = :employee_id";
+        $current_faculty_data_stmt = $conn->prepare($current_faculty_data_query);
+        $current_faculty_data_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $current_faculty_data_stmt->execute();
+        $current_faculty_data = $current_faculty_data_stmt->fetch(PDO::FETCH_ASSOC);
+
+        $department_id_faculty = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : ($current_faculty_data['department'] ?? null);
+        $specialization_faculty = isset($data->specialization) && $data->specialization !== "" ? $data->specialization : ($current_faculty_data['specialization'] ?? null);
+
+        error_log("Faculty Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_faculty . ", Specialization: " . $specialization_faculty);
+        
+        // Removed explicit validation here, let PDO handle NOT NULL exceptions
+
+        $faculty_query = "UPDATE faculty SET department = :department, specialization = :specialization WHERE employee_id = :employee_id";
+        $faculty_stmt = $conn->prepare($faculty_query);
+        $faculty_stmt->bindParam(':department', $department_id_faculty);
+        $faculty_stmt->bindParam(':specialization', $specialization_faculty);
+        $faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $faculty_stmt->execute();
+        if ($faculty_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Faculty table updated for ID: " . $data->KLD_ID);
+        } else {
+            error_log("Faculty table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_faculty);
+        }
+    }
+
+    // Note: Specialization for faculty is not in the EditAccountModal formData
+    // If it were, it would be handled here.
 
     $conn->commit();
 

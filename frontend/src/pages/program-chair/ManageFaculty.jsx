@@ -142,7 +142,9 @@ export default function ManageFaculty() {
           throw new Error(errorMsg);
         }
         const data = await response.json()
-        setFacultyList(data)
+        // Deduplicate faculty list based on faculty_id (client-side safeguard)
+        const uniqueFacultyData = Array.from(new Map(data.map(faculty => [faculty.faculty_id, faculty])).values());
+        setFacultyList(uniqueFacultyData)
       } catch (error) {
         console.error("Fetching faculty failed:", error)
         setError(error.message || "Failed to fetch faculty data. Please try again later.")
@@ -156,11 +158,17 @@ export default function ManageFaculty() {
 
   // Filter faculty based on search query (now uses facultyList state)
   const filteredFaculty = facultyList.filter(
-    (faculty) =>
-      faculty.faculty_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faculty.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faculty.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faculty.department_name.toLowerCase().includes(searchQuery.toLowerCase()),
+    (faculty) => {
+      const lowerCaseSearchQuery = searchQuery.toLowerCase();
+      const facultyRoles = faculty.roles ? faculty.roles.toLowerCase() : '';
+
+      return (
+        faculty.faculty_name.toLowerCase().includes(lowerCaseSearchQuery) ||
+        faculty.email.toLowerCase().includes(lowerCaseSearchQuery) ||
+        facultyRoles.includes(lowerCaseSearchQuery) ||
+        faculty.department_name.toLowerCase().includes(lowerCaseSearchQuery)
+      );
+    }
   )
 
   // Calculate pagination (now uses filteredFaculty derived from state)
@@ -240,6 +248,7 @@ export default function ManageFaculty() {
       if (response.ok) {
         // Success - show success toast
         toast.success("Course assigned successfully", {
+          id: `assign-course-success-${selectedFaculty.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
           description: `${data.course_code} assigned to ${data.section_name}`
         });
         
@@ -262,6 +271,7 @@ export default function ManageFaculty() {
         // Error handling with specific message
         console.error("Error assigning course:", data.message);
         toast.error("Failed to assign course", {
+          id: `assign-course-error-${selectedFaculty.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
           description: data.message || "Error assigning the course. Please try again."
         });
       }
@@ -270,6 +280,7 @@ export default function ManageFaculty() {
       toast.dismiss();
       console.error("Error in API call:", error);
       toast.error("Network error", {
+        id: `assign-course-network-error-${selectedFaculty.faculty_id}-${Date.now()}`,
         description: "Connection problem. Please check your network and try again."
       });
     }
@@ -308,10 +319,12 @@ export default function ManageFaculty() {
         // Check if this was a replacement or new assignment
         if (data.replaced) {
           toast.success("Advisor assignment updated", {
+            id: `assign-advisee-update-${selectedFaculty.faculty_id}-${assignmentData.sectionId}-${Date.now()}`,
             description: `${data.section_name} advisor changed to ${data.new_advisor || "Unknown"}`
           });
         } else {
           toast.success("Advisor assigned successfully", {
+            id: `assign-advisee-success-${selectedFaculty.faculty_id}-${assignmentData.sectionId}-${Date.now()}`,
             description: `${data.section_name} assigned to ${data.advisor_name || "Unknown"}`
           });
         }
@@ -335,6 +348,7 @@ export default function ManageFaculty() {
         // Error handling with specific message
         console.error("Error assigning advisor:", data.message);
         toast.error("Failed to assign advisor", {
+          id: `assign-advisee-error-${selectedFaculty.faculty_id}-${assignmentData.sectionId}-${Date.now()}`,
           description: data.message || "Error assigning the advisor. Please try again."
         });
       }
@@ -343,6 +357,7 @@ export default function ManageFaculty() {
       toast.dismiss();
       console.error("Error in API call:", error);
       toast.error("Network error", {
+        id: `assign-advisee-network-error-${selectedFaculty.faculty_id}-${Date.now()}`,
         description: "Connection problem. Please check your network and try again."
       });
     }
@@ -411,8 +426,11 @@ export default function ManageFaculty() {
           return false;
         });
         
-        console.log("Filtered sections for program chair's programs:", filteredSections);
-        setSectionsData(filteredSections);
+        // Filter out duplicates based on id (client-side safeguard)
+        const uniqueFilteredSections = Array.from(new Map(filteredSections.map(section => [section.id, section])).values());
+        
+        console.log("Filtered sections for program chair's programs:", uniqueFilteredSections);
+        setSectionsData(uniqueFilteredSections);
       } catch (error) {
         console.error("Error fetching sections:", error);
       } finally {
@@ -524,7 +542,9 @@ export default function ManageFaculty() {
           const data = await response.json();
           console.log("Courses received from backend:", data);
           
-          setFilteredCourses(data);
+          // Deduplicate courses based on id (client-side safeguard)
+          const uniqueCoursesData = Array.from(new Map(data.map(course => [course.id, course])).values());
+          setFilteredCourses(uniqueCoursesData);
         } catch (error) {
           console.error("Error fetching courses for section:", error);
           setFilteredCourses([]);
@@ -652,7 +672,7 @@ export default function ManageFaculty() {
                               .filter(option => option.name.toLowerCase().includes(sectionSearchTerm.toLowerCase()))
                               .map((section) => (
                                   <CommandItem
-                                    key={section.id}
+                                    key={`section-${section.id}-${section.name}`}
                                     value={section.name}
                                     onSelect={() => handleSectionSelect(section.id)} // Use the handler
                                     className="cursor-pointer"
@@ -737,7 +757,7 @@ export default function ManageFaculty() {
                                 )
                                 .map((course) => (
                                   <CommandItem
-                                    key={course.id}
+                                    key={`course-${course.id}-${course.course_code}`}
                                     value={course.course_code}
                                     onSelect={() => handleCourseSelect(course.id)} // Use the handler
                                     className="cursor-pointer"
@@ -823,8 +843,11 @@ export default function ManageFaculty() {
             return false;
           });
           
-          console.log("Sections without advisors:", filteredSections);
-          setSectionsWithoutAdvisors(filteredSections);
+          // Filter out duplicates based on id (client-side safeguard)
+          const uniqueFilteredSections = Array.from(new Map(filteredSections.map(section => [section.id, section])).values());
+          
+          console.log("Sections without advisors:", uniqueFilteredSections);
+          setSectionsWithoutAdvisors(uniqueFilteredSections);
         } catch (error) {
           console.error("Error fetching sections without advisors:", error);
         } finally {
@@ -936,7 +959,7 @@ export default function ManageFaculty() {
                                   .filter(section => section.name.toLowerCase().includes(sectionSearchTerm.toLowerCase()))
                                   .map((section) => (
                                     <CommandItem
-                                      key={section.id}
+                                      key={`advisee-section-${section.id}-${section.name}`}
                                       value={section.name}
                                       onSelect={() => handleAdviseeSectionSelect(section.id)} // Use the handler
                                       className="cursor-pointer"
