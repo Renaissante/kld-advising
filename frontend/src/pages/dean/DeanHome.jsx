@@ -1,9 +1,8 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/App-sidebar";
 import Header from "@/components/layout/Header";
-
-// ... existing code ...
-import { useState } from "react"
+import { API_BASE_URL } from '@/config/api';
+import { useCallback, useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
@@ -18,7 +17,6 @@ import {
   Users,
   GraduationCap,
   CheckCircle,
-  AlertCircle,
   BookOpen,
   TrendingUp,
   Filter,
@@ -26,295 +24,104 @@ import {
   FileText,
   Eye,
 } from "lucide-react"
-
-// Mock data - REPLACE WITH ACTUAL API CALLS LATER
-const mockData = {
-  academicYears: ["2023-2024", "2022-2023", "2021-2022"],
-  semesters: ["Fall 2024", "Spring 2024", "Fall 2023", "Spring 2023"],
-  programs: ["Computer Science", "Business Administration", "Engineering", "Liberal Arts", "Medicine", "Education"],
-
-  overallStats: {
-    advisingCompletionRate: 78.5,
-    gradingCompletionRate: 87.5,
-    totalStudentsAdvised: 2236,
-    totalCoursesGraded: 342,
-    totalActiveStudents: 2847,
-  },
-
-  criticalAlerts: [
-    {
-      id: 1,
-      type: "Low Advising",
-      section: "LA-101-A",
-      program: "Liberal Arts",
-      completion: 67.2,
-      priority: "High",
-      color: "red",
-    },
-    {
-      id: 2,
-      type: "Low Grading",
-      section: "EDU-301-B",
-      program: "Education",
-      completion: 71.8,
-      priority: "Medium",
-      color: "orange",
-    },
-    {
-      id: 3,
-      type: "Overdue",
-      section: "BUS-401-A",
-      program: "Business Administration",
-      completion: 71.0,
-      priority: "High",
-      color: "red",
-    },
-  ],
-
-  topPrograms: [
-    { rank: 1, program: "Medicine", completion: 94.6 },
-    { rank: 2, program: "Computer Science", completion: 89.2 },
-    { rank: 3, program: "Engineering", completion: 85.1 },
-    { rank: 4, program: "Business Administration", completion: 73.5 },
-    { rank: 5, program: "Education", completion: 71.8 },
-  ],
-
-  recentActivity: [
-    {
-      id: 1,
-      user: "Dr. Smith",
-      action: "Completed advising for CS-401-A",
-      time: "2 hours ago",
-      type: "advising",
-      icon: User,
-    },
-    {
-      id: 2,
-      user: "Prof. Johnson",
-      action: "Submitted grades for BUS-301-B",
-      time: "4 hours ago",
-      type: "grading",
-      icon: FileText,
-    },
-    {
-      id: 3,
-      user: "Dr. Williams",
-      action: "Updated section ENG-201-C",
-      time: "6 hours ago",
-      type: "update",
-      icon: BookOpen,
-    },
-    {
-      id: 4,
-      user: "Prof. Brown",
-      action: "Reviewed student progress",
-      time: "8 hours ago",
-      type: "review",
-      icon: Eye,
-    },
-  ],
-
-  sectionData: [
-    {
-      section: "CS-401-A",
-      program: "Computer Science",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 42,
-      advisedStudents: 38,
-      advisingCompletion: 90.5,
-      gradedStudents: 40,
-      gradingCompletion: 95.2,
-    },
-    {
-      section: "BUS-301-B",
-      program: "Business Administration",
-      yearLevel: "3rd Year",
-      semester: "Fall 2024",
-      totalStudents: 54,
-      advisedStudents: 41,
-      advisingCompletion: 75.9,
-      gradedStudents: 48,
-      gradingCompletion: 88.9,
-    },
-    {
-      section: "ENG-201-C",
-      program: "Engineering",
-      yearLevel: "2nd Year",
-      semester: "Fall 2024",
-      totalStudents: 36,
-      advisedStudents: 32,
-      advisingCompletion: 88.9,
-      gradedStudents: 33,
-      gradingCompletion: 91.7,
-    },
-    {
-      section: "LA-101-A",
-      program: "Liberal Arts",
-      yearLevel: "1st Year",
-      semester: "Fall 2024",
-      totalStudents: 58,
-      advisedStudents: 39,
-      advisingCompletion: 67.2,
-      gradedStudents: 46,
-      gradingCompletion: 79.3,
-    },
-    {
-      section: "MED-501-A",
-      program: "Medicine",
-      yearLevel: "5th Year",
-      semester: "Fall 2024",
-      totalStudents: 34,
-      advisedStudents: 33,
-      advisingCompletion: 97.1,
-      gradedStudents: 33,
-      gradingCompletion: 97.1,
-    },
-    {
-      section: "EDU-301-B",
-      program: "Education",
-      yearLevel: "3rd Year",
-      semester: "Fall 2024",
-      totalStudents: 39,
-      advisedStudents: 28,
-      advisingCompletion: 71.8,
-      gradedStudents: 33,
-      gradingCompletion: 84.6,
-    },
-    {
-      section: "CS-201-B",
-      program: "Computer Science",
-      yearLevel: "2nd Year",
-      semester: "Fall 2024",
-      totalStudents: 48,
-      advisedStudents: 44,
-      advisingCompletion: 91.7,
-      gradedStudents: 45,
-      gradingCompletion: 93.8,
-    },
-    {
-      section: "BUS-401-A",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-    {
-      section: "BUS-401-B",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-    {
-      section: "BUS-401-C",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-    {
-      section: "BUS-401-D",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-    {
-      section: "BUS-401-E",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-    {
-      section: "BUS-401-F",
-      program: "Business Administration",
-      yearLevel: "4th Year",
-      semester: "Fall 2024",
-      totalStudents: 31,
-      advisedStudents: 22,
-      advisingCompletion: 71.0,
-      gradedStudents: 28,
-      gradingCompletion: 90.3,
-    },
-  ],
-
-  programPerformance: [
-    { program: "Medicine", advisingRate: 94.6, gradingRate: 94.6 },
-    { program: "Computer Science", advisingRate: 89.2, gradingRate: 92.3 },
-    { program: "Engineering", advisingRate: 85.1, gradingRate: 89.1 },
-    { program: "Business Administration", advisingRate: 73.5, gradingRate: 85.7 },
-    { program: "Education", advisingRate: 71.8, gradingRate: 81.4 },
-    { program: "Liberal Arts", advisingRate: 69.2, gradingRate: 83.2 },
-  ],
-
-  advisingStatusBreakdown: [
-    { name: "Advised", value: 2236, color: "#22c55e" },
-    { name: "Pending Advising", value: 611, color: "#f59e0b" },
-  ],
-
-  gradingStatusBreakdown: [
-    { name: "Graded", value: 2491, color: "#3b82f6" },
-    { name: "Pending Grades", value: 356, color: "#ef4444" },
-  ],
-
-  advisingStatusByYear: [
-    { yearLevel: "1st Year", advised: 150, pendingAdvising: 50 },
-    { yearLevel: "2nd Year", advised: 200, pendingAdvising: 40 },
-    { yearLevel: "3rd Year", advised: 180, pendingAdvising: 30 },
-    { yearLevel: "4th Year", advised: 220, pendingAdvising: 20 },
-    { yearLevel: "5th Year", advised: 190, pendingAdvising: 10 },
-  ],
-
-  gradingStatusByYear: [
-    { yearLevel: "1st Year", graded: 180, pendingGrades: 20 },
-    { yearLevel: "2nd Year", graded: 220, pendingGrades: 20 },
-    { yearLevel: "3rd Year", graded: 200, pendingGrades: 10 },
-    { yearLevel: "4th Year", graded: 230, pendingGrades: 10 },
-    { yearLevel: "5th Year", graded: 195, pendingGrades: 5 },
-  ],
-}
+import { useActive } from '@/contexts/ActiveContext';
 
 const DeanHome = () => {
-  const [selectedYear, setSelectedYear] = useState("2023-2024")
-  const [selectedSemester, setSelectedSemester] = useState("Fall 2024")
+  const [dashboardData, setDashboardData] = useState({
+    academicYears: [],
+    semesters: [],
+    programs: [],
+    overallStats: {
+      advisingCompletionRate: 0,
+      gradingCompletionRate: 0,
+      totalStudentsAdvised: 0,
+      totalCoursesGraded: 0,
+      totalActiveStudents: 0,
+    },
+    recentActivity: [],
+    sectionData: [],
+    programPerformance: [],
+    advisingStatusBreakdown: [],
+    gradingStatusBreakdown: [],
+    advisingStatusByYear: [],
+    gradingStatusByYear: [],
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedYear, setSelectedYear] = useState("")
+  const [selectedSemester, setSelectedSemester] = useState("")
   const [selectedProgram, setSelectedProgram] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [sortField, setSortField] = useState("section")
   const [sortDirection, setSortDirection] = useState("asc")
   const [currentPage, setCurrentPage] = useState(1) // New state for current page
-  const sectionsPerPage = 13 // New constant for sections per page
+  const sectionsPerPage = 8 // New constant for sections per page
+  const RECENT_ACTIVITY_LIMIT = 3; // Limit recent activities to 5
+
+  const { activeAcademicYear, activeSemester, loading: activeContextLoading } = useActive();
+
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams();
+      if (selectedYear) params.append('academic_year', selectedYear);
+      if (selectedSemester) params.append('semester_name', selectedSemester);
+      if (selectedProgram) params.append('program_name', selectedProgram);
+
+      const response = await fetch(`${API_BASE_URL}/dean/read_dashboard_data.php?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setDashboardData(data)
+
+      // Set initial selected year and semester based on active context, if available
+
+    } catch (e) {
+      setError("Failed to fetch dashboard data.")
+      console.error("Error fetching dashboard data:", e)
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedYear, selectedSemester, selectedProgram])
+
+  useEffect(() => {
+    if (!activeContextLoading) {
+      fetchDashboardData();
+    }
+  }, [fetchDashboardData, activeAcademicYear, activeSemester, activeContextLoading]);
+
+  // New useEffect to set initial selected year and semester based on active context or fetched data
+  useEffect(() => {
+    if (!activeContextLoading && dashboardData.academicYears.length > 0 && dashboardData.semesters.length > 0) {
+      if (activeAcademicYear && !selectedYear) {
+        setSelectedYear(activeAcademicYear.year);
+      }
+      if (activeSemester && !selectedSemester) {
+        setSelectedSemester(activeSemester.name);
+      }
+    }
+  }, [activeContextLoading, activeAcademicYear, activeSemester, dashboardData.academicYears, dashboardData.semesters, selectedYear, selectedSemester]);
+
+  // Trigger data fetch when filters change
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData, selectedYear, selectedSemester, selectedProgram]);
 
   // Filter and sort section data
-  const filteredAndSortedSectionData = mockData.sectionData
-    .filter(
-      (section) =>
+  const filteredSections = dashboardData.sectionData.filter(
+    (section) => {
+      return (
         section.section.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (selectedProgram === "all" || section.program === selectedProgram) &&
-        section.semester === selectedSemester,
-    )
-    .sort((a, b) => {
+        (selectedYear === "" || section.academicYear === selectedYear) &&
+        (selectedSemester === "" || section.semester === selectedSemester)
+      );
+    }
+  );
+
+  const filteredAndSortedSectionData = filteredSections.sort((a, b) => {
       const aValue = a[sortField]
       const bValue = b[sortField]
       if (sortDirection === "asc") {
@@ -342,6 +149,14 @@ const DeanHome = () => {
       setSortDirection("asc")
     }
     setCurrentPage(1) // Reset to first page on sort change
+  }
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen text-xl">Loading dashboard data...</div>
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-screen text-xl text-red-500">Error: {error}</div>
   }
 
   return (
@@ -377,7 +192,7 @@ const DeanHome = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockData.academicYears.map((year) => (
+                        {dashboardData.academicYears.map((year) => (
                           <SelectItem key={year} value={year}>
                             {year}
                           </SelectItem>
@@ -392,7 +207,7 @@ const DeanHome = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockData.semesters.map((semester) => (
+                        {dashboardData.semesters.map((semester) => (
                           <SelectItem key={semester} value={semester}>
                             {semester}
                           </SelectItem>
@@ -408,9 +223,9 @@ const DeanHome = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Programs</SelectItem>
-                        {mockData.programs.map((program) => (
-                          <SelectItem key={program} value={program}>
-                            {program}
+                        {dashboardData.programs.map((program) => (
+                          <SelectItem key={program.id} value={program.name}>
+                            {program.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -424,56 +239,56 @@ const DeanHome = () => {
  
             {/* Metrics Cards - 4 Equal Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-l-4 border-l-green-500 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600">
+              <Card className="bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-600">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Advising Completion</CardTitle>
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{mockData.overallStats.advisingCompletionRate}%</div>
-                  <Progress value={mockData.overallStats.advisingCompletionRate} className="mt-2" fillColor="bg-green-500" /> {/* Added fillColor */}
+                  <div className="text-2xl font-bold text-green-600">{dashboardData.overallStats.advisingCompletionRate}%</div>
+                  <Progress value={dashboardData.overallStats.advisingCompletionRate} className="mt-2" />
                   <p className="text-xs text-muted-foreground mt-2">
                     {selectedYear} • {selectedSemester}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600">
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Grading Completion</CardTitle>
                   <GraduationCap className="h-5 w-5 text-blue-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{mockData.overallStats.gradingCompletionRate}%</div>
-                  <Progress value={mockData.overallStats.gradingCompletionRate} className="mt-2" fillColor="bg-blue-500" /> {/* Added fillColor */}
+                  <div className="text-2xl font-bold text-blue-600">{dashboardData.overallStats.gradingCompletionRate}%</div>
+                  <Progress value={dashboardData.overallStats.gradingCompletionRate} className="mt-2" />
                   <p className="text-xs text-muted-foreground mt-2">
                     {selectedYear} • {selectedSemester}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-purple-500 bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600">
+              <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Students Advised</CardTitle>
                   <Users className="h-5 w-5 text-purple-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-purple-600">
-                    {mockData.overallStats.totalStudentsAdvised.toLocaleString()}
+                    {dashboardData.overallStats.totalStudentsAdvised.toLocaleString()}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    of {mockData.overallStats.totalActiveStudents.toLocaleString()} total students
+                    of {dashboardData.overallStats.totalActiveStudents.toLocaleString()} total students
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600">
+              <Card className="bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Courses Graded</CardTitle>
                   <BookOpen className="h-5 w-5 text-orange-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{mockData.overallStats.totalCoursesGraded}</div>
+                  <div className="text-2xl font-bold text-orange-600">{dashboardData.overallStats.totalCoursesGraded}</div>
                   <p className="text-xs text-muted-foreground mt-2">Course sections completed</p>
                 </CardContent>
               </Card>
@@ -486,11 +301,10 @@ const DeanHome = () => {
               {/* Main Content Area - 3 columns */}
               <div className="lg:col-span-2">
                 <Tabs defaultValue="sections" className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-4 bg-muted/60 dark:bg-muted/30">
+                  <TabsList className="grid w-full grid-cols-3 bg-muted/60 dark:bg-muted/30"> {/* Changed to 3 columns */}
                     <TabsTrigger value="sections">Section Details</TabsTrigger>
                     <TabsTrigger value="programs">Program Performance</TabsTrigger>
                     <TabsTrigger value="status">Student Status</TabsTrigger>
-                    <TabsTrigger value="alerts">Critical Alerts</TabsTrigger>
                   </TabsList>
 
                   {/* Section Details Tab */}
@@ -595,11 +409,11 @@ const DeanHome = () => {
                           >
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
-                                data={mockData.programPerformance}
+                                data={dashboardData.programPerformance}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="program" angle={-45} textAnchor="end" height={100} fontSize={12} />
+                                <XAxis dataKey="programAbbreviation" angle={-45} textAnchor="end" height={100} fontSize={12} />
                                 <YAxis />
                                 <ChartTooltip content={<ChartTooltipContent />} />
                                 <Bar dataKey="advisingRate" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -626,11 +440,11 @@ const DeanHome = () => {
                           >
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
-                                data={mockData.programPerformance}
+                                data={dashboardData.programPerformance}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="program" angle={-45} textAnchor="end" height={100} fontSize={12} />
+                                <XAxis dataKey="programAbbreviation" angle={-45} textAnchor="end" height={100} fontSize={12} />
                                 <YAxis />
                                 <ChartTooltip content={<ChartTooltipContent />} />
                                 <Bar dataKey="gradingRate" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -667,7 +481,7 @@ const DeanHome = () => {
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie
-                                  data={mockData.advisingStatusBreakdown}
+                                  data={dashboardData.advisingStatusBreakdown}
                                   cx="50%"
                                   cy="50%"
                                   innerRadius={30}
@@ -675,7 +489,7 @@ const DeanHome = () => {
                                   paddingAngle={5}
                                   dataKey="value"
                                 >
-                                  {mockData.advisingStatusBreakdown.map((entry, index) => (
+                                  {dashboardData.advisingStatusBreakdown.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                   ))}
                                 </Pie>
@@ -699,7 +513,7 @@ const DeanHome = () => {
                             </ResponsiveContainer>
                           </ChartContainer>
                           <div className="flex justify-center gap-4 mt-4">
-                            {mockData.advisingStatusBreakdown.map((item, index) => (
+                            {dashboardData.advisingStatusBreakdown.map((item, index) => (
                               <div key={index} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                                 <span className="text-sm">
@@ -732,7 +546,7 @@ const DeanHome = () => {
                           >
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
-                                data={mockData.advisingStatusByYear}
+                                data={dashboardData.advisingStatusByYear}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -769,7 +583,7 @@ const DeanHome = () => {
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie
-                                  data={mockData.gradingStatusBreakdown}
+                                  data={dashboardData.gradingStatusBreakdown}
                                   cx="50%"
                                   cy="50%"
                                   innerRadius={30}
@@ -777,7 +591,7 @@ const DeanHome = () => {
                                   paddingAngle={5}
                                   dataKey="value"
                                 >
-                                  {mockData.gradingStatusBreakdown.map((entry, index) => (
+                                  {dashboardData.gradingStatusBreakdown.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                   ))}
                                 </Pie>
@@ -801,7 +615,7 @@ const DeanHome = () => {
                             </ResponsiveContainer>
                           </ChartContainer>
                           <div className="flex justify-center gap-4 mt-4">
-                            {mockData.gradingStatusBreakdown.map((item, index) => (
+                            {dashboardData.gradingStatusBreakdown.map((item, index) => (
                               <div key={index} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                                 <span className="text-sm">
@@ -834,7 +648,7 @@ const DeanHome = () => {
                           >
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
-                                data={mockData.gradingStatusByYear}
+                                data={dashboardData.gradingStatusByYear}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -852,73 +666,56 @@ const DeanHome = () => {
                   </TabsContent>
 
                   {/* Critical Alerts Tab */}
-                  <TabsContent value="alerts" className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <AlertCircle className="h-5 w-5 text-red-600" />
-                          Critical Alerts
-                        </CardTitle>
-                        <CardDescription>Sections requiring immediate attention</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4 h-[650px] overflow-y-auto"> {/* Adjusted height for alignment */}
-                        {mockData.criticalAlerts.map((alert) => (
-                          <div
-                            key={alert.id}
-                            className="flex items-center justify-between p-4 bg-red-50 rounded-lg border-l-4 border-l-red-500 hover:bg-red-100 transition-colors cursor-pointer"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`w-3 h-3 rounded-full ${alert.color === "red" ? "bg-red-500" : "bg-orange-500"}`}
-                              />
-                              <div>
-                                <p className="font-semibold text-base">
-                                  {alert.type} - {alert.section}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {alert.program} • {alert.completion}% completion
-                                </p>
-                              </div>
-                            </div>
-                            <Badge
-                              variant={alert.priority === "High" ? "destructive" : "secondary"}
-                              className="text-sm px-3 py-1"
-                            >
-                              {alert.priority}
-                            </Badge>
-                          </div>
-                        ))}
-
-                        {/* Removed Recommendations Section */}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
+                  <TabsContent value="alerts" className="hidden"> {/* Removed Critical Alerts Tab */}
+                    </TabsContent>
                 </Tabs>
               </div>
 
               {/* Right Sidebar - 1 column */}
               <div className="lg:col-span-1 space-y-6">
-                {/* Top Programs */}
+                {/* Key Dates & Deadlines */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Top Programs</CardTitle>
-                    <CardDescription>Ranked by completion rates</CardDescription>
+                    <CardTitle>Key Dates & Deadlines</CardTitle>
+                    <CardDescription>Important upcoming academic dates</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 h-[310px]"> {/* Adjusted height, removed overflow */}
-                    {mockData.topPrograms.map((program) => (
-                      <div key={program.rank} className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm">
-                          {program.rank}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{program.program}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Progress value={program.completion} className="flex-1 h-2" />
-                            <span className="text-sm font-medium">{program.completion}%</span>
-                          </div>
-                        </div>
+                  <CardContent className="space-y-4 h-[310px]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 font-semibold text-sm">
+                        <FileText className="h-4 w-4" />
                       </div>
-                    ))}
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Advising Deadline</p>
+                        <p className="text-sm text-muted-foreground mt-1">October 20, 2025</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-semibold text-sm">
+                        <GraduationCap className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Grading Submission Deadline</p>
+                        <p className="text-sm text-muted-foreground mt-1">November 15, 2025</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Next Enrollment Period</p>
+                        <p className="text-sm text-muted-foreground mt-1">December 1, 2025 - December 15, 2025</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 font-semibold text-sm">
+                        <BookOpen className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Semester Start Date</p>
+                        <p className="text-sm text-muted-foreground mt-1">January 6, 2026</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -931,38 +728,49 @@ const DeanHome = () => {
                   </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 h-[310px]"> {/* Adjusted height, removed overflow */}
-                    {mockData.recentActivity.map((activity) => (
-                      <div key={activity.id} className="flex items-start gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            activity.type === "advising"
-                              ? "bg-green-100"
-                              : activity.type === "grading"
-                                ? "bg-blue-100"
-                                : activity.type === "update"
-                                  ? "bg-purple-100"
-                                  : "bg-gray-100"
-                          }`}
-                        >
-                          <activity.icon
-                            className={`w-4 h-4 ${
+                    {dashboardData.recentActivity.slice(0, RECENT_ACTIVITY_LIMIT).map((activity, index) => {
+                      // Determine icon based on activity type
+                      const ActivityIcon = activity.type === "advising" 
+                        ? CheckCircle 
+                        : activity.type === "grading" 
+                          ? GraduationCap 
+                          : activity.type === "update" 
+                            ? FileText 
+                            : User;
+
+                      return (
+                        <div key={activity.id || index} className="flex items-start gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               activity.type === "advising"
-                                ? "text-green-600"
+                                ? "bg-green-100"
                                 : activity.type === "grading"
-                                  ? "text-blue-600"
+                                  ? "bg-blue-100"
                                   : activity.type === "update"
-                                    ? "text-purple-600"
-                                    : "text-gray-600"
+                                    ? "bg-purple-100"
+                                    : "bg-gray-100"
                             }`}
-                          />
+                          >
+                            <ActivityIcon
+                              className={`w-4 h-4 ${
+                                activity.type === "advising"
+                                  ? "text-green-600"
+                                  : activity.type === "grading"
+                                    ? "text-blue-600"
+                                    : activity.type === "update"
+                                      ? "text-purple-600"
+                                      : "text-gray-600"
+                              }`}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{activity.user} ({activity.role})</p>
+                            <p className="text-sm text-muted-foreground">{activity.action}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{activity.user}</p>
-                          <p className="text-sm text-muted-foreground">{activity.action}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </CardContent>
                 </Card>
               </div>
