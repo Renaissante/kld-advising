@@ -19,7 +19,8 @@ import {
   Search,
   NotebookPen,
   Archive,
-  Check
+  Check,
+  CalendarDays // Import CalendarDays for the new component
 } from "lucide-react"
 import {
   Sidebar,
@@ -52,6 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
+import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
 
 export function AppSidebar() {
   const [activeItem, setActiveItem] = useState(null);
@@ -93,6 +95,7 @@ export function AppSidebar() {
     { title: "Manage Faculty", url: "/program-chair/manage-faculty", icon: ListPlus, roles: ["programchair"] },
     { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
+    { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Calendar", url: "", icon: Calendar, roles: ["admin", "faculty", "student", "dean", "programchair"] },
   ];
 

@@ -20,6 +20,7 @@ import FacultyAssignment from "@/pages/program-chair/FacultyAssignment";
 import ManageSections from "@/pages/program-chair/ManageSections";
 import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
+import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
@@ -202,6 +203,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute requiredRoles="dean">
             <DeanHome />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dean/advising-period"
+        element={
+          <ProtectedRoute requiredRoles="dean">
+            <AdvisingPeriodManager />
           </ProtectedRoute>
         }
       />

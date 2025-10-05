@@ -168,7 +168,7 @@ const DeanHome = () => {
         <div className="container mx-auto p-4 md:p-6 mt-4">
           <div className="flex flex-col gap-6">
             {/* Header */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col">
               <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Dean's Academic Progress Dashboard</h1>
               <p className="text-muted-foreground">
                 Monitor advising and grading completion across all programs and sections
