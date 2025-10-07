@@ -5,6 +5,7 @@ const ActiveContext = createContext();
 export const ActiveProvider = ({ children }) => {
   const [activeAcademicYear, setActiveAcademicYear] = useState(null);
   const [activeSemester, setActiveSemester] = useState(null);
+  const [isAdvisingActive, setIsAdvisingActive] = useState(false); // New state for advising status
   const [loading, setLoading] = useState(true);
 
   // Fetch active academic year and semester
@@ -27,8 +28,23 @@ export const ActiveProvider = ({ children }) => {
       // Find active semester
       const activeSem = semesters.find(sem => sem.status === 'Active');
       setActiveSemester(activeSem || null);
+
+      // Fetch advising period status only if activeYear and activeSem are found
+      if (activeYear && activeSem) {
+        const advisingPeriodResponse = await fetch(`${API_BASE_URL}/advising_period/read_single.php?academic_year_id=${activeYear.id}&semester_id=${activeSem.id}`);
+        if (advisingPeriodResponse.ok) {
+          const advisingPeriodData = await advisingPeriodResponse.json();
+          setIsAdvisingActive(advisingPeriodData.status === 'active');
+        } else {
+          // If no advising period found, it's inactive
+          setIsAdvisingActive(false);
+        }
+      } else {
+        setIsAdvisingActive(false);
+      }
     } catch (error) {
       console.error('Error fetching active data:', error);
+      setIsAdvisingActive(false); // Default to inactive on error
     } finally {
       setLoading(false);
     }
@@ -54,13 +70,32 @@ export const ActiveProvider = ({ children }) => {
     fetchActiveData();
   };
 
+  const refreshAdvisingStatus = async () => {
+    if (activeAcademicYear && activeSemester) {
+      try {
+        const advisingPeriodResponse = await fetch(`${API_BASE_URL}/advising_period/read_single.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`);
+        if (advisingPeriodResponse.ok) {
+          const advisingPeriodData = await advisingPeriodResponse.json();
+          setIsAdvisingActive(advisingPeriodData.status === 'active');
+        } else {
+          setIsAdvisingActive(false);
+        }
+      } catch (error) {
+        console.error('Error refreshing advising status:', error);
+        setIsAdvisingActive(false);
+      }
+    }
+  };
+
   const value = {
     activeAcademicYear,
     activeSemester,
     loading,
+    isAdvisingActive, // Expose isAdvisingActive
     updateActiveAcademicYear,
     updateActiveSemester,
-    refreshActiveData
+    refreshActiveData,
+    refreshAdvisingStatus // Expose refreshAdvisingStatus
   };
 
   return (

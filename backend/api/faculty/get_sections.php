@@ -68,6 +68,7 @@ try {
     $query = "SELECT
                 s.id AS section_id,
                 s.name AS section_name,
+                s.status,
                 p.name AS program_name,
                 yl.level AS year_level,
                 sem.semester_name AS semester_name,
@@ -86,7 +87,7 @@ try {
             LEFT JOIN programs p ON s.program_id = p.id
             LEFT JOIN year_levels yl ON s.year_level_id = yl.id
             LEFT JOIN students st ON s.id = st.section_id -- Join students assigned to this section
-            WHERE sa.advisor_id = :advisor_id -- Filter by advisor_id
+            WHERE sa.advisor_id = :advisor_id AND s.status = 'active'-- Filter by advisor_id
             GROUP BY
                 s.id, -- Group by section details
                 s.name,

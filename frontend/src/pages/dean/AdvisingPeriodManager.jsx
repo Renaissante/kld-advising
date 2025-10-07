@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -37,7 +37,33 @@ export default function AdvisingPeriodManager() {
   const [loading, setLoading] = useState(true);
   const [daysRemaining, setDaysRemaining] = useState(0);
 
-  const { activeAcademicYear, activeSemester, loading: activeContextLoading } = useActive();
+  const { activeAcademicYear, activeSemester, loading: activeContextLoading, refreshAdvisingStatus } = useActive(); // Destructure refreshAdvisingStatus
+  const ws = useRef(null);
+
+  useEffect(() => {
+    ws.current = new WebSocket("ws://192.168.18.6:8080"); // Replace with your WebSocket server address
+
+    ws.current.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+    ws.current.onmessage = (event) => {
+      // We don't expect to receive messages here, but good to have a handler
+      console.log("WebSocket message received:", event.data);
+    };
+
+    ws.current.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+
+    ws.current.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      ws.current.close();
+    };
+  }, []);
 
   // Function to fetch advising period data
   const fetchAdvisingPeriod = useCallback(async () => {
@@ -160,6 +186,22 @@ export default function AdvisingPeriodManager() {
       }
       toast.success(`Advising system ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully.`);
       fetchAdvisingPeriod(); // Re-fetch to update UI
+      refreshAdvisingStatus(); // Refresh global advising status
+
+      // Send WebSocket notification
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: "backend_event", // Use backend_event for dean actions
+          payload: {
+            event: "advising_period_updated",
+            data: {
+              action_type: newStatus === 'active' ? 'Activated' : 'Deactivated',
+              academic_year: activeAcademicYear?.year,
+              semester: activeSemester?.name,
+            },
+          },
+        }));
+      }
     } catch (e) {
       setError("Error updating advising system status: " + e.message);
       console.error("Error updating advising system status:", e);
@@ -204,6 +246,21 @@ export default function AdvisingPeriodManager() {
       }
       toast.success("Advising period dates updated successfully!");
       fetchAdvisingPeriod(); // Re-fetch to update UI
+
+      // Send WebSocket notification for date update
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: "backend_event", // Use backend_event for dean actions
+          payload: {
+            event: "advising_period_updated",
+            data: {
+              action_type: "Updated Dates",
+              academic_year: activeAcademicYear?.year,
+              semester: activeSemester?.name,
+            },
+          },
+        }));
+      }
     } catch (e) {
       setError("Error updating advising period dates: " + e.message);
       console.error("Error updating advising period dates:", e);
@@ -402,7 +459,7 @@ export default function AdvisingPeriodManager() {
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/30 dark:border-blue-700">
                     <div className="flex items-start gap-3">
                       <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                      <div>
+    <div>
                         <p className="font-medium text-blue-900 dark:text-blue-50">Current Period</p>
                         <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                           {startDate && endDate ? 
@@ -412,7 +469,7 @@ export default function AdvisingPeriodManager() {
                         </p>
                       </div>
                     </div>
-                  </div>
+    </div>
 
                   {!advisingPeriodId ? (
                     <Button

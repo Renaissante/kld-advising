@@ -56,6 +56,7 @@ try {
                 c.course_title,
                 s.id AS section_id,
                 s.name,
+                s.status,
                 ay.academic_year_name AS academic_year,
                 sem.semester_name AS semester_name,
                 sem.semester_id,
@@ -66,7 +67,7 @@ try {
             JOIN academic_years ay ON s.academic_year_id = ay.academic_year_id
             JOIN semesters sem ON s.semester_id = sem.semester_id
             LEFT JOIN year_levels yl ON s.year_level_id = yl.id
-            WHERE sf.faculty_id = :faculty_id AND sf.status = 'active'
+            WHERE sf.faculty_id = :faculty_id AND sf.status = 'active' AND s.status='active'
             ORDER BY ay.academic_year_name DESC, sem.semester_id, c.course_code, s.name";
 
     // Prepare statement

@@ -10,15 +10,18 @@ require __DIR__ . '/../../vendor/autoload.php'; // Adjust path as needed
 
 class NotificationServer implements MessageComponentInterface {
     protected $clients;
+    protected $users;
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
+        $this->users = []; // To map userId to ConnectionInterface
         echo "WebSocket server started\n";
     }
 
     public function onOpen(ConnectionInterface $conn) {
         // Store the new connection to send messages to later
         $this->clients->attach($conn);
+        $conn->userId = null; // Initialize userId for the connection
 
         echo "New connection! ({$conn->resourceId})\n";
     }
@@ -31,6 +34,15 @@ class NotificationServer implements MessageComponentInterface {
         if ($data === null) {
             echo "Received invalid JSON: " . $msg . "\n";
             return; // Ignore invalid messages
+        }
+
+        // Handle authentication message to associate userId with connection
+        if (isset($data['type']) && $data['type'] === 'auth' && isset($data['payload']['userId'])) {
+            $userId = $data['payload']['userId'];
+            $from->userId = $userId; // Attach userId to the connection object
+            $this->users[$userId] = $from; // Map userId to this connection
+            echo "Connection {$from->resourceId} authenticated as user {$userId}\n";
+            return;
         }
 
         // Check if the message is a generic backend event
@@ -46,30 +58,62 @@ class NotificationServer implements MessageComponentInterface {
                 'payload' => $eventPayload // Pass the original backend event payload to the frontend
             ]);
 
-            // Broadcast the notification to all connected clients (frontend users)
-            foreach ($this->clients as $client) {
-                // In a real application, you might filter clients based on roles,
-                // pages they are viewing, etc. For now, broadcast to all.
-                $client->send($notificationMessage);
+            // Check for specific events that require targeted delivery
+            if ($backendEvent === 'grades_saved_notification' && isset($eventPayload['recipientId'])) {
+                $recipientId = $eventPayload['recipientId'];
+                if (isset($this->users[$recipientId]) && $this->users[$recipientId] instanceof ConnectionInterface) {
+                    $this->users[$recipientId]->send($notificationMessage);
+                    echo "Sent grades_saved_notification to specific advisor: {$recipientId}\n";
+                } else {
+                    echo "Recipient advisor {$recipientId} not found or not connected for grades_saved_notification.\n";
+                }
+            } else {
+                // For all other backend events, broadcast to all connected clients
+                foreach ($this->clients as $client) {
+                    $client->send($notificationMessage);
+                }
+            }
+        } else if (isset($data['type']) && $data['type'] === 'frontend_event' && isset($data['payload']['event'])) {
+            $frontendEvent = $data['payload']['event'];
+            $eventPayload = $data['payload'];
+
+            echo "Received frontend event: " . $frontendEvent . "\n";
+
+            // Handle specific frontend events
+            switch ($frontendEvent) {
+                case 'student_advised':
+                    $notificationMessage = json_encode([
+                        'type' => 'notification',
+                        'payload' => $eventPayload
+                    ]);
+                    // Broadcast to all clients except the sender
+                    foreach ($this->clients as $client) {
+                        if ($from !== $client) {
+                            $client->send($notificationMessage);
+                        }
+                    }
+                    break;
+                default:
+                    echo "Unhandled frontend event: " . $frontendEvent . "\n";
+                    break;
             }
         }
         else {
             // Handle other types of messages (e.g., from frontend clients if needed)
             echo "Received message from frontend client or unhandled backend type: " . $msg . "\n";
-            // Example: If you had a chat feature, you'd handle those messages here
-            // foreach ($this->clients as $client) {
-            //     if ($from !== $client) { // Don't send the message back to the sender
-            //         $client->send($msg);
-            //     }
-            // }
         }
     }
 
     public function onClose(ConnectionInterface $conn) {
         // The connection is closed, remove it from the collection of connected clients
         $this->clients->detach($conn);
-
-        echo "Connection {$conn->resourceId} has disconnected\n";
+        // Remove user from the map if they were authenticated
+        if ($conn->userId !== null) {
+            unset($this->users[$conn->userId]);
+            echo "User {$conn->userId} disconnected. Connection {$conn->resourceId} has disconnected\n";
+        } else {
+            echo "Connection {$conn->resourceId} has disconnected (unauthenticated)\n";
+        }
     }
 
     public function onError(ConnectionInterface $conn, \Exception $e) {

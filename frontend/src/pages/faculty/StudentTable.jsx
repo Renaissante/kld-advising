@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,56 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, MoreHorizontal, UserCog, FileText, Mail } from "lucide-react";
+import { useActive } from '@/contexts/ActiveContext'; // Import useActive context
+import { toast } from "sonner"; // Import toast
+import { useAuth } from "@/contexts/AuthContext";
 
 // Converted props from TypeScript interface to standard destructuring
 export default function StudentTable({ students = [], onAdviseStudent, sectionName, activeTab }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { activeAcademicYear, activeSemester, isAdvisingActive, loading: activeContextLoading, refreshAdvisingStatus } = useActive();
+  const { user } = useAuth();
+  const ws = useRef(null);
+
+  useEffect(() => {
+    ws.current = new WebSocket("ws://192.168.18.6:8080"); // Replace with your WebSocket server address
+
+    ws.current.onopen = () => {
+      console.log("WebSocket connection established");
+      if (user && user.id) {
+        ws.current.send(JSON.stringify({
+          type: "auth",
+          payload: {
+            userId: user.id,
+          },
+        }));
+      }
+    };
+
+    ws.current.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      console.log("WebSocket message received:", message);
+
+      // Check if the message is a notification for a backend event
+      if (message.type === 'notification' && message.payload && message.payload.event === 'advising_period_updated') {
+        const { action_type, academic_year, semester } = message.payload.data;
+        toast.info(`The advising period for ${academic_year} ${semester} has been ${action_type.toLowerCase()}`);
+        refreshAdvisingStatus(); // Call to refresh the advising status
+      }
+    };
+
+    ws.current.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+
+    ws.current.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      ws.current.close();
+    };
+  }, [refreshAdvisingStatus]);
 
   // Filter students based on search query
   const filteredStudents = students.filter(
@@ -125,8 +171,26 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                             onClick={() => {
                               setTimeout(() => {
                                 onAdviseStudent(student);
+                                if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                                  ws.current.send(JSON.stringify({
+                                    type: "frontend_event",
+                                    payload: {
+                                      event: "student_advised",
+                                      data: {
+                                        student_id: student.id,
+                                        student_name: student.name,
+                                        advising_faculty_id: user.id,
+                                        advising_faculty_name: user.name,
+                                        academic_year: activeAcademicYear,
+                                        semester: activeSemester,
+                                      },
+                                    },
+                                  }));
+                                }
                               }, 0);
                             }}
+                            disabled={!isAdvisingActive} // Conditionally disable the item
+                            className={!isAdvisingActive ? "cursor-not-allowed opacity-50" : ""} // Add styling for disabled state
                           >
                             <UserCog className="mr-2 h-4 w-4" />
                             <span>Advise</span>

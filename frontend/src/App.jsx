@@ -32,7 +32,7 @@ const WebSocketHandler = () => {
     let ws = null;
 
     // Only connect if user is logged in and is a faculty member (potential advisor)
-    if (user && user.role === 'faculty') {
+    if (user && activeRole === 'faculty') {
       console.log("User is faculty, attempting WebSocket connection..."); // Log connection attempt
       try {
         

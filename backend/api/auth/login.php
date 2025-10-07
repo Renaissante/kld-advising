@@ -37,7 +37,7 @@ try {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // --- INSECURE PASSWORD COMPARISON (FOR TESTING ONLY) ---
-    if ($user && $password === $user['password_hash']) {
+    if ($user && password_verify($password, $user['password_hash'])) {
         $_SESSION['user_id'] = $user['id'];
         
         $roles_array = explode(',', $user['roles_list']);
