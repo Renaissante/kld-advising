@@ -1,6 +1,6 @@
 "use client"
 import { API_BASE_URL } from '@/config/api';
-import { useState, useContext } from "react" // Import useContext
+import { useState, useContext, useMemo } from "react" // Import useContext
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen,
@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/tooltip"
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
+import ExportAdvisingForms from "@/pages/dean/ExportAdvisingForms"; // Import the new component
 
 export function AppSidebar() {
   const [activeItem, setActiveItem] = useState(null);
@@ -80,8 +81,10 @@ export function AppSidebar() {
     }
   };
 
+  const memoizedDashboardUrl = useMemo(() => getRoleSpecificHomeUrl(activeRole), [activeRole]);
+
   const items = [
-    { title: "Dashboard", url: getRoleSpecificHomeUrl(activeRole), icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
+    { title: "Dashboard", url: memoizedDashboardUrl, icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
     { title: "Users", icon: Users, roles: ["admin"], subItems: [
       { title: "Active Users", url: "/admin/users/active-users", icon: Users },
       { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
@@ -96,6 +99,7 @@ export function AppSidebar() {
     { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
+    { title: "Export Advising Forms", url: "/dean/export-advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
   ];
 
   // Check if any subitem is active

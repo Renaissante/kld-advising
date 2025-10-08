@@ -21,6 +21,8 @@ $dashboard_data = [
     'academicYears' => [],
     'semesters' => [],
     'programs' => [],
+    'activeAcademicYear' => null, // Added for active academic year
+    'activeSemester' => null,     // Added for active semester
     'overallStats' => [
         'advisingCompletionRate' => 0,
         'gradingCompletionRate' => 0,
@@ -35,6 +37,8 @@ $dashboard_data = [
     'gradingStatusBreakdown' => [],
     'advisingStatusByYear' => [],
     'gradingStatusByYear' => [],
+    'yearLevels' => [], // Added for year levels
+    'sections' => [], // Added for sections
 ];
 
 // Helper function to get student counts for a section
@@ -109,6 +113,16 @@ try {
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $dashboard_data['semesters'][] = $row['semester_name'];
     }
+
+    // Fetch Active Academic Year
+    $stmt = $conn->prepare("SELECT academic_year_id, academic_year_name FROM academic_years WHERE status = 'active' LIMIT 1");
+    $stmt->execute();
+    $dashboard_data['activeAcademicYear'] = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Fetch Active Semester
+    $stmt = $conn->prepare("SELECT semester_id, semester_name FROM semesters WHERE status = 'active' LIMIT 1");
+    $stmt->execute();
+    $dashboard_data['activeSemester'] = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Fetch Programs
     $stmt = $conn->prepare("SELECT id, name FROM programs ORDER BY name ASC");
@@ -402,6 +416,31 @@ try {
         return $a['program'] <=> $b['program'];
     });
     $dashboard_data['programPerformance'] = $program_performance_raw;
+
+    // Fetch Year Levels (all)
+    $stmt = $conn->prepare("SELECT id, level FROM year_levels ORDER BY level ASC");
+    $stmt->execute();
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $dashboard_data['yearLevels'][] = ['id' => $row['id'], 'level' => $row['level']];
+    }
+
+    // Fetch Sections (all) - including program and year level for filtering on frontend
+    $stmt = $conn->prepare("SELECT 
+                                s.id as section_id,
+                                s.name as section_name,
+                                p.id as program_id,
+                                p.name as program_name,
+                                yl.id as year_level_id,
+                                yl.level as year_level_name
+                            FROM 
+                                sections s
+                            JOIN 
+                                programs p ON s.program_id = p.id
+                            JOIN 
+                                year_levels yl ON s.year_level_id = yl.id
+                            ORDER BY s.name ASC");
+    $stmt->execute();
+    $dashboard_data['sections'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Fetch Recent Activity (last 10 entries from audit_trail)
     $auditTrailQuery = "SELECT 
