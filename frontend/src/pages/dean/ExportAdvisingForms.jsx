@@ -160,7 +160,7 @@ const ExportAdvisingForms = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedAcademicYear, selectedSemester, selectedProgram, selectedSection, selectedYearLevel, searchQuery]);
+    }, [selectedAcademicYear, selectedSemester]);
 
     useEffect(() => {
         fetchAdvisingForms();
@@ -440,7 +440,7 @@ const ExportAdvisingForms = () => {
                                                 <SelectContent>
                                                     <SelectItem value="all">All Sections</SelectItem>
                                                     {filteredSections.map((sectionName, index) => (
-                                                        <SelectItem key={sectionName || `section-${index}`} value={sectionName}>
+                                                        <SelectItem key={`${sectionName}-${index}`} value={sectionName}>
                                                             {sectionName}
                                                         </SelectItem>
                                                     ))}
@@ -528,7 +528,7 @@ const ExportAdvisingForms = () => {
                                                 </TableRow>
                                             ) : (
                                                 currentForms.map((form, index) => (
-                                                    <TableRow key={form.advised_course_id || `form-${index}`} className="hover:bg-gray-50 dark:hover:bg-muted/50">
+                                                    <TableRow key={`${form.student_number}-${form.advised_course_id ?? `form-${index}`}`} className="hover:bg-gray-50 dark:hover:bg-muted/50">
                                                         <TableCell className="font-medium text-gray-900 px-3 py-2">
                                                             <div>
                                                                 <div className="dark:text-gray-50">{form.student_name}</div>
