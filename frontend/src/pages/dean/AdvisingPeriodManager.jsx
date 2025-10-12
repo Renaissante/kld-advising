@@ -288,7 +288,7 @@ export default function AdvisingPeriodManager() {
             {/* Header */}
             <div>
               <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Advising System Management</h1>
-              <p className="text-muted-foreground">Configure and control the academic advising system</p>
+              <p className="text-muted-foreground mt-1">Configure and control the academic advising system</p>
             </div>
 
             {/* Status Overview Cards */}

@@ -218,7 +218,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/dean/export-advising-forms"
+        path="/dean/advising-forms"
         element={
           <ProtectedRoute requiredRoles="dean">
             <ExportAdvisingForms />

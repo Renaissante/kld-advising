@@ -170,16 +170,95 @@ const DeanHome = () => {
             {/* Header */}
             <div className="flex flex-col">
               <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Dean's Academic Progress Dashboard</h1>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mt-1">
                 Monitor advising and grading completion across all programs and sections
               </p>
+            </div>
+
+         
+ 
+            {/* Metrics Cards - 4 Equal Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Students Enrolled Card */}
+              <Card className="bg-white border border-gray-200 shadow-sm dark:bg-gray-950 dark:border-gray-800">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Students Enrolled</p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{dashboardData.overallStats.totalActiveStudents.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-1">Total active students</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/30">
+                      <BookOpen className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Students Advised Card */}
+              <Card className="bg-white border border-gray-200 shadow-sm dark:bg-gray-950 dark:border-gray-800">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Students Advised</p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+                        {dashboardData.overallStats.totalStudentsAdvised.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        of {dashboardData.overallStats.totalActiveStudents.toLocaleString()} total students
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30">
+                      <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Advising Completion Card */}
+              <Card className="bg-white border border-gray-200 shadow-sm dark:bg-gray-950 dark:border-gray-800">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Advising Completion</p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{dashboardData.overallStats.advisingCompletionRate}%</p>
+                      <Progress value={dashboardData.overallStats.advisingCompletionRate} className="mt-2" />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedYear} • {selectedSemester}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
+                      <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Grading Completion Card */}
+              <Card className="bg-white border border-gray-200 shadow-sm dark:bg-gray-950 dark:border-gray-800">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Grading Completion</p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{dashboardData.overallStats.gradingCompletionRate}%</p>
+                      <Progress value={dashboardData.overallStats.gradingCompletionRate} className="mt-2" />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedYear} • {selectedSemester}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                      <GraduationCap className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Filters - Full Width */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
+                  
                   Filters
                 </CardTitle>
               </CardHeader>
@@ -234,67 +313,6 @@ const DeanHome = () => {
                 </div>
               </CardContent>
             </Card>
-
-         
- 
-            {/* Metrics Cards - 4 Equal Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Advising Completion</CardTitle>
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{dashboardData.overallStats.advisingCompletionRate}%</div>
-                  <Progress value={dashboardData.overallStats.advisingCompletionRate} className="mt-2" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {selectedYear} • {selectedSemester}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Grading Completion</CardTitle>
-                  <GraduationCap className="h-5 w-5 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{dashboardData.overallStats.gradingCompletionRate}%</div>
-                  <Progress value={dashboardData.overallStats.gradingCompletionRate} className="mt-2" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {selectedYear} • {selectedSemester}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Students Advised</CardTitle>
-                  <Users className="h-5 w-5 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">
-                    {dashboardData.overallStats.totalStudentsAdvised.toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    of {dashboardData.overallStats.totalActiveStudents.toLocaleString()} total students
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Courses Graded</CardTitle>
-                  <BookOpen className="h-5 w-5 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{dashboardData.overallStats.totalCoursesGraded}</div>
-                  <p className="text-xs text-muted-foreground mt-2">Course sections completed</p>
-                </CardContent>
-              </Card>
-            </div>
-
-
 
             {/* Main Content Area - Left Large, Right Sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -359,7 +377,7 @@ const DeanHome = () => {
                             </TableHeader>
                             <TableBody>
                               {currentSections.map((section) => (
-                                <TableRow key={section.section}>
+                                <TableRow key={section.section_id}>
                                   <TableCell className="font-medium">{section.section}</TableCell>
                                   <TableCell>{section.program}</TableCell>
                                   <TableCell>{section.yearLevel}</TableCell>
@@ -681,7 +699,7 @@ const DeanHome = () => {
                   </CardHeader>
                   <CardContent className="space-y-4 h-[310px]">
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 font-semibold text-sm">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 font-semibold text-sm dark:bg-red-900/30 dark:text-red-400">
                         <FileText className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
@@ -690,7 +708,7 @@ const DeanHome = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-semibold text-sm">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-semibold text-sm dark:bg-orange-900/30 dark:text-orange-400">
                         <GraduationCap className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
@@ -699,7 +717,7 @@ const DeanHome = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm dark:bg-blue-900/30 dark:text-blue-400">
                         <Users className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
@@ -708,7 +726,7 @@ const DeanHome = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 font-semibold text-sm">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 font-semibold text-sm dark:bg-purple-900/30 dark:text-purple-400">
                         <BookOpen className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
@@ -743,23 +761,23 @@ const DeanHome = () => {
                           <div
                             className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               activity.type === "advising"
-                                ? "bg-green-100"
+                                ? "bg-green-100 dark:bg-green-900/30"
                                 : activity.type === "grading"
-                                  ? "bg-blue-100"
+                                  ? "bg-blue-100 dark:bg-blue-900/30"
                                   : activity.type === "update"
-                                    ? "bg-purple-100"
-                                    : "bg-gray-100"
+                                    ? "bg-purple-100 dark:bg-purple-900/30"
+                                    : "bg-gray-100 dark:bg-gray-800"
                             }`}
                           >
                             <ActivityIcon
                               className={`w-4 h-4 ${
                                 activity.type === "advising"
-                                  ? "text-green-600"
+                                  ? "text-green-600 dark:text-green-400"
                                   : activity.type === "grading"
-                                    ? "text-blue-600"
+                                    ? "text-blue-600 dark:text-blue-400"
                                     : activity.type === "update"
-                                      ? "text-purple-600"
-                                      : "text-gray-600"
+                                      ? "text-purple-600 dark:text-purple-400"
+                                      : "text-gray-600 dark:text-gray-400"
                               }`}
                             />
                           </div>

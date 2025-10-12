@@ -292,7 +292,7 @@ const ExportAdvisingForms = () => {
                 <div>
                             <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Advising Forms Management</h1>
                             <p className="text-muted-foreground mt-1">
-                                View, filter, and export completed advising forms
+                                View and export completed advising forms
                             </p>
                 </div>
 
@@ -366,7 +366,7 @@ const ExportAdvisingForms = () => {
                             </CardHeader>
                             <CardContent className="space-y-4">
                 <div>
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Filter by:</label>
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Filters</label>
                                     <div className="flex flex-wrap gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Search</label>

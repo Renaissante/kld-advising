@@ -183,6 +183,7 @@ try {
         $gradingCompletion = $counts['totalStudents'] > 0 ? round(($counts['gradedStudents'] / $counts['totalStudents']) * 100, 2) : 0;
 
         $dashboard_data['sectionData'][] = [
+            'section_id' => $section['section_id'], // Add section ID
             'section' => $section['section_name'],
             'program' => $section['program_name'],
             'yearLevel' => $section['year_level'],

@@ -99,7 +99,7 @@ export function AppSidebar() {
     { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
-    { title: "Export Advising Forms", url: "/dean/export-advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
+    { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
   ];
 
   // Check if any subitem is active
