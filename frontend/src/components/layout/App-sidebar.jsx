@@ -20,7 +20,8 @@ import {
   NotebookPen,
   Archive,
   Check,
-  CalendarDays // Import CalendarDays for the new component
+  CalendarDays, // Import CalendarDays for the new component
+  Bell
 } from "lucide-react"
 import {
   Sidebar,
@@ -84,7 +85,7 @@ export function AppSidebar() {
   const memoizedDashboardUrl = useMemo(() => getRoleSpecificHomeUrl(activeRole), [activeRole]);
 
   const items = [
-    { title: "Dashboard", url: memoizedDashboardUrl, icon: LayoutDashboard, roles: ["admin", "faculty", "student", "dean", "programchair"] },
+    { title: "Dashboard", url: memoizedDashboardUrl, icon: LayoutDashboard, roles: ["admin", "dean", "programchair"] },
     { title: "Users", icon: Users, roles: ["admin"], subItems: [
       { title: "Active Users", url: "/admin/users/active-users", icon: Users },
       { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
@@ -100,6 +101,7 @@ export function AppSidebar() {
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
+    { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin", "faculty", "student", "programchair", "dean"] }, // New item for all roles
   ];
 
   // Check if any subitem is active

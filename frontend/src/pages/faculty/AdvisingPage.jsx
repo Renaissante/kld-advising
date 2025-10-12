@@ -324,14 +324,9 @@ const AdvisingPage = () => {
 
         <div className="container mx-auto p-4 md:p-6 mt-4">
           <div className="flex flex-col gap-6">
-            <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Academic Advising</h1>
             <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Academic Advising</h1>
               <p className="text-muted-foreground">Manage academic advising for your assigned sections</p>
-              {activeTab === 'current' && (
-                <p className="text-sm text-muted-foreground">
-                  Showing sections for A.Y. {activeAcademicYear?.year || 'Loading...'} / {activeSemester?.name || 'Loading...'}
-                </p>
-              )}
             </div>
 
             <div className="flex items-center justify-between flex-wrap gap-4">

@@ -22,6 +22,7 @@ import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
 import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
 import ExportAdvisingForms from "@/pages/dean/ExportAdvisingForms"; // Import the new component
+import NotificationsManagement from "@/pages/NotificationsManagement"; // Import the new component
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
@@ -222,6 +223,16 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute requiredRoles="dean">
             <ExportAdvisingForms />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* New Route for Notifications (accessible by all roles) */}
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute requiredRoles={["admin", "faculty", "student", "programchair", "dean"]}>
+            <NotificationsManagement />
           </ProtectedRoute>
         }
       />
