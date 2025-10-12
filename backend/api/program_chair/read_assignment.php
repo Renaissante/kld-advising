@@ -33,14 +33,16 @@ try {
                 u.email,
                 GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles,
                 e.name as faculty_name,
-                d.name as department_name
+                d.name as department_name,
+                f.advisor_status
               FROM employees e
               JOIN users u ON e.employee_id = u.id
               LEFT JOIN user_roles ur ON u.id = ur.user_id
               LEFT JOIN roles r ON ur.role_id = r.id
               JOIN departments d ON e.department_id = d.id
-              WHERE r.role_name IN ('faculty', 'programchair', 'dean', 'advisor')
-              GROUP BY e.employee_id, u.email, e.name, d.name
+              LEFT JOIN faculty f ON e.employee_id = f.employee_id
+              WHERE r.role_name = 'faculty'
+              GROUP BY e.employee_id, u.email, e.name, d.name, f.advisor_status
               ORDER BY e.name";
 
     // Use $conn

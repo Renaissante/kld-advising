@@ -78,11 +78,17 @@ try {
                                 st.curriculum_id
                              FROM students st
                              JOIN sections s ON st.section_id = s.id
-                             JOIN section_advisors sa ON s.id = sa.section_id -- Corrected join to section_advisors
+                             LEFT JOIN section_advisors sa_assigned ON s.id = sa_assigned.section_id
+                             LEFT JOIN faculty f_assigned ON sa_assigned.advisor_id = f_assigned.employee_id
                              WHERE st.student_id = :student_id
                              AND s.academic_year_id = :active_academic_year_id
                              AND s.semester_id = :active_semester_id
-                             AND sa.advisor_id = :faculty_id -- Corrected condition to check advisor_id
+                             AND (
+                               -- Case 1: Student is in a section advised by the requesting faculty
+                               (sa_assigned.advisor_id = :faculty_id)
+                               -- Case 2: Student's assigned advisor is unavailable, allowing any faculty to advise
+                               OR (f_assigned.advisor_status = 'unavailable')
+                             )
                              LIMIT 1";
 
 
@@ -93,14 +99,15 @@ try {
     $stmtStudentSection->bindParam(':student_id', $studentId);
     $stmtStudentSection->bindParam(':active_academic_year_id', $activeAcademicYearId);
     $stmtStudentSection->bindParam(':active_semester_id', $activeSemesterId);
-    $stmtStudentSection->bindParam(':faculty_id', $facultyId); // Still binding facultyId, but used for advisor_id
+    $stmtStudentSection->bindParam(':faculty_id', $facultyId); // The requesting faculty's ID
     $stmtStudentSection->execute();
     $studentSectionInfo = $stmtStudentSection->fetch(PDO::FETCH_ASSOC);
 
     if (!$studentSectionInfo) {
         // Student not found in a section for the active AY/Sem assigned to this faculty as an ADVISOR
+        // OR student's advisor is unavailable (allowing other faculty to advise)
         http_response_code(404);
-        echo json_encode(array("success" => false, "message" => "Student not found in your assigned advising sections for the active academic year/semester.")); // Updated message
+        echo json_encode(array("success" => false, "message" => "Student not found in your assigned advising sections or their advisor is not currently unavailable.")); // Updated message
         exit();
     }
 

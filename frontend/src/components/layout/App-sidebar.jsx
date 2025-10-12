@@ -95,7 +95,7 @@ export function AppSidebar() {
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
     { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
-    { title: "Manage Faculty", url: "/program-chair/manage-faculty", icon: ListPlus, roles: ["programchair"] },
+    { title: "Manage Faculty", url: "/program-chair/manage-faculty", basePath: "/program-chair/faculty-assignment", icon: ListPlus, roles: ["programchair"] },
     { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
@@ -138,7 +138,7 @@ export function AppSidebar() {
                 {items
                   .filter((item) => item.roles.includes(activeRole)) // Filter by activeRole
                   .map((item) => {
-                    const isActive = location.pathname === item.url;
+                    const isActive = location.pathname === item.url || (item.basePath && location.pathname.startsWith(item.basePath));
                     const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(isSubmenuActive(item));
                     
                     return (

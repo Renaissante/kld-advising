@@ -76,7 +76,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
       <CardHeader>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
           <div>
-            <CardTitle className="mb-2">Students in {sectionName}</CardTitle>
+            <CardTitle className="mb-2">{sectionName}</CardTitle>
             <CardDescription>
               {/* Use filteredStudents.length for accurate count after search */}
               {filteredStudents.length} student{filteredStudents.length !== 1 ? "s" : ""} found
@@ -166,7 +166,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                        {activeTab === "current" && (
+                        {(activeTab === "current" || activeTab === "unavailable-advisor-students") && (
                           <DropdownMenuItem
                             onClick={() => {
                               setTimeout(() => {

@@ -35,8 +35,8 @@ if (!isset($data->assignment_id)) {
 $assignment_id = $data->assignment_id;
 
 try {
-    // Prepare an update statement to set status to 'archived'
-    $query = "UPDATE section_faculty SET status = 'archived' WHERE id = :assignment_id";
+    // Prepare a delete statement to remove the assignment
+    $query = "DELETE FROM section_faculty WHERE id = :assignment_id";
     $stmt = $conn->prepare($query);
 
     // Bind the ID
@@ -46,14 +46,14 @@ try {
     if ($stmt->execute()) {
         if ($stmt->rowCount() > 0) {
             http_response_code(200);
-            echo json_encode(["message" => "Assignment archived successfully.", "success" => true]);
+            echo json_encode(["message" => "Assignment deleted successfully.", "success" => true]);
         } else {
             http_response_code(404);
             echo json_encode(["message" => "No assignment found with the provided ID.", "success" => false]);
         }
     } else {
         http_response_code(500);
-        echo json_encode(["message" => "Internal Server Error: Failed to archive assignment.", "success" => false]);
+        echo json_encode(["message" => "Internal Server Error: Failed to delete assignment.", "success" => false]);
     }
 } catch (PDOException $e) {
     http_response_code(503);

@@ -37,6 +37,10 @@ const AdvisingPage = () => {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [studentsError, setStudentsError] = useState(null);
 
+  const [unavailableAdvisorStudents, setUnavailableAdvisorStudents] = useState([]);
+  const [isLoadingUnavailableAdvisorStudents, setIsLoadingUnavailableAdvisorStudents] = useState(false);
+  const [unavailableAdvisorStudentsError, setUnavailableAdvisorStudentsError] = useState(null);
+
   useEffect(() => {
     if (!user?.id) {
       setIsLoadingSections(false);
@@ -99,6 +103,59 @@ const AdvisingPage = () => {
 
     fetchSections();
   }, [user]);
+
+  useEffect(() => {
+    const fetchUnavailableAdvisorStudents = async () => {
+      if (activeTab !== "unavailable-advisor-students") return;
+      if (!user?.id || !activeAcademicYear?.id || !activeSemester?.id) {
+        setUnavailableAdvisorStudents([]);
+        setIsLoadingUnavailableAdvisorStudents(false);
+        setUnavailableAdvisorStudentsError(null);
+        return;
+      }
+
+      setIsLoadingUnavailableAdvisorStudents(true);
+      setUnavailableAdvisorStudentsError(null);
+      try {
+        const apiUrl = `${API_BASE_URL}/student/read_students_by_unavailable_advisor.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+        console.log("Fetching students with unavailable advisors from:", apiUrl);
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          let errorMsg = `HTTP error! status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+            console.error("Unavailable students fetch error response:", errorData);
+          } catch (e) {
+            console.error("Unavailable students fetch error (non-JSON):", await response.text());
+          }
+          throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        console.log("Unavailable students API response:", data);
+
+        if (data.success && Array.isArray(data.data)) {
+          setUnavailableAdvisorStudents(data.data);
+        } else if (data.success && !Array.isArray(data.data)) {
+          console.warn("API for unavailable students returned success but data is not an array:", data.data);
+          setUnavailableAdvisorStudents([]);
+          throw new Error(data.message || "API returned unexpected data format for unavailable students.");
+        } else {
+          throw new Error(data.message || "Failed to fetch students with unavailable advisors.");
+        }
+      } catch (error) {
+        console.error("Fetching unavailable advisor students failed:", error);
+        setUnavailableAdvisorStudentsError(error.message || "Failed to load students with unavailable advisors. Please try again later.");
+        setUnavailableAdvisorStudents([]);
+      } finally {
+        setIsLoadingUnavailableAdvisorStudents(false);
+      }
+    };
+
+    fetchUnavailableAdvisorStudents();
+  }, [activeTab, user, activeAcademicYear, activeSemester]);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -230,6 +287,13 @@ const AdvisingPage = () => {
     setStudentsError(null);
     setSelectedHistoricalAy("");
     setSelectedHistoricalSem("");
+
+    // Reset unavailable advisor students state when switching away from its tab
+    if (newTabValue !== "unavailable-advisor-students") {
+      setUnavailableAdvisorStudents([]);
+      setIsLoadingUnavailableAdvisorStudents(false);
+      setUnavailableAdvisorStudentsError(null);
+    }
   };
 
   const handleHistoricalAyChange = (ayId) => {
@@ -275,8 +339,10 @@ const AdvisingPage = () => {
                 <TabsList className="bg-muted/60 dark:bg-muted/30">
                   <TabsTrigger value="previous">Previous Semesters</TabsTrigger>
                   <TabsTrigger value="current">Current Semester</TabsTrigger>
+                  <TabsTrigger value="unavailable-advisor-students">Students With Unavailable Advisors</TabsTrigger>
                 </TabsList>
               </Tabs>
+              {activeTab !== "unavailable-advisor-students" && (
               <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -287,16 +353,37 @@ const AdvisingPage = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+              )}
             </div>
-
+      
             {isLoading ? (
               <div className="p-6 border rounded-lg">
                 <Skeleton className="h-48 w-full" />
               </div>
-            ) : sectionsError ? (
+            ) : sectionsError && activeTab !== "unavailable-advisor-students" ? (
               <div className="flex justify-center items-center p-8 border rounded-lg bg-destructive/10 text-destructive">
                 <p>Error loading sections: {sectionsError}</p>
               </div>
+            ) : isLoadingUnavailableAdvisorStudents && activeTab === "unavailable-advisor-students" ? (
+              <div className="p-6 border rounded-lg">
+                <div className="flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  <span>Loading students...</span>
+                </div>
+                <Skeleton className="h-40 w-full mt-4" />
+              </div>
+            ) : unavailableAdvisorStudentsError && activeTab === "unavailable-advisor-students" ? (
+              <div className="flex justify-center items-center p-8 border rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                <p>Error loading students: {unavailableAdvisorStudentsError}</p>
+              </div>
+            ) : activeTab === "unavailable-advisor-students" ? (
+              <StudentTable
+                students={unavailableAdvisorStudents}
+                onAdviseStudent={handleAdviseStudent}
+                sectionName="Students With Unavailable Advisors"
+                activeTab={activeTab}
+              />
             ) : (
               <SectionCarousel
                 allSections={allSections}
