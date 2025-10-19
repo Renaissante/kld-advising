@@ -53,7 +53,7 @@ try {
     $stmt = $conn->prepare($sql);
 
 
-    $defaultPassword = password_hash('123456', PASSWORD_BCRYPT);
+    $defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
 
     $userId = isset($data->employeeId) ? $data->employeeId : uniqid(); 
     $stmt->bindParam(':id', $userId);

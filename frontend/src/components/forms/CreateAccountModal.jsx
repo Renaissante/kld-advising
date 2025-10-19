@@ -45,7 +45,6 @@ export function CreateAccountModal({onAccountCreated}) {
   const [studentId, setStudentId] = useState("");
   const [department, setDepartment] = useState("");
   const [program, setProgram] = useState("");
-  const [specialization, setSpecialization] = useState("");
   const [yearLevel, setYearLevel] = useState("");
   const [section, setSection] = useState("");
   const [entryYear, setEntryYear] = useState("");
@@ -128,7 +127,6 @@ export function CreateAccountModal({onAccountCreated}) {
     setStudentId("");
     setDepartment("");
     setProgram("");
-    setSpecialization("");
     setYearLevel("");
     setSection("");
     setEntryYear("");
@@ -145,7 +143,7 @@ export function CreateAccountModal({onAccountCreated}) {
       email,
       role,
       dob,
-      specialization,
+      
     };
 
     
@@ -537,15 +535,7 @@ export function CreateAccountModal({onAccountCreated}) {
                 </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="specialization">Specialization</Label>
-                <Input
-                  id="specialization"
-                  value={specialization}
-                  onChange={(e) => setSpecialization(e.target.value)}
-                  placeholder="Enter specialization"
-                />
-              </div>
+              
             </div>
           )}
 

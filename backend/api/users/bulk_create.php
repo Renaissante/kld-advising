@@ -28,7 +28,7 @@ $processedCount = 0;
 $failedCount = 0;
 $failedUsers = [];
 
-$defaultPassword = password_hash('123456', PASSWORD_BCRYPT); // Default password for new users
+$defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
 
 try {
     switch ($role) {
@@ -340,8 +340,17 @@ try {
                     $stmtStudent->bindParam(':program_id', $programId);
                     $stmtStudent->bindParam(':entry_year_id', $entryYearId);
                     $stmtStudent->bindParam(':curriculum_id', $curriculumId);
-
                     $stmtStudent->execute();
+
+                    // Get the auto-incremented ID of the newly created student
+                    $newlyCreatedStudentInternalId = $conn->lastInsertId();
+
+                    // Insert into student_section_enrollments table
+                    $sqlEnrollment = "INSERT INTO student_section_enrollments (student_id, section_id) VALUES (:student_id, :section_id)";
+                    $stmtEnrollment = $conn->prepare($sqlEnrollment);
+                    $stmtEnrollment->bindParam(':student_id', $newlyCreatedStudentInternalId); // Use the internal integer ID
+                    $stmtEnrollment->bindParam(':section_id', $sectionId);
+                    $stmtEnrollment->execute();
 
                     // Pre-populate course_grades table for the student
                     $sqlCourses = "SELECT id FROM courses WHERE curriculum_id = :curriculum_id";

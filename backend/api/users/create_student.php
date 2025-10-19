@@ -51,7 +51,7 @@ try {
             VALUES (:id, :email, :password_hash, NOW())";
     $stmt = $conn->prepare($sql);
 
-    $defaultPassword = password_hash('123456', PASSWORD_BCRYPT);
+    $defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
     $userId = $data->studentId;
 
     $stmt->bindParam(':id', $userId);
@@ -156,14 +156,24 @@ try {
     $stmt->bindParam(':curriculum_id', $curriculumId);
     $stmt->execute();
 
-    // 8. Retrieve courses associated with the curriculum directly from the courses table
+    // Get the auto-incremented ID of the newly created student
+    $newlyCreatedStudentInternalId = $conn->lastInsertId();
+
+    // 8. Insert into student_section_enrollments table
+    $sqlEnrollment = "INSERT INTO student_section_enrollments (student_id, section_id) VALUES (:student_id, :section_id)";
+    $stmtEnrollment = $conn->prepare($sqlEnrollment);
+    $stmtEnrollment->bindParam(':student_id', $newlyCreatedStudentInternalId); // Use the internal integer ID
+    $stmtEnrollment->bindParam(':section_id', $sectionId);
+    $stmtEnrollment->execute();
+
+    // 9. Retrieve courses associated with the curriculum directly from the courses table
     $sqlCourses = "SELECT id FROM courses WHERE curriculum_id = :curriculum_id";
     $stmtCourses = $conn->prepare($sqlCourses);
     $stmtCourses->bindParam(':curriculum_id', $curriculumId);
     $stmtCourses->execute();
     $courses = $stmtCourses->fetchAll(PDO::FETCH_ASSOC);
 
-    // 9. Pre-populate course_grades table for the student
+    // 10. Pre-populate course_grades table for the student
     if (!empty($courses)) {
         $sqlGradeInsert = "INSERT INTO course_grades (student_id, course_id) VALUES (:student_id, :course_id)";
         $stmtGradeInsert = $conn->prepare($sqlGradeInsert);

@@ -34,8 +34,7 @@ if (
     empty($data->email) || 
     empty($data->department) || 
     empty($data->role) ||
-    empty($data->employeeId) ||
-    empty($data->specialization)
+    empty($data->employeeId)
 ) {
     http_response_code(400);
     echo json_encode(["message" => "All required fields must be filled."]);
@@ -107,11 +106,10 @@ try {
     $stmt->execute();
 
  
-    $sql = "INSERT INTO faculty (employee_id, specialization, department) 
-            VALUES (:employee_id, :specialization, :department)";
+    $sql = "INSERT INTO faculty (employee_id, department) 
+            VALUES (:employee_id, :department)";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':employee_id', $data->employeeId);
-    $stmt->bindParam(':specialization', $data->specialization);
     $stmt->bindParam(':department', $departmentId);
     $stmt->execute();
 

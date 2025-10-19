@@ -56,7 +56,7 @@ try {
             VALUES (:id, :email, :password_hash, NOW())";
     $stmt = $conn->prepare($sql);
 
-    $defaultPassword = password_hash('123456', PASSWORD_BCRYPT);
+    $defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
 
     $userId = isset($data->employeeId) ? $data->employeeId : uniqid();
 
