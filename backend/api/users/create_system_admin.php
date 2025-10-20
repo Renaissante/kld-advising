@@ -95,6 +95,12 @@ try {
     $stmt->bindParam(':dob', $data->dob);
     $stmt->execute();
 
+    $sql = "INSERT INTO system_admins (employee_id) 
+    VALUES (:employee_id)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':employee_id', $data->employeeId);
+    $stmt->execute();
+
     $conn->commit();
 
     // --- Add WebSocket Notification ---

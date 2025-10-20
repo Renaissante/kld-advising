@@ -100,21 +100,213 @@ try {
     }
     // --- Handle User Roles --- END
 
-    // 2. Conditionally update other tables based on *current* roles after updates
-    // Re-fetch current roles to ensure we're working with the latest set after role changes
+    // Re-fetch current roles to ensure we're working with the latest set after role changes for further processing
     $current_roles_stmt = $conn->prepare($current_roles_query);
     $current_roles_stmt->bindParam(':user_id', $data->KLD_ID);
     $current_roles_stmt->execute();
     $current_user_roles_after_update = array_column($current_roles_stmt->fetchAll(PDO::FETCH_ASSOC), 'role_name');
 
-    // Now use in_array() checks against $current_user_roles_after_update
+    // Get roles that were newly added and roles that were removed
+    $roles_added = array_diff($new_roles_from_frontend, $existing_role_names);
+    $roles_removed = array_diff($existing_role_names, $new_roles_from_frontend);
+
+    // 2. Conditionally insert/delete/update other tables based on role changes and current roles
+
+    // Handle 'student' role
+    if (in_array("student", $roles_added)) {
+        // Check if student record already exists to prevent duplicate inserts
+        $check_student_query = "SELECT COUNT(*) FROM students WHERE student_id = :student_id";
+        $check_student_stmt = $conn->prepare($check_student_query);
+        $check_student_stmt->bindParam(':student_id', $data->KLD_ID);
+        $check_student_stmt->execute();
+        if ($check_student_stmt->fetchColumn() == 0) {
+            $insert_student_query = "INSERT INTO students (student_id, name, department_id, program_id, year_level_id, section_id) VALUES (:student_id, :name, :department_id, :program_id, :year_level_id, :section_id)";
+            $insert_student_stmt = $conn->prepare($insert_student_query);
+            $insert_student_stmt->bindParam(':student_id', $data->KLD_ID);
+            $insert_student_stmt->bindParam(':name', $data->name);
+            $insert_student_stmt->bindValue(':department_id', isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null, PDO::PARAM_INT);
+            $insert_student_stmt->bindValue(':program_id', isset($data->program_id) && $data->program_id !== "" ? $data->program_id : null, PDO::PARAM_INT);
+            $insert_student_stmt->bindValue(':year_level_id', isset($data->year_level_id) && $data->year_level_id !== "" ? $data->year_level_id : null, PDO::PARAM_INT);
+            $insert_student_stmt->bindValue(':section_id', isset($data->section_id) && $data->section_id !== "" ? $data->section_id : null, PDO::PARAM_INT);
+            $insert_student_stmt->execute();
+            if ($insert_student_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new student record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (in_array("student", $roles_removed)) {
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_student_status_query = "UPDATE students SET status = 'inactive' WHERE student_id = :student_id";
+        $update_student_status_stmt = $conn->prepare($update_student_status_query);
+        $update_student_status_stmt->bindParam(':student_id', $data->KLD_ID);
+        $update_student_status_stmt->execute();
+        if ($update_student_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted student record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Handle 'employee' related roles (faculty, programchair, dean, admin)
+    $employee_roles = ["faculty", "programchair", "dean", "admin"];
+    $has_employee_role_before = !empty(array_intersect($existing_role_names, $employee_roles));
+    $has_employee_role_after = !empty(array_intersect($current_user_roles_after_update, $employee_roles));
+
+    if ($has_employee_role_after && !$has_employee_role_before) { // Employee role newly added
+        // Check if employee record already exists
+        $check_employee_query = "SELECT COUNT(*) FROM employees WHERE employee_id = :employee_id";
+        $check_employee_stmt = $conn->prepare($check_employee_query);
+        $check_employee_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $check_employee_stmt->execute();
+        if ($check_employee_stmt->fetchColumn() == 0) {
+            $insert_employee_query = "INSERT INTO employees (employee_id, name, department_id) VALUES (:employee_id, :name, :department_id)";
+            $insert_employee_stmt = $conn->prepare($insert_employee_query);
+            $insert_employee_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $insert_employee_stmt->bindParam(':name', $data->name);
+            $insert_employee_stmt->bindValue(':department_id', isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null, PDO::PARAM_INT);
+            $insert_employee_stmt->execute();
+            if ($insert_employee_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new employee record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (!$has_employee_role_after && $has_employee_role_before) { // All employee roles removed
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_employee_status_query = "UPDATE employees SET status = 'inactive' WHERE employee_id = :employee_id";
+        $update_employee_status_stmt = $conn->prepare($update_employee_status_query);
+        $update_employee_status_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $update_employee_status_stmt->execute();
+        if ($update_employee_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted employee record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Handle 'programchair' role
+    if (in_array("programchair", $roles_added)) {
+        $check_pc_query = "SELECT COUNT(*) FROM program_chairs WHERE employee_id = :employee_id";
+        $check_pc_stmt = $conn->prepare($check_pc_query);
+        $check_pc_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $check_pc_stmt->execute();
+        if ($check_pc_stmt->fetchColumn() == 0) {
+            $insert_pc_query = "INSERT INTO program_chairs (employee_id, program, department) VALUES (:employee_id, :program, :department)";
+            $insert_pc_stmt = $conn->prepare($insert_pc_query);
+            $insert_pc_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $insert_pc_stmt->bindValue(':program', isset($data->program_id) && $data->program_id !== "" ? $data->program_id : null, PDO::PARAM_INT);
+            $insert_pc_stmt->bindValue(':department', isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null, PDO::PARAM_INT);
+            $insert_pc_stmt->execute();
+            if ($insert_pc_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new program chair record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (in_array("programchair", $roles_removed)) {
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_pc_status_query = "UPDATE program_chairs SET status = 'inactive' WHERE employee_id = :employee_id";
+        $update_pc_status_stmt = $conn->prepare($update_pc_status_query);
+        $update_pc_status_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $update_pc_status_stmt->execute();
+        if ($update_pc_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted program chair record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Handle 'dean' role
+    if (in_array("dean", $roles_added)) {
+        $check_dean_query = "SELECT COUNT(*) FROM deans WHERE employee_id = :employee_id";
+        $check_dean_stmt = $conn->prepare($check_dean_query);
+        $check_dean_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $check_dean_stmt->execute();
+        if ($check_dean_stmt->fetchColumn() == 0) {
+            $insert_dean_query = "INSERT INTO deans (employee_id, department) VALUES (:employee_id, :department)";
+            $insert_dean_stmt = $conn->prepare($insert_dean_query);
+            $insert_dean_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $insert_dean_stmt->bindValue(':department', isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null, PDO::PARAM_INT);
+            $insert_dean_stmt->execute();
+            if ($insert_dean_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new dean record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (in_array("dean", $roles_removed)) {
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_dean_status_query = "UPDATE deans SET status = 'inactive' WHERE employee_id = :employee_id";
+        $update_dean_status_stmt = $conn->prepare($update_dean_status_query);
+        $update_dean_status_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $update_dean_status_stmt->execute();
+        if ($update_dean_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted dean record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Handle 'faculty' role
+    if (in_array("faculty", $roles_added)) {
+        $check_faculty_query = "SELECT COUNT(*) FROM faculty WHERE employee_id = :employee_id";
+        $check_faculty_stmt = $conn->prepare($check_faculty_query);
+        $check_faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $check_faculty_stmt->execute();
+        if ($check_faculty_stmt->fetchColumn() == 0) {
+            $insert_faculty_query = "INSERT INTO faculty (employee_id, department) VALUES (:employee_id, :department)"; // Specialization is nullable
+            $insert_faculty_stmt = $conn->prepare($insert_faculty_query);
+            $insert_faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $insert_faculty_stmt->bindValue(':department', isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null, PDO::PARAM_INT);
+            $insert_faculty_stmt->execute();
+            if ($insert_faculty_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new faculty record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (in_array("faculty", $roles_removed)) {
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_faculty_status_query = "UPDATE faculty SET status = 'inactive' WHERE employee_id = :employee_id";
+        $update_faculty_status_stmt = $conn->prepare($update_faculty_status_query);
+        $update_faculty_status_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $update_faculty_status_stmt->execute();
+        if ($update_faculty_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted faculty record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Handle 'admin' role
+    if (in_array("admin", $roles_added)) {
+        $check_admin_query = "SELECT COUNT(*) FROM system_admins WHERE employee_id = :employee_id";
+        $check_admin_stmt = $conn->prepare($check_admin_query);
+        $check_admin_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $check_admin_stmt->execute();
+        if ($check_admin_stmt->fetchColumn() == 0) {
+            $insert_admin_query = "INSERT INTO system_admins (employee_id, status) VALUES (:employee_id, 'active')";
+            $insert_admin_stmt = $conn->prepare($insert_admin_query);
+            $insert_admin_stmt->bindParam(':employee_id', $data->KLD_ID);
+            $insert_admin_stmt->execute();
+            if ($insert_admin_stmt->rowCount() > 0) {
+                $changesMade = true;
+                error_log("Inserted new system admin record for ID: " . $data->KLD_ID);
+            }
+        }
+    } elseif (in_array("admin", $roles_removed)) {
+        // Soft delete: Update status to 'inactive' instead of deleting
+        $update_admin_status_query = "UPDATE system_admins SET status = 'inactive' WHERE employee_id = :employee_id";
+        $update_admin_status_stmt = $conn->prepare($update_admin_status_query);
+        $update_admin_status_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $update_admin_status_stmt->execute();
+        if ($update_admin_status_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Soft-deleted system admin record for ID: " . $data->KLD_ID);
+        }
+    }
+
+    // Now proceed with updates for existing roles
+    // Use in_array() checks against $current_user_roles_after_update
     if (in_array("student", $current_user_roles_after_update)) {
         $student_query = "UPDATE students SET
                             name = :name,
                             department_id = :department_id,
                             program_id = :program_id,
                             year_level_id = :year_level_id,
-                            section_id = :section_id
+                            section_id = :section_id,
+                            status = 'active' -- Set status to active if role is present
                           WHERE student_id = :student_id";
         $student_stmt = $conn->prepare($student_query);
 
@@ -220,19 +412,12 @@ try {
     }
 
     // Update employees table if the user has any employee-related roles
-    $employee_roles = ["faculty", "programchair", "dean", "admin"];
-    $has_employee_role = false;
-    foreach ($employee_roles as $emp_role) {
-        if (in_array($emp_role, $current_user_roles_after_update)) {
-            $has_employee_role = true;
-            break;
-        }
-    }
-
-    if ($has_employee_role) {
+    // This block now only handles updates, creation/deletion handled above
+    if ($has_employee_role_after) {
         $employee_query = "UPDATE employees SET
                                 name = :name,
-                                department_id = :department_id
+                                department_id = :department_id,
+                                status = 'active' -- Set status to active if role is present
                               WHERE employee_id = :employee_id";
         $employee_stmt = $conn->prepare($employee_query);
 
@@ -251,6 +436,7 @@ try {
     }
 
     // Update program_chairs table if role is programchair
+    // This block now only handles updates, creation/deletion handled above
     if (in_array("programchair", $current_user_roles_after_update)) {
         // Fetch current department and program for program chair
         $current_pc_data_query = "SELECT department, program FROM program_chairs WHERE employee_id = :employee_id";
@@ -273,20 +459,18 @@ try {
         $department_id_pc = $new_department_id_from_frontend ?? $current_department_in_db; // Use new if provided, else keep old
 
         // Determine final program_id_pc (set to null if department changed and program is empty)
+        // Adjust for NOT NULL constraint on program in program_chairs if applicable.
+        // For simplicity, we assume if department changes and program is empty, it means no program is associated with the new department,
+        // and we will try to set it to NULL. If DB schema doesn't allow, it will throw an exception.
         if ($department_changed_in_frontend && ($new_program_id_from_frontend === null || $new_program_id_from_frontend === "")) {
-            // If department changed and no program selected in frontend for new department,
-            // we cannot set to NULL due to NOT NULL constraint. Throw an error.
-            error_log("Program Chair Update failed: Department changed and program cleared. Program is NOT NULL.");
-            throw new Exception("Program cannot be empty when changing department for a Program Chair. Please select a program.");
+            $program_id_pc = null;
         } else {
             $program_id_pc = $new_program_id_from_frontend ?? $current_program_in_db; // Use new if provided, else keep old
         }
         
         error_log("Program Chair Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_pc . ", Program ID=" . $program_id_pc);
         
-        // Removed explicit validation here, let PDO handle NOT NULL exceptions
-
-        $program_chair_query = "UPDATE program_chairs SET program = :program, department = :department WHERE employee_id = :employee_id";
+        $program_chair_query = "UPDATE program_chairs SET program = :program, department = :department, status = 'active' WHERE employee_id = :employee_id";
         $program_chair_stmt = $conn->prepare($program_chair_query);
         $program_chair_stmt->bindParam(':program', $program_id_pc);
         $program_chair_stmt->bindParam(':department', $department_id_pc);
@@ -301,6 +485,7 @@ try {
     }
 
     // Update deans table if role is dean
+    // This block now only handles updates, creation/deletion handled above
     if (in_array("dean", $current_user_roles_after_update)) {
         // Fetch current department for dean
         $current_dean_data_query = "SELECT department FROM deans WHERE employee_id = :employee_id";
@@ -313,24 +498,22 @@ try {
 
         error_log("Dean Update: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_dean);
 
-        if ($department_id_dean === null) {
-            error_log("Dean update failed: Department ID is null for NOT NULL field.");
+        // We bind department_id_dean to null if it's empty from frontend for nullable columns.
+        $dean_query = "UPDATE deans SET department = :department, status = 'active' WHERE employee_id = :employee_id";
+        $dean_stmt = $conn->prepare($dean_query);
+        $dean_stmt->bindValue(':department', $department_id_dean, PDO::PARAM_INT); // Bind as INT or NULL
+        $dean_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $dean_stmt->execute();
+        if ($dean_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("Deans table updated for ID: " . $data->KLD_ID);
         } else {
-            $dean_query = "UPDATE deans SET department = :department WHERE employee_id = :employee_id";
-            $dean_stmt = $conn->prepare($dean_query);
-            $dean_stmt->bindParam(':department', $department_id_dean);
-            $dean_stmt->bindParam(':employee_id', $data->KLD_ID);
-            $dean_stmt->execute();
-            if ($dean_stmt->rowCount() > 0) {
-                $changesMade = true;
-                error_log("Deans table updated for ID: " . $data->KLD_ID);
-            } else {
-                error_log("Deans table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_dean);
-            }
+            error_log("Deans table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_dean);
         }
     }
 
     // Update faculty table if role is faculty
+    // This block now only handles updates, creation/deletion handled above
     if (in_array("faculty", $current_user_roles_after_update)) {
         // Fetch current department for faculty
         $current_faculty_data_query = "SELECT department, specialization FROM faculty WHERE employee_id = :employee_id";
@@ -344,12 +527,10 @@ try {
 
         error_log("Faculty Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_faculty . ", Specialization: " . $specialization_faculty);
         
-        // Removed explicit validation here, let PDO handle NOT NULL exceptions
-
-        $faculty_query = "UPDATE faculty SET department = :department, specialization = :specialization WHERE employee_id = :employee_id";
+        $faculty_query = "UPDATE faculty SET department = :department, specialization = :specialization, status = 'active' WHERE employee_id = :employee_id";
         $faculty_stmt = $conn->prepare($faculty_query);
-        $faculty_stmt->bindParam(':department', $department_id_faculty);
-        $faculty_stmt->bindParam(':specialization', $specialization_faculty);
+        $faculty_stmt->bindValue(':department', $department_id_faculty, PDO::PARAM_INT); // Bind as INT or NULL
+        $faculty_stmt->bindValue(':specialization', $specialization_faculty, PDO::PARAM_STR); // Bind as STRING or NULL
         $faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
         $faculty_stmt->execute();
         if ($faculty_stmt->rowCount() > 0) {
@@ -357,6 +538,20 @@ try {
             error_log("Faculty table updated for ID: " . $data->KLD_ID);
         } else {
             error_log("Faculty table: No rows affected for ID: " . $data->KLD_ID . " with department: " . $department_id_faculty);
+        }
+    }
+
+    // Update system_admins table if role is admin
+    if (in_array("admin", $current_user_roles_after_update)) {
+        $admin_query = "UPDATE system_admins SET status = 'active' WHERE employee_id = :employee_id";
+        $admin_stmt = $conn->prepare($admin_query);
+        $admin_stmt->bindParam(':employee_id', $data->KLD_ID);
+        $admin_stmt->execute();
+        if ($admin_stmt->rowCount() > 0) {
+            $changesMade = true;
+            error_log("System Admins table updated for ID: " . $data->KLD_ID);
+        } else {
+            error_log("System Admins table: No rows affected for ID: " . $data->KLD_ID);
         }
     }
 

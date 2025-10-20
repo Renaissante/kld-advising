@@ -74,6 +74,7 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
       } else {
         setSelectedRoles([]);
       }
+      // console.log('EditAccountModal selectedRoles after init from userData:', userData.roles.split(',').map(role => role.trim())); // REMOVED LOG
     }
   }, [userData]);
 
@@ -109,21 +110,24 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
           rolesRes.json(), // Parse roles data
         ]);
 
-        setDepartments(departmentsData);
-        setPrograms(programsData);
-        setYearLevels(yearLevelsData);
-        setSections(sectionsData);
-        setFacultyAdvisors(facultyData);
-        setAcademicYears(academicYearData);
-        setAvailableRoles(rolesData); // Set available roles
+          // console.log('EditAccountModal fetched rolesData:', rolesData); // REMOVED LOG
 
-      } catch (error) {
-        console.error("Error fetching dropdown data:", error);
-        toast.error("Failed to load necessary data for editing.");
-      }
-    };
-    fetchDropdownData();
-  }, []);
+          setDepartments(departmentsData);
+          setPrograms(programsData);
+          setYearLevels(yearLevelsData);
+          setSections(sectionsData);
+          setFacultyAdvisors(facultyData);
+          setAcademicYears(academicYearData);
+          setAvailableRoles(rolesData); // Set available roles
+          // console.log('EditAccountModal availableRoles after setting state:', rolesData); // REMOVED LOG
+
+        } catch (error) {
+          console.error("Error fetching dropdown data:", error);
+          toast.error("Failed to load necessary data for editing.");
+        }
+      };
+      fetchDropdownData();
+    }, []);
 
   useEffect(() => {
     if (formData.department_id) {
@@ -269,16 +273,17 @@ export function EditAccountModal({ isOpen, onClose, userData, onAccountUpdated }
               Roles
             </Label>
             <div className="flex flex-wrap gap-2">
-              {availableRoles.map((role) => (
+              {availableRoles.map((role) => {
+                return (
                 <div key={role.id} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`role-${role.id}`}
-                    checked={selectedRoles.includes(role.name)}
-                    onCheckedChange={(checked) => handleRoleCheckboxChange(role.name, checked)}
+                    id={`role-${role.role_name}`}
+                    checked={selectedRoles.includes(role.role_name)}
+                    onCheckedChange={(checked) => handleRoleCheckboxChange(role.role_name, checked)}
                   />
-                  <Label htmlFor={`role-${role.id}`}>{role.name}</Label>
+                  <Label htmlFor={`role-${role.role_name}`}>{role.role_name}</Label>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 

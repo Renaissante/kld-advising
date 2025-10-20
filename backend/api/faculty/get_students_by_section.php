@@ -131,7 +131,7 @@ try {
     $sql = "SELECT
                 s.student_id AS id,
                 s.name,
-                s.status,
+                s.enrollment_status,
                 -- Subquery to calculate total units of courses ACTUALLY advised for this student
                 (SELECT COALESCE(SUM(c.unit_lec + c.unit_lab), 0)
                  FROM advised_courses ac
