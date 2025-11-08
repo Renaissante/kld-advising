@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // Converted props from TypeScript interface to standard destructuring
 export default function StudentTable({ students = [], onAdviseStudent, sectionName, activeTab }) {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("");
   const { activeAcademicYear, activeSemester, isAdvisingActive, loading: activeContextLoading, refreshAdvisingStatus } = useActive();
   const { user } = useAuth();
@@ -198,7 +200,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                         )}
 
 
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/faculty/credit-courses/${student.id}`)}>
                             <FileText className="mr-2 h-4 w-4" />
                             <span>Credit Courses</span>
                           </DropdownMenuItem>

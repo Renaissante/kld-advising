@@ -28,7 +28,7 @@ try {
     // $conn variable is expected from database.php
 
     // 1. Get the student's curriculum_id
-    $student_query = "SELECT curriculum_id FROM students WHERE student_id = :student_id";
+    $student_query = "SELECT curriculum_id, name FROM students WHERE student_id = :student_id";
     $student_stmt = $conn->prepare($student_query);
     $student_stmt->bindParam(':student_id', $student_id);
     $student_stmt->execute();
@@ -42,6 +42,7 @@ try {
     }
 
     $curriculum_id = $student_row['curriculum_id'];
+    $student_name = $student_row['name']; // Fetch student's name
 
     if (!$curriculum_id) {
         http_response_code(404);
@@ -147,7 +148,8 @@ try {
         'curriculumName' => array(
             'name' => $curriculum_details['name'],
             'program' => $program_name,
-            'academicYear' => $academic_year
+            'academicYear' => $academic_year,
+            'studentName' => $student_name // Add student's name to the response
         ),
         'yearLevels' => $year_levels,
         'semesters' => $semesters,

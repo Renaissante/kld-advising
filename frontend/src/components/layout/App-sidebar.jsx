@@ -92,7 +92,7 @@ export function AppSidebar() {
     ] },
     { title: "Curriculum Data", url: "/admin/curriculum", icon: Inbox, roles: ["admin"] },
     { title: "Grades", url: "/faculty/grades", icon: BookA, roles: ["faculty"] },
-    { title: "Advise", url: "/faculty/advise", icon: NotebookPen, roles: ["faculty"] },
+    { title: "Advise", url: "/faculty/advise", basePath: "/faculty/credit-courses", icon: NotebookPen, roles: ["faculty"] },
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
     { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },

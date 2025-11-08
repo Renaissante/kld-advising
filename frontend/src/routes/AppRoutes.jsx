@@ -8,6 +8,7 @@ import AuditTrail from "@/pages/admin/AuditTrail";
 import StudentHome from "@/pages/student/StudentHome";
 import FacultyHome from "@/pages/faculty/FacultyHome";
 import AdvisingPage from "@/pages/faculty/AdvisingPage";
+import CreditCourses from "@/pages/faculty/CreditCourses";
 import ProgramChairHome from "@/pages/program-chair/ProgramChairHome";
 import ProgramChairManageCurriculum from "@/pages/program-chair/ManageCurriculum";
 import DeanHome from "@/pages/dean/DeanHome";
@@ -116,6 +117,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute requiredRoles="faculty">
             <AdvisingPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/faculty/credit-courses/:studentId"
+        element={
+          <ProtectedRoute requiredRoles="faculty">
+            <CreditCourses />
           </ProtectedRoute>
         }
       />
