@@ -40,15 +40,8 @@ if (!$facultyId && isset($_SESSION['user_id'])) {
             echo json_encode(array("success" => false, "message" => "Forbidden: User is not a faculty member"));
             exit();
         }
-    } else {
-        http_response_code(403);
-        echo json_encode(array("success" => false, "message" => "Forbidden: User roles not found in session"));
-        exit();
     }
-}
-
-// Validate required parameters
-if (!$facultyId) {
+} else if (!$facultyId) { // If facultyId is still null after checking session
     http_response_code(401);
     echo json_encode(array("success" => false, "message" => "Unauthorized: You must be logged in as faculty"));
     exit();
@@ -81,36 +74,27 @@ if (!$courseId || !$sectionId || !$academicYearId || !$semesterId || empty($stud
     exit();
 }
 
-// Function to calculate transmutation
-function calculateTransmutation($average) {
-    if ($average === null || $average === "") return null;
-
-    $numAverage = floatval($average);
-
-    if (is_nan($numAverage)) return null;
-
-    if ($numAverage >= 97) return "1.00";
-    if ($numAverage >= 94) return "1.25";
-    if ($numAverage >= 91) return "1.50";
-    if ($numAverage >= 88) return "1.75";
-    if ($numAverage >= 85) return "2.00";
-    if ($numAverage >= 82) return "2.25";
-    if ($numAverage >= 79) return "2.50";
-    if ($numAverage >= 76) return "2.75";
-    if ($numAverage >= 70) return "3.00";
-    if ($numAverage >= 65) return "5.00";
-    return "5.00"; // Failing grade
-  }
-
-// Function to get remarks based on transmutation
-function getDefaultRemarks($transmutation) {
+// Function to get remarks based on transmutation (5-point grading scale)
+function getRemarksFromTransmutation($transmutation) {
     if ($transmutation === null || $transmutation === "") return null;
-    if ($transmutation === "5.00") return "Failed";
-    return "Passed";
-}
 
-// Determine status based on action (This status is for the grade entry itself, not the student's course status)
-// $status = ($action === 'submit') ? 'submitted' : 'draft'; // This status field doesn't seem to exist in the schema based on get_students.php
+    // Check for non-numeric special grades first
+    $lowerTransmutation = strtolower($transmutation);
+    if ($lowerTransmutation === 'inc') return 'Incomplete';
+    if ($lowerTransmutation === 'ud') return 'Unofficially Dropped';
+    if ($lowerTransmutation === 'od') return 'Officially Dropped';
+
+    $numTransmutation = floatval($transmutation);
+
+    if (is_nan($numTransmutation)) {
+        return null; // It's not a known text grade or a valid number
+    }
+
+    // 5-point grading scale: 1.00-3.00 is Passed, 3.25-5.00 is Failed
+    if ($numTransmutation >= 1.00 && $numTransmutation <= 3.00) return "Passed";
+    if ($numTransmutation >= 3.25 && $numTransmutation <= 5.00) return "Failed";
+    return null; // Should not happen with valid input range
+}
 
 try {
     // First, verify this faculty is assigned to the given course and section
@@ -148,44 +132,18 @@ try {
     foreach ($students as $student) {
         // Extract student data
         $studentId = isset($student['student_id']) ? $student['student_id'] : null;
-        // Numeric grades (can be null)
-        $midterm = isset($student['midterm']) && $student['midterm'] !== "" ? floatval($student['midterm']) : null;
-        $final = isset($student['final']) && $student['final'] !== "" ? floatval($student['final']) : null;
-        // Status grades (can be null, 'UD', or 'OD')
-        $midtermStatus = isset($student['midterm_status']) && $student['midterm_status'] !== "" ? $student['midterm_status'] : null;
-        $finalStatus = isset($student['final_status']) && $student['final_status'] !== "" ? $student['final_status'] : null;
-
-        // Calculate average, transmutation, and remarks based on status first
-        $calculatedAverage = null;
-        $transmutedGrade = null;
-        $remarks = null;
-
-        if ($midtermStatus === 'UD' || $midtermStatus === 'OD') {
-            // If midterm status is set, final status should also be set to the same value
-            $finalStatus = $midtermStatus; // Ensure consistency
-            $calculatedAverage = 0.00; // Average is 0 for dropped
-            $transmutedGrade = 0.00; // Transmutation is 0 for dropped
-            $remarks = $midtermStatus === 'UD' ? "Unofficially Dropped" : "Officially Dropped";
-        } else {
-            // No midterm status, calculate based on numeric grades if available
-            $isMidtermNumericValid = $midterm !== null && $midterm >= 0 && $midterm <= 100;
-            $isFinalNumericValid = $final !== null && $final >= 0 && $final <= 100;
-
-            if ($isMidtermNumericValid && $isFinalNumericValid) {
-                $calculatedAverage = ($midterm + $final) / 2;
-                $transmutedGrade = calculateTransmutation($calculatedAverage);
-                $remarks = getDefaultRemarks($transmutedGrade);
-            }
-            // If not both numeric valid, average, transmutation, and remarks remain null
-        }
+        $transmutation = isset($student['transmutation']) && $student['transmutation'] !== "" ? $student['transmutation'] : null;
+        
+        // Calculate remarks based on transmutation
+        $remarks = getRemarksFromTransmutation($transmutation);
 
         // For submission, validate all required fields
         if ($action === 'submit') {
-            // Check if either status is set OR both numeric grades are valid
-            $isValidForSubmission = ($midtermStatus === 'UD' || $midtermStatus === 'OD') || ($isMidtermNumericValid && $isFinalNumericValid);
+            // Check if transmutation is present and valid
+            $isValidForSubmission = ($transmutation !== null && $remarks !== null); // Transmutation should exist and be valid to derive remarks
 
             if (!$isValidForSubmission) {
-                 $errors[] = "Missing or invalid grades for student ID: $studentId. Must have valid numeric grades or a valid status (UD/OD).";
+                 $errors[] = "Missing or invalid transmutation grade for student ID: $studentId.";
                  continue; // Skip saving for this student if validation fails on submit
             }
         }
@@ -204,24 +162,14 @@ try {
         if ($checkStmt->rowCount() > 0) {
             // Update existing entry
             $updateQuery = "UPDATE course_grades
-                           SET midterm = :midterm,
-                               final = :final,
-                               midterm_status = :midterm_status,
-                               final_status = :final_status,
-                               average = :average,
-                               transmutation = :transmutation,
+                           SET transmutation = :transmutation,
                                remarks = :remarks,
                                updated_at = NOW()
                            WHERE student_id = :student_id
                            AND course_id = :course_id";
 
             $updateStmt = $conn->prepare($updateQuery);
-            $updateStmt->bindParam(':midterm', $midterm);
-            $updateStmt->bindParam(':final', $final);
-            $updateStmt->bindParam(':midterm_status', $midtermStatus);
-            $updateStmt->bindParam(':final_status', $finalStatus);
-            $updateStmt->bindParam(':average', $calculatedAverage);
-            $updateStmt->bindParam(':transmutation', $transmutedGrade);
+            $updateStmt->bindParam(':transmutation', $transmutation);
             $updateStmt->bindParam(':remarks', $remarks);
             $updateStmt->bindParam(':student_id', $studentId);
             $updateStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
@@ -234,20 +182,15 @@ try {
         } else {
             // Insert new entry
             $insertQuery = "INSERT INTO course_grades (
-                              student_id, course_id, midterm, final, midterm_status, final_status, average, transmutation, remarks
+                              student_id, course_id, transmutation, remarks
                            ) VALUES (
-                              :student_id, :course_id, :midterm, :final, :midterm_status, :final_status, :average, :transmutation, :remarks
+                              :student_id, :course_id, :transmutation, :remarks
                            )";
 
             $insertStmt = $conn->prepare($insertQuery);
             $insertStmt->bindParam(':student_id', $studentId);
             $insertStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
-            $insertStmt->bindParam(':midterm', $midterm);
-            $insertStmt->bindParam(':final', $final);
-            $insertStmt->bindParam(':midterm_status', $midtermStatus);
-            $insertStmt->bindParam(':final_status', $finalStatus);
-            $insertStmt->bindParam(':average', $calculatedAverage);
-            $insertStmt->bindParam(':transmutation', $transmutedGrade);
+            $insertStmt->bindParam(':transmutation', $transmutation);
             $insertStmt->bindParam(':remarks', $remarks);
 
             if ($insertStmt->execute()) {
@@ -316,7 +259,7 @@ try {
                 // error_log("PHP Log: Attempting to send WebSocket message: " . $wsMessage);
                 $client->send($wsMessage);
                 $client->close();
-                // error_log("WebSocket message sent to advisor {$advisorEmployeeId}: " . $wsMessage);
+                // error_log("WebSocket message sent to advisor {$advisorEmployeeId}: " . $wsMessage.");
 
             } catch (Exception $e) {
                 // Log WebSocket error to PHP error log

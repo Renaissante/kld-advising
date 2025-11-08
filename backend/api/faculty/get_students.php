@@ -109,11 +109,6 @@ try {
     // Now fetch students enrolled in this section
     $query = "SELECT s.id, s.student_id, s.name, sec.name as section,
                      c.course_code, c.course_title,
-                     COALESCE(g.midterm, '') as midterm,
-                     COALESCE(g.final, '') as final,
-                     COALESCE(g.midterm_status, '') as midterm_status,
-                     COALESCE(g.final_status, '') as final_status,
-                     COALESCE(g.average, '') as average,
                      COALESCE(g.transmutation, '') as transmutation,
                      COALESCE(g.remarks, '') as remarks
               FROM students s

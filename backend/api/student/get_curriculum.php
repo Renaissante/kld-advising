@@ -95,7 +95,6 @@ try {
                 c.unit_lab,
                 c.hour_lec,
                 c.hour_lab,
-                cg.average,          -- Get average from course_grades if available
                 cg.transmutation,    -- Get transmutation from course_grades if available
                 GROUP_CONCAT(DISTINCT cp.prerequisite_course_id) AS prerequisite_ids -- Use DISTINCT for prerequisites
             FROM courses c
@@ -133,7 +132,7 @@ try {
                 "hour_lec" => $row['hour_lec'],
                 "hour_lab" => $row['hour_lab'],
                  // Use transmutation if not null, otherwise null. Format if not null.
-                "grade" => $row['transmutation'] !== null ? number_format((float)$row['transmutation'], 2, '.', '') : null,
+                "grade" => $row['transmutation'] !== null ? $row['transmutation']: null,
                 "prerequisite_ids" => $prereq_ids // Assign the processed array
             );
             array_push($curriculum_data, $course);

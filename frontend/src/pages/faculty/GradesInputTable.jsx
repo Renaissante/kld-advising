@@ -4,33 +4,24 @@ import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export function GradesInputTable({ students, loading, onGradeChange }) {
-  // Function to calculate transmuted grade based on average
-  const calculateTransmutation = (average) => {
-    // This function is now only used for numeric averages.
-    if (average === null || average === "" || isNaN(parseFloat(average))) return null;
 
-    const numAverage = parseFloat(average);
-
-    // Transmutation scale (adjust according to your grading system)
-    if (numAverage >= 97) return "1.00";
-    if (numAverage >= 94) return "1.25";
-    if (numAverage >= 91) return "1.50";
-    if (numAverage >= 88) return "1.75";
-    if (numAverage >= 85) return "2.00";
-    if (numAverage >= 82) return "2.25";
-    if (numAverage >= 79) return "2.50";
-    if (numAverage >= 76) return "2.75";
-    if (numAverage >= 70) return "3.00";
-    if (numAverage >= 65) return "5.00";
-    return "5.00"; // Failing grade
-  };
-
-  // Function to get remarks based on transmutation (only for numeric grades)
-  const getDefaultRemarks = (transmutation) => {
-    // This function is now only used for numeric transmutations.
+  // Function to get remarks based on transmutation (only for numeric grades on a 5-point scale)
+  const getRemarksFromTransmutation = (transmutation) => {
     if (transmutation === null || transmutation === "") return null;
-    if (transmutation === "5.00") return "Failed";
-    return "Passed";
+    
+    const numTransmutation = parseFloat(transmutation);
+
+    if (isNaN(numTransmutation)) {
+        const lowerTransmutation = String(transmutation).toLowerCase();
+        if (lowerTransmutation === 'inc') return 'Incomplete';
+        if (lowerTransmutation === 'ud') return 'Unofficially Dropped';
+        if (lowerTransmutation === 'od') return 'Officially Dropped';
+        return null; // Unknown text
+    }
+
+    if (numTransmutation >= 1.00 && numTransmutation <= 3.00) return "Passed";
+    if (numTransmutation >= 3.25 && numTransmutation <= 5.00) return "Failed";
+    return null; 
   };
 
   if (loading) {
@@ -47,49 +38,19 @@ export function GradesInputTable({ students, loading, onGradeChange }) {
       <Table>
         <TableHeader className="bg-muted/50">
           <TableRow>
-            <TableHead className="w-[120px] px-3 py-2">Student ID</TableHead>
-            <TableHead className="min-w-[150px] px-3 py-2">Name</TableHead>
+            <TableHead className="px-3 py-2">Student ID</TableHead>
+            <TableHead className="min-w-[200px] px-3 py-2">Name</TableHead>
             <TableHead className="w-[100px] px-3 py-2">Section</TableHead>
-            <TableHead className="w-[120px] px-3 py-2">Course Code</TableHead>
-            <TableHead className="w-[100px] text-center px-3 py-2">Midterm</TableHead>
-            <TableHead className="w-[100px] text-center px-3 py-2">Final</TableHead>
-            <TableHead className="w-[100px] text-center px-3 py-2">Average</TableHead>
-            <TableHead className="w-[100px] text-center px-3 py-2">Transmutation</TableHead>
+            <TableHead className="px-3 py-2">Course Code</TableHead>
+            <TableHead className="w-[120px] text-center px-3 py-2">Final Grade</TableHead>
             <TableHead className="w-[150px] px-3 py-2">Remarks</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {students.length > 0 ? (
             students.map((student) => {
-              // Calculate average, transmutation, and remarks dynamically based on input values and statuses
-              const midtermNumeric = student.midterm; // Can be number or null
-              const finalNumeric = student.final;   // Can be number or null
-              const midtermStatus = student.midterm_status; // Can be 'UD', 'OD', or null
-              const finalStatus = student.final_status;   // Can be 'UD', 'OD', or null
-
-              let calculatedAverage = null;
-              let transmutedGrade = null;
-              let remarks = null;
-
-              if (midtermStatus === 'UD' || midtermStatus === 'OD') {
-                  // If midterm status is set, the student dropped
-                  calculatedAverage = "0.00";
-                  transmutedGrade = "0.00";
-                  remarks = midtermStatus === 'UD' ? "Unofficially Dropped" : "Officially Dropped";
-              } else {
-                  // No midterm status, calculate based on numeric grades if available
-                  const isMidtermNumericValid = midtermNumeric !== null && !isNaN(midtermNumeric) && midtermNumeric >= 0 && midtermNumeric <= 100;
-                  const isFinalNumericValid = finalNumeric !== null && !isNaN(finalNumeric) && finalNumeric >= 0 && finalNumeric <= 100;
-
-                  if (isMidtermNumericValid && isFinalNumericValid) {
-                      // Both are valid numbers (0-100)
-                      calculatedAverage = ((midtermNumeric + finalNumeric) / 2).toFixed(2);
-                      transmutedGrade = calculateTransmutation(calculatedAverage);
-                      remarks = getDefaultRemarks(transmutedGrade);
-                  }
-                  // If not both numeric valid, average, transmutation, and remarks remain null
-              }
-
+              const transmutationInput = student.transmutation || ""; // Value from state/prop
+              const remarks = getRemarksFromTransmutation(transmutationInput);
 
               return (
                 <TableRow key={student.student_id}>
@@ -101,41 +62,16 @@ export function GradesInputTable({ students, loading, onGradeChange }) {
                     <Input
                       type="text"
                       inputMode="text"
-                      // Display status if available, otherwise display numeric grade (or empty string if null)
-                      value={midtermStatus || (midtermNumeric !== null ? String(midtermNumeric) : '')}
-                      onChange={(e) => onGradeChange(student.student_id, "midterm", e.target.value)}
+                      value={transmutationInput}
+                      onChange={(e) => onGradeChange(student.student_id, "transmutation", e.target.value)}
                       className="w-full text-center h-8"
-                      placeholder="0-100, UD, OD"
-                      maxLength={5}
+                      placeholder="1.00 - 5.00, INC, UD, OD"
+                      maxLength={4}
                     />
                   </TableCell>
-                  <TableCell className="px-3 py-2">
-                    <Input
-                      type="text"
-                      inputMode="text"
-                       // Display status if available, otherwise display numeric grade (or empty string if null)
-                      value={finalStatus || (finalNumeric !== null ? String(finalNumeric) : '')}
-                      onChange={(e) => onGradeChange(student.student_id, "final", e.target.value)}
-                      className="w-full text-center h-8"
-                      placeholder="0-100, UD, OD"
-                      maxLength={5}
-                    />
-                  </TableCell>
-                  <TableCell className="text-center font-medium px-3 py-2">
-                    {/* Display calculated average or "-" */}
-                    {calculatedAverage !== null ? calculatedAverage : "-"}
-                  </TableCell>
-                  <TableCell className={`text-center font-medium px-3 py-2 ${
-                    // Apply red color for failing numeric grade (5.00) or dropped status (0.00)
-                    transmutedGrade === "5.00" || transmutedGrade === "0.00" ? "text-red-500" :
-                    // Apply green color for passing numeric grade
-                    (transmutedGrade !== null && transmutedGrade !== "5.00") ? "text-green-600" : ""
+                  <TableCell className={`px-3 py-2 ${
+                    remarks === "Failed" || remarks === "Unofficially Dropped" || remarks === "Officially Dropped" ? "text-red-500" : ""
                   }`}>
-                    {/* Display calculated transmutation or "-" */}
-                    {transmutedGrade !== null ? transmutedGrade : "-"}
-                  </TableCell>
-                  <TableCell className="px-3 py-2">
-                    {/* Display calculated remarks or "-" */}
                     {remarks !== null ? remarks : "-"}
                   </TableCell>
                 </TableRow>
@@ -143,7 +79,7 @@ export function GradesInputTable({ students, loading, onGradeChange }) {
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                 No students found for this section.
               </TableCell>
             </TableRow>

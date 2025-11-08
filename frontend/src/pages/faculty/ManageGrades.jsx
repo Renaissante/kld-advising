@@ -191,10 +191,8 @@ const ManageGrades = () => {
         // Initialize students with fetched data, ensuring new fields exist
         setStudents(data.data.map(student => ({
             ...student,
-            midterm: student.midterm === '' ? null : parseFloat(student.midterm), // Ensure numeric is float or null
-            final: student.final === '' ? null : parseFloat(student.final), // Ensure numeric is float or null
-            midterm_status: student.midterm_status === '' ? null : student.midterm_status, // Ensure status is string or null
-            final_status: student.final_status === '' ? null : student.final_status, // Ensure status is string or null
+            transmutation: student.transmutation === '' ? null : student.transmutation,
+            remarks: student.remarks === '' ? null : student.remarks,
             // average, transmutation, remarks will be calculated in GradesInputTable
         })) || []);
       } else {
@@ -295,68 +293,17 @@ const ManageGrades = () => {
           let updatedStudent = { ...student };
           const trimmedValue = value ? String(value).trim() : "";
           const lowerValue = trimmedValue.toLowerCase();
-          const allowedText = ["ud", "od"];
-
-          if (field === "midterm") {
-            // Allow any input to update the state temporarily
-            // Validation will happen on save
-            updatedStudent.midterm = trimmedValue; // Store raw string input
-            updatedStudent.midterm_status = null; // Clear status on input change
-
-            // If the input is exactly UD or OD (case-insensitive),
-            // auto-set the final status as well for immediate feedback,
-            // but the main validation is on save.
-            if (allowedText.includes(lowerValue)) {
-                 updatedStudent.midterm_status = lowerValue.toUpperCase();
-                 updatedStudent.midterm = null; // Clear numeric if it's UD/OD text
-                 updatedStudent.final_status = lowerValue.toUpperCase();
-                 updatedStudent.final = null; // Clear final numeric if midterm is UD/OD text
-            } else {
-                // If not UD/OD text, try parsing as number for immediate feedback
-                const numValue = parseFloat(trimmedValue);
-                if (trimmedValue === "" || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
-                    updatedStudent.midterm = trimmedValue === "" ? null : numValue;
-                    updatedStudent.midterm_status = null;
-                } else {
-                    // If it's other text or invalid number, store the raw string
-                    updatedStudent.midterm = trimmedValue;
-                    updatedStudent.midterm_status = null;
-                }
-                 // Ensure final status is cleared if midterm is not UD/OD text
-                 if (allowedText.includes(String(student.midterm_status || "").toLowerCase())) {
-                     updatedStudent.final_status = null;
-                     // Do NOT clear final numeric value here, let the user input it
-                 }
-            }
-
-
-          } else if (field === "final") {
-             // Allow any input to update the state temporarily
-             // Validation will happen on save
-             updatedStudent.final = trimmedValue; // Store raw string input
-             updatedStudent.final_status = null; // Clear status on input change
-
-             // If the input is exactly UD or OD (case-insensitive),
-             // set the final status for immediate feedback,
-             // but the main validation is on save.
-             if (allowedText.includes(lowerValue)) {
-                updatedStudent.final_status = lowerValue.toUpperCase();
-                updatedStudent.final = null; // Clear numeric if it's UD/OD text
-             } else {
-                 // If not UD/OD text, try parsing as number for immediate feedback
-                 const numValue = parseFloat(trimmedValue);
-                 if (trimmedValue === "" || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
-                    updatedStudent.final = trimmedValue === "" ? null : numValue;
-                    updatedStudent.final_status = null;
-                 } else {
-                    // If it's other text or invalid number, store the raw string
-                    updatedStudent.final = trimmedValue;
-                    updatedStudent.final_status = null;
-                 }
-             }
+          
+          // Only handle 'transmutation' field now
+          if (field === "transmutation") {
+            const processedValue = (trimmedValue === 'inc' || trimmedValue === 'ud' || trimmedValue === 'od')
+              ? trimmedValue.toUpperCase()
+              : trimmedValue;
+            updatedStudent.transmutation = processedValue;
           }
+          // Remarks will be calculated by the backend based on transmutation
+          // No need to clear other fields as they are no longer relevant in this simplified flow
 
-          // Average, Transmutation, Remarks are calculated in GradesInputTable based on midterm/final/status
           return updatedStudent;
         }
         return student;
@@ -376,11 +323,8 @@ const ManageGrades = () => {
       action: 'save', // Or 'submit' if you add a submit button
       students: students.map(student => ({
           student_id: student.student_id,
-          midterm: student.midterm, // Send numeric value (can be null)
-          final: student.final,     // Send numeric value (can be null)
-          midterm_status: student.midterm_status, // Send status (can be null, 'UD', 'OD')
-          final_status: student.final_status,   // Send status (can be null, 'UD', 'OD')
-          // average, transmutation, remarks are calculated backend
+          transmutation: student.transmutation,
+          // average, remarks are calculated backend
       }))
     };
 
@@ -440,7 +384,7 @@ const ManageGrades = () => {
           const json = XLSX.utils.sheet_to_json(worksheet);
 
           let updatedStudentsCount = 0;
-          const allowedText = ["ud", "od"];
+          const allowedText = ["inc", "ud", "od"];
 
           setStudents(prevStudents => {
             const newStudents = prevStudents.map(student => {
@@ -452,53 +396,27 @@ const ManageGrades = () => {
                 let updated = { ...student };
                 let gradeUpdated = false;
 
-                // Process Midterm
-                if (matchingRow["Midterm"] !== undefined) {
-                  const midtermValue = String(matchingRow["Midterm"]).trim();
-                  const midtermLower = midtermValue.toLowerCase();
+                // Process Transmutation
+                if (matchingRow["Transmutation"] !== undefined) {
+                  const transmutationValue = String(matchingRow["Transmutation"]).trim();
+                  const transmutationLower = transmutationValue.toLowerCase();
 
-                  if (allowedText.includes(midtermLower)) {
-                     updated.midterm_status = midtermLower.toUpperCase();
-                     updated.midterm = null;
-                     // Auto-set final status if midterm is UD/OD from file
-                     updated.final_status = midtermLower.toUpperCase();
-                     updated.final = null;
-                     gradeUpdated = true;
+                  if (allowedText.includes(transmutationLower)) {
+                    updated.transmutation = transmutationLower.toUpperCase();
+                    gradeUpdated = true;
                   } else {
-                    const numMidterm = parseFloat(midtermValue);
-                    if (midtermValue === "" || (!isNaN(numMidterm) && numMidterm >= 0 && numMidterm <= 100)) {
-                      updated.midterm = midtermValue === "" ? null : numMidterm;
-                      updated.midterm_status = null;
-                      gradeUpdated = true;
+                    const numTransmutation = parseFloat(transmutationValue);
+                    // Check if it's a valid number between 1.00 and 5.00, or an empty string
+                    if (transmutationValue === "" || (!isNaN(numTransmutation) && numTransmutation >= 1.00 && numTransmutation <= 5.00 && (numTransmutation * 100) % 25 === 0)) {
+                        updated.transmutation = transmutationValue === "" ? null : numTransmutation.toFixed(2);
+                        gradeUpdated = true;
                     } else {
-                       console.warn(`Skipping invalid Midterm value for student ${student.student_id}: ${midtermValue}`);
+                       console.warn(`Skipping invalid Transmutation value for student ${student.student_id}: ${transmutationValue}`);
                     }
                   }
                 }
-
-                // Process Final (only if midterm wasn't set to text, as that auto-sets final)
-                // Also ensure we don't overwrite if midterm was UD/OD and already set final
-                if (matchingRow["Final"] !== undefined && !allowedText.includes(String(updated.midterm_status || "").toLowerCase())) {
-                   const finalValue = String(matchingRow["Final"]).trim();
-                   const finalLower = finalValue.toLowerCase();
-
-                   if (allowedText.includes(finalLower)) {
-                      updated.final_status = finalLower.toUpperCase();
-                      updated.final = null;
-                      gradeUpdated = true;
-                   } else {
-                      const numFinal = parseFloat(finalValue);
-                      if (finalValue === "" || (!isNaN(numFinal) && numFinal >= 0 && numFinal <= 100)) {
-                        updated.final = finalValue === "" ? null : numFinal;
-                        updated.final_status = null;
-                        gradeUpdated = true;
-                      } else {
-                         console.warn(`Skipping invalid Final value for student ${student.student_id}: ${finalValue}`);
-                      }
-                   }
-                }
-
-                // Average, Transmutation, Remarks are calculated in GradesInputTable based on midterm/final/status
+                
+                // Remarks will be calculated by the backend based on transmutation
                 if (gradeUpdated) {
                     updatedStudentsCount++;
                 }

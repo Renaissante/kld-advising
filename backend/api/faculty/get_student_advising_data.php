@@ -150,9 +150,6 @@ try {
         // This is needed to check prerequisites from any previous semester
         $fullGradeHistoryQuery = "SELECT
                                        cg.id,
-                                       cg.midterm,
-                                       cg.final,
-                                       cg.average,
                                        cg.transmutation,
                                        cg.remarks,
                                        c.id AS course_id,
