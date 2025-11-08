@@ -110,13 +110,15 @@ try {
     $query = "SELECT s.id, s.student_id, s.name, sec.name as section,
                      c.course_code, c.course_title,
                      COALESCE(g.transmutation, '') as transmutation,
-                     COALESCE(g.remarks, '') as remarks
+                     COALESCE(g.remarks, '') as remarks,
+                     COALESCE(g.is_credited, FALSE) as is_credited
               FROM students s
               JOIN sections sec ON s.section_id = sec.id
               JOIN courses c ON c.id = :course_id
               LEFT JOIN course_grades g ON g.student_id = s.student_id
                                AND g.course_id = :course_id
               WHERE s.section_id = :section_id
+                AND COALESCE(g.is_credited, FALSE) = FALSE
               ORDER BY s.name";
 
     $stmt = $conn->prepare($query);

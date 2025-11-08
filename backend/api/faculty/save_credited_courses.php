@@ -54,8 +54,8 @@ try {
 
         // Prepare SQL for INSERT ... ON DUPLICATE KEY UPDATE
         // This assumes 'student_id' and 'course_id' form a unique key in 'course_grades'
-        $query = "INSERT INTO course_grades (student_id, course_id, transmutation, remarks) VALUES (:student_id, :course_id, :grade, :remarks)
-                  ON DUPLICATE KEY UPDATE transmutation = :grade, remarks = :remarks";
+        $query = "INSERT INTO course_grades (student_id, course_id, transmutation, remarks, is_credited) VALUES (:student_id, :course_id, :grade, :remarks, TRUE)
+                  ON DUPLICATE KEY UPDATE transmutation = :grade, remarks = :remarks, is_credited = TRUE";
         
         $stmt = $conn->prepare($query);
         $stmt->bindParam(':student_id', $student_id);

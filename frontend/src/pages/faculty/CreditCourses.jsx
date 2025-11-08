@@ -12,6 +12,16 @@ import { API_BASE_URL } from '@/config/api';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useParams } from 'react-router-dom'; // Import useParams
 import { toast } from "sonner"; // Import toast for notifications
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog"
 
 // --- Helper function for formatting prerequisites ---
 const formatPrerequisites = (prerequisiteIds, allCourses) => {
@@ -43,6 +53,7 @@ const CreditCourses = () => {
   const [error, setError] = useState(null);
   const [grades, setGrades] = useState({})
   const [isSaving, setIsSaving] = useState(false)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const navigate = useNavigate();
 
   // --- Get student_id from localStorage (temporary for now) ---
@@ -109,8 +120,9 @@ const CreditCourses = () => {
     }))
   }
 
-  const handleSaveGrades = async () => {
-    setIsSaving(true)
+  const executeSaveGrades = async () => {
+    setIsSaving(true);
+    setShowConfirmDialog(false); // Close dialog once action is confirmed and started
     try {
       // Prepare the data to be sent to the API
       const gradesToSave = Object.keys(grades).map(courseId => ({
@@ -145,18 +157,10 @@ const CreditCourses = () => {
       }
 
       // After successful save, refresh curriculum data to display updated grades
-      // This might be redundant if the local state update is sufficient,
-      // but ensures consistency with the backend.
-      // Optionally, you might want to re-fetch the entire curriculum data here
-      // to get the latest state including any backend-applied logic (e.g., averages).
-
-      // For now, let's assume the local state update in setCurriculumData is enough after saving.
-      // Update approved credits with new grades
       const updatedCourses = courses.map((course) => ({
         ...course,
         grade: grades[course.id] || course.grade,
       }))
-      // Update the curriculumData state with the new courses (including updated grades)
       setCurriculumData(prev => ({ ...prev, courses: updatedCourses }));
 
       console.log("[v0] Grades saved:", grades)
@@ -166,7 +170,11 @@ const CreditCourses = () => {
     } finally {
       setIsSaving(false)
     }
-  }
+  };
+
+  const handleSaveGradesClick = () => {
+    setShowConfirmDialog(true);
+  };
 
   // Calculate totals - these will be replaced by semester-specific totals in the rendering logic
   const totalLecUnits = courses.reduce(
@@ -289,8 +297,8 @@ const CreditCourses = () => {
             <div className="p-6">
               <div className="max-w-7xl mx-auto">
               <div className="pb-4">
-                    <h2 className="text-lg font-semibold text-[#1b4b2a]">{curriculumName?.studentName || "Student Name"}</h2>
-                    <p className="text-sm text-gray-600 mt-1">Student ID: {studentId}</p>
+                    <h2 className="text-lg font-semibold text-[#1b4b2a] dark:text-emerald-300">{curriculumName?.studentName || "Student Name"}</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Student ID: {studentId}</p>
                    
                   </div>
                 <div className="">
@@ -300,15 +308,15 @@ const CreditCourses = () => {
                   <div className="overflow-x-auto">
                     {sortedGroups.map((group) => (
                       <div key={`${group.yearLevelId}-${group.semesterId}`} className="mb-6 border rounded-md shadow-lg overflow-hidden">
-                        <div className="bg-[#e8f0e8] border-y py-2 px-4">
-                          <span className="font-semibold text-[#1b4b2a] text-sm">
+                        <div className="bg-[#e8f0e8] dark:bg-gray-800 border-y py-2 px-4">
+                          <span className="font-semibold text-[#1b4b2a] dark:text-emerald-300 text-sm">
                             {getYearSemesterLabel(group.yearLevelId, group.semesterId)}
                           </span>
                         </div>
                         <div className="overflow-x-auto">
                           <Table className="border-collapse">
                             <TableHeader>
-                              <TableRow className="bg-gray-50">
+                              <TableRow>
                                 <TableHead rowSpan={2} className="align-bottom border-r w-20 text-center text-xs font-semibold">
                                   Grade
                                 </TableHead>
@@ -322,7 +330,7 @@ const CreditCourses = () => {
                                 </TableHead>
                                 <TableHead rowSpan={2} className="align-bottom border-r text-xs font-semibold">Prerequisite(s)</TableHead>
                               </TableRow>
-                              <TableRow className="bg-gray-50">
+                              <TableRow>
                                 <TableHead className="text-center w-24 border-r text-xs">Lec</TableHead>
                                 <TableHead className="text-center w-24 border-r text-xs">Lab</TableHead>
                                 <TableHead className="text-center w-24 border-r text-xs">Lec</TableHead>
@@ -332,7 +340,7 @@ const CreditCourses = () => {
                             <TableBody>
                               {/* Course Rows */}
                               {group.courses.map((course) => (
-                                <TableRow key={course.id} className="bg-white">
+                                <TableRow key={course.id}>
                                   <TableCell className="border-r text-center p-2">
                                     {course.grade ? (
                                           <span className="font-medium">
@@ -381,7 +389,7 @@ const CreditCourses = () => {
                                 )
                                 const semesterTotalHours = semesterLecHours + semesterLabHours
                                 return (
-                                  <TableRow className="font-semibold border-t border-border bg-[#f0f5f0]">
+                                  <TableRow className="font-semibold border-t border-border bg-[#f0f5f0] dark:bg-gray-800">
                                     <TableCell className="border-r"></TableCell>
                                     <TableCell className="border-r text-center">TOTAL</TableCell>
                                     <TableCell className="border-r text-center">{semesterTotalHours.toFixed(1)}</TableCell>
@@ -409,13 +417,38 @@ const CreditCourses = () => {
                     >
                       Reset
                     </Button>
-                    <Button
-                      onClick={handleSaveGrades}
-                      disabled={isSaving}
-                      className="bg-[#1b4b2a] hover:bg-[#153d22] text-white"
-                    >
-                      {isSaving ? "Saving..." : "Save Grades"}
-                    </Button>
+                    
+                    <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={handleSaveGradesClick}
+                          disabled={isSaving}
+                          className="bg-[#1b4b2a] hover:bg-[#153d22] text-white"
+                        >
+                          {isSaving ? "Saving..." : "Save Grades"}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Confirm Save</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to save these credited courses? This action cannot be undone.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                          <Button
+                            onClick={executeSaveGrades}
+                            disabled={isSaving}
+                            className="bg-[#1b4b2a] hover:bg-[#153d22] text-white"
+                          >
+                            {isSaving ? "Saving..." : "Confirm Save"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </div>
