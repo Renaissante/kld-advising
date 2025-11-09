@@ -3,6 +3,8 @@
 header("Content-Type: application/json");
 include_once '../../config/cors.php';
 require_once "../../config/database.php";
+require_once "../../config/email_config.php"; // Include email configuration
+require_once "../../utils/send_email.php";     // Include email utility
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -28,7 +30,15 @@ $processedCount = 0;
 $failedCount = 0;
 $failedUsers = [];
 
-$defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
+// Function to generate a random temporary password
+function generateTemporaryPassword($length = 10) {
+    $chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+    $password = "";
+    for ($i = 0; $i < $length; $i++) {
+        $password .= $chars[rand(0, strlen($chars) - 1)];
+    }
+    return $password;
+}
 
 try {
     switch ($role) {
@@ -104,9 +114,12 @@ try {
                     $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
                                 VALUES (:id, :email, :password_hash, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
+                    $tempPassword = generateTemporaryPassword(); // Generate unique temporary password
+                    $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
+
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
-                    $stmtUser->bindParam(':password_hash', $defaultPassword);
+                    $stmtUser->bindParam(':password_hash', $hashedPassword); // Use the hashed password
                     // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
 
@@ -140,6 +153,18 @@ try {
                     $userResult['success'] = true;
                     $userResult['message'] = "Faculty account created successfully.";
                     $processedCount++;
+
+                    // Send temporary password to user's email
+                    $subject = "Your New Account Credentials for KLD Advising System";
+                    $body = "Hello " . $name . ",<br><br>";
+                    $body .= "Your account for the KLD Advising System has been successfully created.<br>";
+                    $body .= "Your username is: <b>" . $email . "</b><br>";
+                    $body .= "Your temporary password is: <b>" . $tempPassword . "</b><br><br>";
+                    $body .= "Please log in using your credentials and change your password immediately:<br>";
+                    $body .= "<a href=\"" . LOGIN_PAGE_URL . "\">Login Page</a><br><br>";
+                    $body .= "Thank you.<br>";
+                    $body .= "KLD Advising System Team";
+                    sendEmail($email, $name, $subject, $body);
 
                 } catch (PDOException $e) {
                     $conn->rollBack();
@@ -315,9 +340,12 @@ try {
                     $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
                                 VALUES (:id, :email, :password_hash, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
+                    $tempPassword = generateTemporaryPassword(); // Generate unique temporary password
+                    $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
+
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
-                    $stmtUser->bindParam(':password_hash', $defaultPassword);
+                    $stmtUser->bindParam(':password_hash', $hashedPassword); // Use the hashed password
                     // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
 
@@ -373,6 +401,18 @@ try {
                     $userResult['success'] = true;
                     $userResult['message'] = "Student account created successfully.";
                     $processedCount++;
+
+                    // Send temporary password to user's email
+                    $subject = "Your New Account Credentials for KLD Advising System";
+                    $body = "Hello " . $fullName . ",<br><br>";
+                    $body .= "Your account for the KLD Advising System has been successfully created.<br>";
+                    $body .= "Your username is: <b>" . $email . "</b><br>";
+                    $body .= "Your temporary password is: <b>" . $tempPassword . "</b><br><br>";
+                    $body .= "Please log in using your credentials and change your password immediately:<br>";
+                    $body .= "<a href=\"" . LOGIN_PAGE_URL . "\">Login Page</a><br><br>";
+                    $body .= "Thank you.<br>";
+                    $body .= "KLD Advising System Team";
+                    sendEmail($email, $fullName, $subject, $body);
 
                 } catch (PDOException $e) {
                     $conn->rollBack();

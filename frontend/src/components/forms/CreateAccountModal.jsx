@@ -23,6 +23,7 @@ import { PlusSquare } from "lucide-react";
 import eventService from "@/services/eventService";
 import { API_BASE_URL } from '@/config/api';
 import { useActive } from "@/contexts/ActiveContext";
+import { toast } from "sonner"; // Import toast for notifications
 
 export function CreateAccountModal({onAccountCreated}) {
 
@@ -48,6 +49,7 @@ export function CreateAccountModal({onAccountCreated}) {
   const [yearLevel, setYearLevel] = useState("");
   const [section, setSection] = useState("");
   const [entryYear, setEntryYear] = useState("");
+  const [specialization, setSpecialization] = useState(""); // Add specialization state
 
   const [entryYearName, setEntryYearName] = useState("");
 
@@ -62,8 +64,16 @@ export function CreateAccountModal({onAccountCreated}) {
   const selectedYearLevel = yearLevels.find((year) => year.level === yearLevel);
   const yearLevelId = selectedYearLevel ? selectedYearLevel.id : null;
 
+  // Function to generate a random temporary password
+  const generateTemporaryPassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+    let password = "";
+    for (let i = 0; i < 10; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
 
-  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -130,27 +140,28 @@ export function CreateAccountModal({onAccountCreated}) {
     setYearLevel("");
     setSection("");
     setEntryYear("");
+    setSpecialization(""); // Reset specialization
     setEntryYearName("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const tempPassword = generateTemporaryPassword(); // Generate temporary password
+
     const formData = {
       firstName,
       middleName,
-      employeeId,
       lastName,
       email,
       role,
       dob,
-      
+      password: tempPassword, // Include temporary password in form data
     };
-
-    
 
     if (role === "admin") {
       formData.employeeId = employeeId;
-    
+
       try {
         const response = await fetch(`${API_BASE_URL}/users/create_system_admin.php`, {
           method: 'POST',
@@ -159,25 +170,25 @@ export function CreateAccountModal({onAccountCreated}) {
           },
           body: JSON.stringify(formData),
         });
-    
+
         const result = await response.json();
         console.log(result);
-    
+
         if (response.ok) {
-          alert("System admin account created successfully!");
+          toast.success("System admin account created successfully! Temporary password sent to email.");
           resetForm();
           onAccountCreated();
         } else {
-          alert(result.message || "Failed to create system admin account.");
+          toast.error(result.message || "Failed to create system admin account.");
         }
       } catch (error) {
         console.error("Error creating account:", error);
-        alert("An error occurred while creating the account.");
+        toast.error("An error occurred while creating the account.");
       }
     } else if (role === "dean") {
       formData.employeeId = employeeId;
       formData.department = department;
-    
+
       try {
         const response = await fetch(`${API_BASE_URL}/users/create_dean.php`, {
           method: 'POST',
@@ -186,20 +197,20 @@ export function CreateAccountModal({onAccountCreated}) {
           },
           body: JSON.stringify(formData),
         });
-    
+
         const result = await response.json();
         console.log(result);
-    
+
         if (response.ok) {
-          alert("Dean account created successfully!");
+          toast.success("Dean account created successfully! Temporary password sent to email.");
           resetForm();
           onAccountCreated();
         } else {
-          alert(result.message || "Failed to create dean account.");
+          toast.error(result.message || "Failed to create dean account.");
         }
       } catch (error) {
         console.error("Error creating account:", error);
-        alert("An error occurred while creating the account.");
+        toast.error("An error occurred while creating the account.");
       }
     }  else if (role === "programchair") {
       formData.employeeId = employeeId;
@@ -214,20 +225,20 @@ export function CreateAccountModal({onAccountCreated}) {
           },
           body: JSON.stringify(formData),
         });
-    
+
         const result = await response.json();
         console.log(result);
-    
+
         if (response.ok) {
-          alert("Program Chair account created successfully!");
+          toast.success("Program Chair account created successfully! Temporary password sent to email.");
           resetForm();
           onAccountCreated();
         } else {
-          alert(result.message || "Failed to create program chair account.");
+          toast.error(result.message || "Failed to create program chair account.");
         }
       } catch (error) {
         console.error("Error creating account:", error);
-        alert("An error occurred while creating the account.");
+        toast.error("An error occurred while creating the account.");
       }
     } else if (role === "faculty") {
       formData.employeeId = employeeId;
@@ -242,13 +253,13 @@ export function CreateAccountModal({onAccountCreated}) {
           },
           body: JSON.stringify(formData),
         });
-    
+
         const result = await response.json();
         console.log("Faculty creation API response:", result);
-    
+
         if (response.ok) {
-          alert("Faculty account created successfully!");
-          
+          toast.success("Faculty account created successfully! Temporary password sent to email.");
+
           // Create a new faculty object that matches the format expected by AdvisorsList
           const newFaculty = {
             id: result.id || result.faculty_id || result.user_id || Math.random().toString(36).substr(2, 9),
@@ -260,22 +271,22 @@ export function CreateAccountModal({onAccountCreated}) {
             sections: [], // New faculty has no sections assigned yet
             timestamp: new Date().getTime()
           };
-          
+
           console.log("Emitting faculty_account_created event with faculty:", newFaculty);
-          
+
           // Emit the event with the new faculty object
           window.setTimeout(() => {
             eventService.emit('faculty_account_created', { faculty: newFaculty });
           }, 0);
-          
+
           resetForm();
           onAccountCreated();
         } else {
-          alert(result.message || "Failed to create faculty account.");
+          toast.error(result.message || "Failed to create faculty account.");
         }
       } catch (error) {
         console.error("Error creating account:", error);
-        alert("An error occurred while creating the account.");
+        toast.error("An error occurred while creating the account.");
       }
     } else if (role === "student") {
       formData.studentId = studentId;
@@ -293,24 +304,24 @@ export function CreateAccountModal({onAccountCreated}) {
           },
           body: JSON.stringify(formData),
         });
-    
+
         const result = await response.json();
         console.log(result);
-    
+
         if (response.ok) {
-          alert("Student account created successfully!");
+          toast.success("Student account created successfully! Temporary password sent to email.");
           resetForm();
           onAccountCreated();
         } else {
-          alert(result.message || "Failed to create student account.");
+          toast.error(result.message || "Failed to create student account.");
         }
       } catch (error) {
         console.error("Error creating account:", error);
-        alert("An error occurred while creating the account.");
+        toast.error("An error occurred while creating the account.");
       }
     }
     console.log("Submitting account data:", formData);
-    
+
   };
 
   return (
@@ -421,7 +432,7 @@ export function CreateAccountModal({onAccountCreated}) {
               <div>
                 <Label htmlFor="department">Department</Label>
                 <Select value={department} onValueChange={(value) => {
-                  
+
                   setDepartment(value);
                   }}>
                   <SelectTrigger id="department">
@@ -472,7 +483,7 @@ export function CreateAccountModal({onAccountCreated}) {
   if (role === "programchair") {
     const selectedProgram = programs.find(prog => prog.id === value);
     if (selectedProgram) {
-      setProgram(selectedProgram.id); 
+      setProgram(selectedProgram.id);
     }
   } else {
     setProgram(value);
@@ -535,7 +546,15 @@ export function CreateAccountModal({onAccountCreated}) {
                 </SelectContent>
                 </Select>
               </div>
-              
+              <div>
+                <Label htmlFor="specialization">Specialization</Label>
+                <Input
+                  id="specialization"
+                  value={specialization}
+                  onChange={(e) => setSpecialization(e.target.value)}
+                  placeholder="Enter specialization"
+                />
+              </div>
             </div>
           )}
 
@@ -623,7 +642,7 @@ export function CreateAccountModal({onAccountCreated}) {
                           .filter((sec) => {
                             console.log('Filtering section:', sec.name, 'Program ID Match:', sec.program_id === programId, 'Year Level ID Match:', sec.year_level_id === yearLevelId, 'Academic Year ID Match:', sec.academic_year_id === activeAcademicYear.id, 'Semester ID Match:', sec.semester_id === activeSemester.id);
                             return (
-                              sec.program_id === programId && 
+                              sec.program_id === programId &&
                               sec.year_level_id === yearLevelId &&
                               sec.academic_year_id === activeAcademicYear.id &&
                               sec.semester_id === activeSemester.id

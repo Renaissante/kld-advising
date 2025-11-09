@@ -11,6 +11,8 @@ header("Content-Type: application/json");
 // }
 include_once '../../config/cors.php';
 require_once "../../config/database.php";
+require_once "../../config/email_config.php"; // Include email configuration
+require_once "../../utils/send_email.php";     // Include email utility
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -30,7 +32,8 @@ if (
     empty($data->firstName) ||
     empty($data->lastName) ||
     empty($data->email) ||
-    empty($data->role)
+    empty($data->role) ||
+    empty($data->password) // Add password to required fields
 ) {
     http_response_code(400);
     echo json_encode(["message" => "All required fields must be filled."]);
@@ -56,13 +59,13 @@ try {
             VALUES (:id, :email, :password_hash, NOW())";
     $stmt = $conn->prepare($sql);
 
-    $defaultPassword = '123456'; // Default password for new users - FOR TESTING ONLY! DO NOT USE IN PRODUCTION!
+    $hashedPassword = password_hash($data->password, PASSWORD_DEFAULT); // Hash the temporary password
 
     $userId = isset($data->employeeId) ? $data->employeeId : uniqid();
 
     $stmt->bindParam(':id', $userId);
     $stmt->bindParam(':email', $data->email);
-    $stmt->bindParam(':password_hash', $defaultPassword);
+    $stmt->bindParam(':password_hash', $hashedPassword); // Use the hashed password
     // $stmt->bindParam(':role', $data->role); // Removed as role is now in user_roles
     $stmt->execute();
 
@@ -102,6 +105,19 @@ try {
     $stmt->execute();
 
     $conn->commit();
+
+    // Send temporary password to user's email
+    $subject = "Your New Account Credentials for KLD Advising System";
+    $body = "Hello " . $data->firstName . ",<br><br>";
+    $body .= "Your account for the KLD Advising System has been successfully created.<br>";
+    $body .= "Your username is: <b>" . $data->email . "</b><br>";
+    $body .= "Your temporary password is: <b>" . $data->password . "</b><br><br>";
+    $body .= "Please log in using your credentials and change your password immediately:<br>";
+    $body .= "<a href=\"" . LOGIN_PAGE_URL . "\">Login Page</a><br><br>";
+    $body .= "Thank you.<br>";
+    $body .= "KLD Advising System Team";
+
+    sendEmail($data->email, $fullName, $subject, $body);
 
     // --- Add WebSocket Notification ---
     // Require the Composer autoload file to use the WebSocket client
