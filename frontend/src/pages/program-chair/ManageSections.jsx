@@ -60,7 +60,7 @@ export default function ManageSections() {
   const [sectionToDeleteDetails, setSectionToDeleteDetails] = useState(null);
   const [newSection, setNewSection] = useState({
     name: "",
-    capacity: 30,
+    capacity: 40,
     yearLevel: null,
     program: null,
   })
@@ -71,6 +71,20 @@ export default function ManageSections() {
   const [studentsPerPage] = useState(10); // You can adjust this value as needed
   const [selectedStudentsForAssignment, setSelectedStudentsForAssignment] = useState([]);
   const [assignStudentsActiveTab, setAssignStudentsActiveTab] = useState("available");
+
+  // New states for irregular student assignment
+  const [showAssignIrregularStudentsDialogForSectionId, setShowAssignIrregularStudentsDialogForSectionId] = useState(null);
+  const [irregularAssignmentActiveTab, setIrregularAssignmentActiveTab] = useState("available");
+  const [selectedIrregularStudentsForAssignment, setSelectedIrregularStudentsForAssignment] = useState([]);
+  const [irregularStudentCourseAssignments, setIrregularStudentCourseAssignments] = useState({});
+
+  const [irregularStudentsToAssign, setIrregularStudentsToAssign] = useState([]);
+  const [isLoadingIrregularStudents, setIsLoadingIrregularStudents] = useState(false);
+  const [irregularStudentsError, setIrregularStudentsError] = useState(null);
+
+  const [coursesForSelectedSection, setCoursesForSelectedSection] = useState([]);
+  const [isLoadingCoursesForSection, setIsLoadingCoursesForSection] = useState(false);
+  const [coursesForSectionError, setCoursesForSectionError] = useState(null);
 
   // Loading and error states for API calls
   const [isLoadingSections, setIsLoadingSections] = useState(true);
@@ -157,6 +171,46 @@ export default function ManageSections() {
     }
   }, [activeAcademicYear, activeSemester]);
 
+  const fetchIrregularStudentsForAssignment = useCallback(async () => {
+    if (!user?.id || !activeAcademicYear?.id || !activeSemester?.id) return;
+    setIsLoadingIrregularStudents(true);
+    setIrregularStudentsError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/student/read_irregular_students_with_failed_courses.php?program_chair_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setIrregularStudentsToAssign(data.data || []);
+    } catch (error) {
+      console.error("Error fetching irregular students:", error);
+      setIrregularStudentsError("Failed to load irregular students.");
+      setIrregularStudentsToAssign([]);
+    } finally {
+      setIsLoadingIrregularStudents(false);
+    }
+  }, [user, activeAcademicYear, activeSemester]);
+
+  const fetchCoursesForRetakeDropdown = useCallback(async (sectionId) => {
+    if (!sectionId || !user?.id) return;
+    setIsLoadingCoursesForSection(true);
+    setCoursesForSectionError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/course/read_courses_by_section_curriculum.php?section_id=${sectionId}&program_chair_id=${user.id}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setCoursesForSelectedSection(data.data || []);
+    } catch (error) {
+      console.error("Error fetching courses for section:", error);
+      setCoursesForSectionError("Failed to load courses for this section.");
+      setCoursesForSelectedSection([]);
+    } finally {
+      setIsLoadingCoursesForSection(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     const fetchProgramChairData = async () => {
       if (!user || !user.id) {
@@ -191,17 +245,20 @@ export default function ManageSections() {
       }
     };
     fetchProgramChairData();
-  }, [user]); // Add fetchSections to dependencies to avoid stale closure warning
+  }, [user]);
 
   // Main data fetching effect
   useEffect(() => {
     if (activeAcademicYear?.id && activeSemester?.id && !loadingProgramData) {
       if (assignedProgramIds.length > 0) {
-      fetchSections();
+        fetchSections();
+        fetchIrregularStudentsForAssignment(); // Fetch irregular students here
       } else if (!loadingProgramData) {
         console.log("No assigned programs for program chair, clearing sections.");
         setSections([]);
         setIsLoadingSections(false);
+        setIrregularStudentsToAssign([]); // Clear irregular students
+        setIsLoadingIrregularStudents(false); // Set irregular student loading to false
       }
       fetchUnassignedStudents();
     } else if (!activeAcademicYear?.id || !activeSemester?.id) {
@@ -209,8 +266,10 @@ export default function ManageSections() {
       setIsLoadingSections(false);
       setAvailableStudents([]);
       setIsLoadingStudents(false);
+      setIrregularStudentsToAssign([]); // Clear irregular students
+      setIsLoadingIrregularStudents(false); // Set irregular student loading to false
     }
-  }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds, fetchSections, fetchUnassignedStudents]);
+  }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds, fetchSections, fetchUnassignedStudents, fetchIrregularStudentsForAssignment]);
 
   const getUnassignedStudents = () => {
     // This function will now filter from the `availableStudents` fetched from API
@@ -495,6 +554,59 @@ export default function ManageSections() {
     }
   }
 
+  const handleAssignIrregularStudents = async (studentIdsToAssign) => {
+    if (!selectedSection || studentIdsToAssign.length === 0) return;
+
+    const assignments = studentIdsToAssign.map(studentDbId => ({
+      student_id: studentDbId,
+      section_id: selectedSection.id,
+      course_id_to_retake: parseInt(irregularStudentCourseAssignments[studentDbId]),
+    }));
+
+    try {
+      const responses = await Promise.all(assignments.map(assignment =>
+        fetch(`${API_BASE_URL}/program_chair/assign_irregular_student_to_section.php?program_chair_id=${user.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(assignment),
+        })
+      ));
+
+      let allSuccess = true;
+      for (const response of responses) {
+        const data = await response.json();
+        if (!response.ok) {
+          allSuccess = false;
+          console.error("Error assigning irregular student:", data.message);
+          toast.error(data.message || "Failed to assign some irregular students.");
+        }
+      }
+
+      if (allSuccess) {
+        toast.success("Irregular students assigned successfully to " + selectedSection.name);
+      } else {
+        toast.warning("Some irregular students could not be assigned. Check console for details.");
+      }
+
+      // Refresh data after assignment
+      fetchSections();
+      fetchIrregularStudentsForAssignment();
+
+    } catch (error) {
+      console.error("Error assigning irregular students:", error);
+      toast.error(error.message || "Failed to assign irregular students. Please try again.");
+    } finally {
+      setShowAssignIrregularStudentsDialogForSectionId(null);
+      setSelectedIrregularStudentsForAssignment([]);
+      setIrregularStudentCourseAssignments({});
+      setSearchQuery("");
+      setIrregularAssignmentActiveTab("available");
+      setCoursesForSelectedSection([]);
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case "active":
@@ -509,7 +621,15 @@ export default function ManageSections() {
   }
 
   const getEnrolledStudentCount = (students, requiredStatus = 'enrolled') => {
-    return students.filter(student => student.enrollmentStatus === requiredStatus).length;
+    // Ensure students is an array and filter by enrollmentStatus. Also count irregular students.
+    if (!Array.isArray(students)) return 0;
+    // Count regular students for active sections, or irregular students if specific status is 'irregular'
+    if (requiredStatus === 'irregular') {
+      return students.filter(student => student.is_irregular).length;
+    } else if (requiredStatus === 'enrolled') {
+        return students.filter(student => !student.is_irregular).length; // Count only regular students for 'enrolled' status
+    }
+    return students.length; // Default count all if no specific filter
   };
 
   const activeSections = sections.filter((s) => s.status === "active" && s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
@@ -836,7 +956,7 @@ export default function ManageSections() {
                           <div>
                             <p className="font-medium">Number of Students</p>
                             <p className="text-muted-foreground">
-                              {getEnrolledStudentCount(section.enrolledStudents, 'enrolled')}/{section.capacity}
+                              {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
                             </p>
                           </div>
                           <div>
@@ -857,11 +977,13 @@ export default function ManageSections() {
                             <div>
                               <CardTitle className="text-lg">Students in {section.name}</CardTitle>
                               <CardDescription>
-                                Current enrollment: {getEnrolledStudentCount(section.enrolledStudents, 'enrolled')}/{section.capacity}
+                                Current enrollment: {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
                               </CardDescription>
                             </div>
+                            <div className="flex gap-2">
                               <Button
                                 variant="green"
+                                size="sm"
                                 onClick={() => {
                                   setShowAssignStudentsDialogForSectionId(section.id);
                                   setSelectedSection(section);
@@ -869,6 +991,18 @@ export default function ManageSections() {
                               >
                                 Assign Students
                               </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setShowAssignIrregularStudentsDialogForSectionId(section.id);
+                                  setSelectedSection(section);
+                                  fetchCoursesForRetakeDropdown(section.id); // Fetch courses for the selected section
+                                }}
+                              >
+                                Assign Students for Retake
+                              </Button>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -880,33 +1014,52 @@ export default function ManageSections() {
                                   <TableHead>Name</TableHead>
                                   <TableHead>Email</TableHead>
                                   <TableHead>Previous Section</TableHead>
+                                  <TableHead>Retake Course</TableHead>
+                                  <TableHead>Status</TableHead>
                                   <TableHead className="text-right">Actions</TableHead>
-                                   
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {section.enrolledStudents.filter(student => student.enrollmentStatus === 'enrolled').length > 0 ? (
-                                  section.enrolledStudents.filter(student => student.enrollmentStatus === 'enrolled').map((student) => (
-                                    <TableRow key={student.id}>
-                                      <TableCell className="font-medium">{student.studentId}</TableCell>
-                                    <TableCell>{student.name}</TableCell>
-                                    <TableCell>{student.email}</TableCell>
-                                    <TableCell>{student.previousSection || "N/A"}</TableCell>
-                                    <TableCell className="text-right">
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleRemoveStudent(student.id, section.id, student.name, section.name)}
-                                      >
+                                {section.enrolledStudents.length > 0 ? (
+                                  section.enrolledStudents.map((student) => (
+                                    <TableRow key={student.id} className={student.is_irregular ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                                      <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                          
+                                          {student.student_id}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>{student.name}</TableCell>
+                                      <TableCell>{student.email}</TableCell>
+                                      <TableCell>{student.previous_section_name || "N/A"}</TableCell>
+                                      <TableCell>
+                                        {student.assigned_course_code ? (
+                                          <Badge variant="secondary">{student.assigned_course_code}</Badge>
+                                        ) : (
+                                          <span className="text-sm">N/A</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        {student.is_irregular ? (
+                                          <Badge className="bg-yellow-100 text-yellow-800">Irregular</Badge>
+                                        ) : (
+                                          <Badge variant="outline">Regular</Badge>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => handleRemoveStudent(student.id, section.id, student.name, section.name)}
+                                        >
                                           <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </TableCell>
-                                    
-                                  </TableRow>
-                                ))
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
                                 ) : (
                                   <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                       No students enrolled yet
                                     </TableCell>
                                   </TableRow>
@@ -943,71 +1096,71 @@ export default function ManageSections() {
 
                             {/* Available Students Tab Content */}
                             <TabsContent value="available">
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                              placeholder="Search by name, student ID, email, or previous section..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-10"
-                            />
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Search by name, student ID, email, or previous section..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                        {isLoadingStudents ? (
+                          <div className="flex items-center justify-center p-8 text-muted-foreground">
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                            <span>Loading students...</span>
                           </div>
-                                {isLoadingStudents ? (
-                                  <div className="flex items-center justify-center p-8 text-muted-foreground">
-                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                    <span>Loading students...</span>
-                                  </div>
-                                ) : studentsError ? (
-                                  <div className="flex justify-center items-center p-8 bg-destructive/10 text-destructive rounded-md">
-                                    <AlertTriangle className="h-5 w-5 mr-2" />
-                                    <p>Error loading students: {studentsError}</p>
-                                  </div>
-                                ) : (
-                          <div className="max-h-96 overflow-y-auto border rounded-md">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Student ID</TableHead>
-                                  <TableHead>Name</TableHead>
-                                  <TableHead>Email</TableHead>
-                                  <TableHead>Previous Section</TableHead>
-                                  <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                        {currentStudents.map((student) => (
-                                  <TableRow key={student.id}>
-                                    <TableCell className="font-medium">{student.studentId}</TableCell>
-                                    <TableCell>{student.name}</TableCell>
-                                    <TableCell>{student.email}</TableCell>
-                                    <TableCell>{student.previousSection || "N/A"}</TableCell>
-                                    <TableCell className="text-right">
-                                      <Button
-                                        size="sm"
-                                                variant={selectedStudentsForAssignment.includes(student.id) ? "secondary" : "outline"}
-                                        onClick={() => {
-                                                  setSelectedStudentsForAssignment((prev) =>
-                                                    prev.includes(student.id)
-                                                      ? prev.filter((id) => id !== student.id)
-                                                      : [...prev, student.id]
-                                                  );
-                                                }}
-                                              >
-                                                {selectedStudentsForAssignment.includes(student.id) ? "Deselect" : "Select"}
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                                        {currentStudents.length === 0 && (
-                                  <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                      {searchQuery
-                                        ? "No students found matching your search"
-                                        : "No unassigned students available"}
-                                    </TableCell>
-                                  </TableRow>
-                                        )}
+                        ) : studentsError ? (
+                          <div className="flex justify-center items-center p-8 bg-destructive/10 text-destructive rounded-md">
+                            <AlertTriangle className="h-5 w-5 mr-2" />
+                            <p>Error loading students: {studentsError}</p>
+                          </div>
+                        ) : (
+                  <div className="max-h-96 overflow-y-auto border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Student ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Previous Section</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                                {currentStudents.map((student) => (
+                          <TableRow key={student.id}>
+                            <TableCell className="font-medium">{student.student_id}</TableCell>
+                            <TableCell>{student.name}</TableCell>
+                            <TableCell>{student.email}</TableCell>
+                            <TableCell>{student.previous_section_name || "N/A"}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                        variant={selectedStudentsForAssignment.includes(student.id) ? "secondary" : "outline"}
+                                onClick={() => {
+                                          setSelectedStudentsForAssignment((prev) =>
+                                            prev.includes(student.id)
+                                              ? prev.filter((id) => id !== student.id)
+                                              : [...prev, student.id]
+                                          );
+                                        }}
+                                      >
+                                        {selectedStudentsForAssignment.includes(student.id) ? "Deselect" : "Select"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                                {currentStudents.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              {searchQuery
+                                ? "No students found matching your search"
+                                : "No unassigned students available"}
+                            </TableCell>
+                          </TableRow>
+                        )}
                                       </TableBody>
                                     </Table>
                                   </div>
@@ -1041,10 +1194,10 @@ export default function ManageSections() {
                                           if (!student) return null;
                                           return (
                                             <TableRow key={student.id}>
-                                              <TableCell className="font-medium">{student.studentId}</TableCell>
+                                              <TableCell className="font-medium">{student.student_id}</TableCell>
                                               <TableCell>{student.name}</TableCell>
                                               <TableCell>{student.email}</TableCell>
-                                              <TableCell>{student.previousSection || "N/A"}</TableCell>
+                                              <TableCell>{student.previous_section_name || "N/A"}</TableCell>
                                               <TableCell className="text-right">
                                                 <Button
                                                   size="sm"
@@ -1095,6 +1248,231 @@ export default function ManageSections() {
                             </Button>
                           </DialogFooter>
                       </DialogContent>
+                    </Dialog>
+                    {/* Dialog for Assigning Irregular Students */}
+                    <Dialog open={showAssignIrregularStudentsDialogForSectionId === section.id} onOpenChange={(open) => {
+                        setShowAssignIrregularStudentsDialogForSectionId(open ? section.id : null);
+                        setSelectedSection(open ? section : null);
+                        if (!open) {
+                            setSearchQuery("");
+                            setSelectedIrregularStudentsForAssignment([]);
+                            setIrregularStudentCourseAssignments({});
+                            setCoursesForSelectedSection([]); // Clear courses when dialog closes
+                        }
+                    }}>
+                        <DialogContent className="sm:max-w-4xl">
+                            <DialogHeader>
+                                <DialogTitle>Assign Students for Retake to {selectedSection?.name}</DialogTitle>
+                                <DialogDescription>
+                                    Select students who need to retake a failed course and assign them to this section.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <Tabs value={irregularAssignmentActiveTab} onValueChange={setIrregularAssignmentActiveTab}>
+                                <TabsList className="grid w-full grid-cols-2 mb-4">
+                                    <TabsTrigger value="available">Available Students for Retake ({irregularStudentsToAssign.length})</TabsTrigger>
+                                    <TabsTrigger value="selected">Selected ({selectedIrregularStudentsForAssignment.length})</TabsTrigger>
+                                </TabsList>
+
+                                <TabsContent value="available" className="space-y-4">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                        <Input
+                                            placeholder="Search by name, ID, email..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                    {isLoadingIrregularStudents ? (
+                                        <div className="flex items-center justify-center p-8 text-muted-foreground">
+                                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                            <span>Loading irregular students...</span>
+                                        </div>
+                                    ) : irregularStudentsError ? (
+                                        <div className="flex justify-center items-center p-8 bg-destructive/10 text-destructive rounded-md">
+                                            <AlertTriangle className="h-5 w-5 mr-2" />
+                                            <p>Error loading irregular students: {irregularStudentsError}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="max-h-96 overflow-y-auto border rounded-lg">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        
+                                                        <TableHead>Student ID</TableHead>
+                                                        <TableHead>Name</TableHead>
+                                                        <TableHead>Home Section</TableHead>
+                                                        <TableHead>Year Level</TableHead>
+                                                        <TableHead>Failed Courses</TableHead>
+                                                        <TableHead className="w-10">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {irregularStudentsToAssign.filter(student =>
+                                                        (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         student.student_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                                                    ).map((student) => (
+                                                        <TableRow key={student.id}>
+                                                            
+                                                            <TableCell className="font-medium text-sm">{student.student_id}</TableCell>
+                                                            <TableCell>{student.name}</TableCell>
+                                                            <TableCell className="text-sm">{student.home_section_name}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className="bg-yellow-100 text-yellow-800">{student.year_level}</Badge>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {student.failed_courses && student.failed_courses.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {student.failed_courses.map(course => (
+                                                                            <Badge key={course.course_id} variant="destructive">{course.course_code}</Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground text-sm">N/A</span>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant={selectedIrregularStudentsForAssignment.includes(student.id) ? "secondary" : "outline"}
+                                                                    onClick={() => {
+                                                                        setSelectedIrregularStudentsForAssignment((prev) =>
+                                                                            prev.includes(student.id)
+                                                                                ? prev.filter((id) => id !== student.id)
+                                                                                : [...prev, student.id]
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    {selectedIrregularStudentsForAssignment.includes(student.id) ? "Deselect" : "Select"}
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    {irregularStudentsToAssign.filter(student =>
+                                                        (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         student.student_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                                                    ).length === 0 && (
+                                                        <TableRow>
+                                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                                {searchQuery ? "No irregular students found matching your search" : "No students available for retake"}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    )}
+                                </TabsContent>
+
+                                <TabsContent value="selected" className="space-y-4">
+                                    <div className="max-h-96 overflow-y-auto border rounded-lg">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Student ID</TableHead>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Home Section</TableHead>
+                                                    <TableHead>Failed Course to Retake</TableHead>
+                                                    <TableHead className="text-right w-20">Action</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {selectedIrregularStudentsForAssignment.length > 0 ? (
+                                                    selectedIrregularStudentsForAssignment.map((studentId) => {
+                                                        const student = irregularStudentsToAssign.find((s) => s.id === studentId);
+                                                        if (!student) return null;
+
+                                                        return (
+                                                            <TableRow key={student.id} className="bg-yellow-50 dark:bg-yellow-950/20">
+                                                                <TableCell className="font-medium text-sm">{student.student_id}</TableCell>
+                                                                <TableCell>{student.name}</TableCell>
+                                                                <TableCell className="text-sm">{student.home_section_name}</TableCell>
+                                                                <TableCell>
+                                                                    {isLoadingCoursesForSection ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : coursesForSectionError ? (
+                                                                        <span className="text-destructive">Error loading courses</span>
+                                                                    ) : (
+                                                                        <select
+                                                                            value={irregularStudentCourseAssignments[student.id] || ""}
+                                                                            onChange={(e) => {
+                                                                                setIrregularStudentCourseAssignments((prev) => ({
+                                                                                    ...prev,
+                                                                                    [student.id]: parseInt(e.target.value),
+                                                                                }))
+                                                                            }}
+                                                                            className="w-full px-2 py-1 text-sm border rounded bg-background"
+                                                                            disabled={!selectedSection} // Disable if no section selected
+                                                                        >
+                                                                            <option value="">Select a course...</option>
+                                                                            {coursesForSelectedSection.map((course) => (
+                                                                                <option key={course.course_id} value={course.course_id}>
+                                                                                    {course.course_code} - {course.course_title}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="destructive"
+                                                                        onClick={() => {
+                                                                            setSelectedIrregularStudentsForAssignment((prev) => prev.filter((id) => id !== student.id));
+                                                                            setIrregularStudentCourseAssignments((prev) => {
+                                                                                const newMapping = { ...prev };
+                                                                                delete newMapping[student.id];
+                                                                                return newMapping;
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                            No students selected for retake yet
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+
+                            <DialogFooter className="mt-6">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setShowAssignIrregularStudentsDialogForSectionId(null);
+                                        setSearchQuery("");
+                                        setSelectedIrregularStudentsForAssignment([]);
+                                        setIrregularStudentCourseAssignments({});
+                                        setCoursesForSelectedSection([]);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="green"
+                                    onClick={() => handleAssignIrregularStudents(selectedIrregularStudentsForAssignment)}
+                                    disabled={
+                                        selectedIrregularStudentsForAssignment.length === 0 ||
+                                        selectedIrregularStudentsForAssignment.some((id) => !irregularStudentCourseAssignments[id])
+                                    }
+                                >
+                                    Assign Students for Retake
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
                     </Dialog>
                   </div>
                   ))
@@ -1176,7 +1554,7 @@ export default function ManageSections() {
                         <div>
                           <p className="font-medium">Number of Students</p>
                           <p className="text-muted-foreground">
-                            {getEnrolledStudentCount(section.enrolledStudents, 'archived')}/{section.capacity}
+                            {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
                           </p>
                         </div>
                         <div>
@@ -1195,7 +1573,7 @@ export default function ManageSections() {
                       <CardHeader>
                         <CardTitle className="text-lg">Students in {section.name}</CardTitle>
                         <CardDescription>
-                          Current enrollment: {getEnrolledStudentCount(section.enrolledStudents, 'archived')}/{section.capacity}
+                          Current enrollment: {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -1207,43 +1585,59 @@ export default function ManageSections() {
                                 <TableHead>Name</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Previous Section</TableHead>
+                                <TableHead>Retake Course</TableHead>
+                                <TableHead>Status</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {section.enrolledStudents.filter(student => student.enrollmentStatus === 'archived').length > 0 ? (
-                                section.enrolledStudents.filter(student => student.enrollmentStatus === 'archived').map((student) => (
-                                <TableRow key={student.id}>
-                                  <TableCell className="font-medium">{student.studentId}</TableCell>
+                              {section.enrolledStudents.length > 0 ? (
+                                section.enrolledStudents.map((student) => (
+                                <TableRow key={student.id} className={student.is_irregular ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                                  <TableCell className="font-medium">{student.student_id}</TableCell>
                                   <TableCell>{student.name}</TableCell>
                                   <TableCell>{student.email}</TableCell>
-                                  <TableCell>{student.previousSection || "N/A"}</TableCell>
+                                  <TableCell>{student.previous_section_name || "N/A"}</TableCell>
+                                  <TableCell>
+                                    {student.assigned_course_code ? (
+                                      <Badge variant="secondary">{student.assigned_course_code}</Badge>
+                                    ) : (
+                                      <span className="text-sm">N/A</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {student.is_irregular ? (
+                                      <Badge className="bg-yellow-100 text-yellow-800">Irregular</Badge>
+                                    ) : (
+                                      <Badge variant="outline">Regular</Badge>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
-                              ))
-                              ) : (
+                            ))
+                            ) : (
                                 <TableRow>
-                                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                     No students enrolled yet
                                   </TableCell>
                                 </TableRow>
-                              )}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  </div>
-                  ))
-                )}
-                {archivedSections.length === 0 && (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <p className="text-muted-foreground">No archived sections found.</p>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
-              </div>
-            </TabsContent>
+                </div>
+                ))
+              )}
+              {archivedSections.length === 0 && (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">No archived sections found.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
 
             <TabsContent value="completed" className="space-y-4">
               <div className="grid gap-4">
@@ -1269,113 +1663,129 @@ export default function ManageSections() {
                             {getStatusBadge(section.status)}
                           </CardTitle>
                           <CardDescription>
-                              {section.academic_year} {section.semester}
+                                {section.academic_year} {section.semester}
                           </CardDescription>
                         </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (viewingStudentsFor === section.id) {
-                                  setViewingStudentsFor(null);
-                                  setSelectedSection(null);
-                                } else {
-                                  setViewingStudentsFor(section.id);
-                                  setSelectedSection(section);
-                                }
-                              }}
-                            >
-                              <Users className="w-4 h-4 mr-2" />
-                              {viewingStudentsFor === section.id ? "Hide Students" : "Students List"}
-                            </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteSection(section.id, section.name)}>
-                            <Trash2 className="w-4 h-4" />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (viewingStudentsFor === section.id) {
+                                setViewingStudentsFor(null);
+                                setSelectedSection(null);
+                              } else {
+                                setViewingStudentsFor(section.id);
+                                setSelectedSection(section);
+                              }
+                            }}
+                          >
+                            <Users className="w-4 h-4 mr-2" />
+                            {viewingStudentsFor === section.id ? "Hide Students" : "Students List"}
                           </Button>
-                        </div>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteSection(section.id, section.name)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="font-medium">Year Level</p>
-                          <p className="text-muted-foreground">
-                            {section.year_level}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="font-medium">Number of Students</p>
-                          <p className="text-muted-foreground">
-                            {getEnrolledStudentCount(section.enrolledStudents, 'completed')}/{section.capacity}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="font-medium">Status</p>
-                          <p className="text-muted-foreground capitalize">{section.status}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium">Advisor</p>
-                          <p className="text-muted-foreground">{section.advisor_name || "N/A"}</p>
-                        </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium">Year Level</p>
+                        <p className="text-muted-foreground">
+                          {section.year_level}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                    {viewingStudentsFor === section.id && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Students in {section.name}</CardTitle>
-                          <CardDescription>
-                            Current enrollment: {getEnrolledStudentCount(section.enrolledStudents, 'completed')}/{section.capacity}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="border rounded-md">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Student ID</TableHead>
-                                  <TableHead>Name</TableHead>
-                                  <TableHead>Email</TableHead>
-                                  <TableHead>Previous Section</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {section.enrolledStudents.filter(student => student.enrollmentStatus === 'completed').length > 0 ? (
-                                  section.enrolledStudents.filter(student => student.enrollmentStatus === 'completed').map((student) => (
-                                    <TableRow key={student.id}>
-                                      <TableCell className="font-medium">{student.studentId}</TableCell>
-                                      <TableCell>{student.name}</TableCell>
-                                      <TableCell>{student.email}</TableCell>
-                                      <TableCell>{student.previousSection || "N/A"}</TableCell>
-                                    </TableRow>
-                                  ))
-                                ) : (
-                                  <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                      No students enrolled yet
+                      <div>
+                        <p className="font-medium">Number of Students</p>
+                        <p className="text-muted-foreground">
+                          {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium">Status</p>
+                        <p className="text-muted-foreground capitalize">{section.status}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium">Advisor</p>
+                        <p className="text-muted-foreground">{section.advisor_name || "N/A"}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                  {viewingStudentsFor === section.id && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Students in {section.name}</CardTitle>
+                        <CardDescription>
+                          Current enrollment: {getEnrolledStudentCount(section.enrolledStudents)}/{section.capacity}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Student ID</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Previous Section</TableHead>
+                                <TableHead>Retake Course</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {section.enrolledStudents.length > 0 ? (
+                                section.enrolledStudents.map((student) => (
+                                  <TableRow key={student.id} className={student.is_irregular ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                                    <TableCell className="font-medium">{student.student_id}</TableCell>
+                                    <TableCell>{student.name}</TableCell>
+                                    <TableCell>{student.email}</TableCell>
+                                    <TableCell>{student.previous_section_name || "N/A"}</TableCell>
+                                    <TableCell>
+                                      {student.assigned_course_code ? (
+                                        <Badge variant="secondary">{student.assigned_course_code}</Badge>
+                                      ) : (
+                                        <span className="text-sm">N/A</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {student.is_irregular ? (
+                                        <Badge className="bg-yellow-100 text-yellow-800">Irregular</Badge>
+                                      ) : (
+                                        <Badge variant="outline">Regular</Badge>
+                                      )}
                                     </TableCell>
                                   </TableRow>
-                                )}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                  ))
-                )}
-                {completedSections.length === 0 && (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <p className="text-muted-foreground">No completed sections found.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                    No students enrolled yet
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                ))
+              )}
+              {completedSections.length === 0 && (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">No completed sections found.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </main>
       <Toaster />
   </SidebarProvider>

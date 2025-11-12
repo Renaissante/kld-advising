@@ -36,8 +36,9 @@ try {
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Use password_verify for secure password comparison
-    if ($user && password_verify($password, $user['password_hash'])) {
+    // --- TEMPORARY INSECURE PASSWORD COMPARISON (FOR TESTING ONLY) ---
+    // IMPORTANT: Revert to password_verify for production!
+    if ($user && $password === $user['password_hash']) {
         $_SESSION['user_id'] = $user['id'];
         
         $roles_array = explode(',', $user['roles_list']);

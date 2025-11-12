@@ -106,6 +106,21 @@ try {
 
     $courseInfo = $courseStmt->fetch(PDO::FETCH_ASSOC);
 
+    // Fetch the curriculum_id for the given course_id
+    $courseCurriculumQuery = "SELECT curriculum_id FROM courses WHERE id = :course_id";
+    $courseCurriculumStmt = $conn->prepare($courseCurriculumQuery);
+    $courseCurriculumStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
+    $courseCurriculumStmt->execute();
+    $courseCurriculumResult = $courseCurriculumStmt->fetch(PDO::FETCH_ASSOC);
+    $courseCurriculumId = $courseCurriculumResult ? $courseCurriculumResult['curriculum_id'] : null;
+
+    if ($courseCurriculumId === null) {
+        // If the course doesn't have a curriculum_id, it's an invalid state or unassigned, return no students.
+        http_response_code(200);
+        echo json_encode(array("success" => true, "count" => 0, "course_info" => $courseInfo, "data" => [], "message" => "Course has no assigned curriculum."));
+        exit();
+    }
+
     // Now fetch students enrolled in this section
     $query = "SELECT s.id, s.student_id, s.name, sec.name as section,
                      c.course_code, c.course_title,
@@ -115,11 +130,52 @@ try {
               FROM students s
               JOIN sections sec ON s.section_id = sec.id
               JOIN courses c ON c.id = :course_id
-              LEFT JOIN course_grades g ON g.student_id = s.student_id
-                               AND g.course_id = :course_id
+              LEFT JOIN course_grades g ON g.id = (
+                                            SELECT MAX(id) FROM course_grades 
+                                            WHERE student_id = s.student_id 
+                                            AND course_id = :course_id
+                                          )
               WHERE s.section_id = :section_id
                 AND COALESCE(g.is_credited, FALSE) = FALSE
-              ORDER BY s.name";
+              -- ORDER BY s.name -- Removed individual ORDER BY to fix UNION ALL syntax
+    ";
+
+    // Add a UNION ALL to include irregular students enrolled in this course for retake
+    $query .= "
+        UNION ALL
+        SELECT 
+            s.id, 
+            s.student_id, 
+            s.name, 
+            sec.name as section,
+            c.course_code, 
+            c.course_title,
+            COALESCE(g.transmutation, '') as transmutation,
+            COALESCE(g.remarks, '') as remarks,
+            FALSE as is_credited -- Irregular students are not credited until passed
+        FROM 
+            students s
+        JOIN 
+            irregular_course_enrollments ice ON s.id = ice.student_id
+        JOIN 
+            sections sec ON ice.section_id = sec.id
+        JOIN 
+            courses c ON ice.course_id = c.id
+        LEFT JOIN 
+            course_grades g ON g.student_id = s.student_id
+                           AND g.course_id = ice.course_id
+        WHERE 
+            ice.section_id = :section_id 
+            AND ice.course_id = :course_id
+            AND ice.enrollment_type = 'Retake'
+    ";
+
+    // Add the global ORDER BY clause for the entire UNION ALL query
+    $query .= " ORDER BY name ASC";
+
+    // DEBUG: Print the query to identify syntax error
+    // echo "<pre>$query</pre>";
+    // exit();
 
     $stmt = $conn->prepare($query);
     if ($stmt === false) {
@@ -128,6 +184,14 @@ try {
 
     $stmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
     $stmt->bindParam(':section_id', $sectionId, PDO::PARAM_INT);
+    // $stmt->bindParam(':course_curriculum_id', $courseCurriculumId, PDO::PARAM_INT); // Removed: no longer used in query
+    // $stmt->bindParam(':academic_year_id', $academic_year_id, PDO::PARAM_INT); // Removed: course_grades does not have AY/Sem
+    // $stmt->bindParam(':semester_id', $semester_id, PDO::PARAM_INT); // Removed: course_grades does not have AY/Sem
+    // Bind parameters again for the UNION ALL part (if they are named differently, or use same names)
+    // For PDO, if parameters have the same name, they only need to be bound once.
+    // $stmt->bindParam(':section_id_union', $sectionId, PDO::PARAM_INT);
+    // $stmt->bindParam(':course_id_union', $courseId, PDO::PARAM_INT);
+    // $stmt->bindParam(':course_curriculum_id_union', $courseCurriculumId, PDO::PARAM_INT);
     $stmt->execute();
 
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);

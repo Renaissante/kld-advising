@@ -128,6 +128,7 @@ try {
     $successCount = 0;
     $totalCount = count($students);
     $errors = [];
+    $studentsToUpdateStatus = []; // Array to store student_ids that need status update
 
     foreach ($students as $student) {
         // Extract student data
@@ -150,7 +151,7 @@ try {
 
 
         // Check if an entry already exists
-        $checkQuery = "SELECT id FROM course_grades
+        $checkQuery = "SELECT id, remarks FROM course_grades
                        WHERE student_id = :student_id
                        AND course_id = :course_id";
 
@@ -158,8 +159,10 @@ try {
         $checkStmt->bindParam(':student_id', $studentId);
         $checkStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
         $checkStmt->execute();
+        $existingGrade = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        $oldRemarks = $existingGrade ? $existingGrade['remarks'] : null;
 
-        if ($checkStmt->rowCount() > 0) {
+        if ($existingGrade) {
             // Update existing entry
             $updateQuery = "UPDATE course_grades
                            SET transmutation = :transmutation,
@@ -199,10 +202,75 @@ try {
                 $errors[] = "Failed to save grades for student ID: $studentId";
             }
         }
+
+        // Logic to set student to 'Irregular' if a current course is failed and has un-passed prerequisites
+        if ($remarks === "Failed") {
+            $prereqQuery = "SELECT course_id FROM course_prerequisites WHERE prerequisite_course_id = :course_id";
+            $prereqStmt = $conn->prepare($prereqQuery);
+            $prereqStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
+            $prereqStmt->execute();
+            $coursesHavingThisAsPrereq = $prereqStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!empty($coursesHavingThisAsPrereq)) {
+                // If this course is a prerequisite for other courses, and the student failed it,
+                // they should be set to irregular (if not already).
+                $studentsToUpdateStatus[] = $studentId;
+            }
+        }
+        // Logic to set student back to 'Regular' if grade changes from Failed to Passed
+        // and no other failed prerequisites exist.
+        else if ($oldRemarks === "Failed" && $remarks === "Passed") {
+            // Check if the student has any other failed courses that have un-passed prerequisites
+            $anyOtherFailedPrereqs = false;
+            
+            $failedCoursesQuery = "SELECT cg.course_id FROM course_grades cg
+                                  JOIN course_prerequisites cp ON cg.course_id = cp.prerequisite_course_id
+                                  WHERE cg.student_id = :student_id
+                                  AND cg.remarks = 'Failed'";
+            $failedCoursesStmt = $conn->prepare($failedCoursesQuery);
+            $failedCoursesStmt->bindParam(':student_id', $studentId);
+            $failedCoursesStmt->execute();
+            $failedPrereqCourses = $failedCoursesStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!empty($failedPrereqCourses)) {
+                foreach ($failedPrereqCourses as $failedPrereqCourseId) {
+                    // For each failed prerequisite course, check if there are other courses that require it
+                    $checkIfRequiredQuery = "SELECT course_id FROM course_prerequisites WHERE prerequisite_course_id = :failed_prereq_course_id";
+                    $checkIfRequiredStmt = $conn->prepare($checkIfRequiredQuery);
+                    $checkIfRequiredStmt->bindParam(':failed_prereq_course_id', $failedPrereqCourseId, PDO::PARAM_INT);
+                    $checkIfRequiredStmt->execute();
+                    $isStillRequired = $checkIfRequiredStmt->fetch(PDO::FETCH_COLUMN);
+
+                    if ($isStillRequired) {
+                        $anyOtherFailedPrereqs = true;
+                        break; // Found another failed prerequisite, no need to check further
+                    }
+                }
+            }
+
+            if (!$anyOtherFailedPrereqs) {
+                // If no other failed prerequisites, add student to list to be set to Regular
+                $studentsToUpdateStatus[] = ['id' => $studentId, 'status' => 'Regular'];
+            }
+        }
     }
 
     // Commit or rollback transaction based on success
     if (empty($errors)) { // Commit only if there are no errors
+        // Update student enrollment status for those who failed a prerequisite
+        if (!empty($studentsToUpdateStatus)) {
+            foreach ($studentsToUpdateStatus as $studentUpdate) {
+                $studentIdToUpdate = is_array($studentUpdate) ? $studentUpdate['id'] : $studentUpdate;
+                $newStatus = is_array($studentUpdate) ? $studentUpdate['status'] : 'Irregular';
+
+                $updateStudentStatusQuery = "UPDATE students SET enrollment_status = :new_status WHERE student_id = :student_id AND enrollment_status != :new_status";
+                $updateStudentStatusStmt = $conn->prepare($updateStudentStatusQuery);
+                $updateStudentStatusStmt->bindParam(':new_status', $newStatus);
+                $updateStudentStatusStmt->bindParam(':student_id', $studentIdToUpdate);
+                $updateStudentStatusStmt->execute();
+            }
+        }
+
         $conn->commit();
 
         // --- WebSocket Notification for Advisor ---
@@ -223,7 +291,7 @@ try {
             require dirname(__DIR__, 3) . '/vendor/autoload.php'; 
 
             try {
-                $client = new WebSocket\Client("ws://192.168.18.6:8080");
+                $client = new WebSocket\Client("ws://192.168.1.11:8080");
 
               
                 $sqlDetails = "SELECT c.course_code, c.course_title AS course_name, s.name as section_name

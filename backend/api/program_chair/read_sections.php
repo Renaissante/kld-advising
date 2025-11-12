@@ -119,14 +119,14 @@ try {
                 "enrolledStudents" => array() // Initialize enrolledStudents array
             );
 
-            // Fetch enrolled students for this section
+            // Fetch enrolled students for this section (Regular Students)
             $students_query = "SELECT 
                                     s.id as student_db_id, 
                                     s.student_id, 
                                     s.name, 
                                     u.email,
-                                    sse.enrollment_status,
-                                    sse.completed_at,
+                                    'Regular' as enrollment_type, -- Explicitly mark as regular
+                                    null as retake_course_code,
                                     (SELECT 
                                         prev_sec.name 
                                      FROM 
@@ -139,15 +139,40 @@ try {
                                      ORDER BY 
                                         prev_sse.completed_at DESC
                                      LIMIT 1
-                                    ) AS previous_section_name
+                                    ) AS previous_section_name,
+                                    null as irregular_enrollment_id -- Added to match irregular student query
                                 FROM 
                                     students s
                                 JOIN 
                                     users u ON s.student_id = u.id
-                                JOIN
-                                    student_section_enrollments sse ON s.id = sse.student_id
                                 WHERE 
-                                    sse.section_id = :section_id";
+                                    s.section_id = :section_id
+
+                                UNION ALL
+
+                                -- Fetch irregular students for this section
+                                SELECT
+                                    s.id as student_db_id,
+                                    s.student_id,
+                                    s.name,
+                                    u.email,
+                                    'Irregular' as enrollment_type, -- Explicitly mark as irregular
+                                    c.course_code as retake_course_code,
+                                    COALESCE(home_sec.name, 'N/A') as previous_section_name,
+                                    ice.id as irregular_enrollment_id -- Add irregular enrollment ID
+                                FROM
+                                    students s
+                                JOIN
+                                    users u ON s.student_id = u.id
+                                JOIN
+                                    irregular_course_enrollments ice ON s.id = ice.student_id
+                                JOIN
+                                    courses c ON ice.course_id = c.id
+                                LEFT JOIN
+                                    sections home_sec ON s.section_id = home_sec.id -- Student's actual home section
+                                WHERE
+                                    ice.section_id = :section_id AND ice.enrollment_type = 'retake';";
+
             $students_stmt = $conn->prepare($students_query);
             $students_stmt->bindParam(':section_id', $row['id']);
             $students_stmt->execute();
@@ -155,13 +180,14 @@ try {
 
             foreach ($enrolled_students as $student_row) {
                 array_push($section_item['enrolledStudents'], array(
-                    "id" => $student_row['student_db_id'],
-                    "studentId" => $student_row['student_id'],
+                    "id" => $student_row['enrollment_type'] === 'Irregular' ? "irregular-" . $student_row['student_db_id'] . "-" . $student_row['irregular_enrollment_id'] : $student_row['student_db_id'], // Unique ID for irregular students
+                    "student_id" => $student_row['student_id'],
                     "name" => $student_row['name'],
                     "email" => $student_row['email'],
-                    "enrollmentStatus" => $student_row['enrollment_status'],
-                    "completedAt" => $student_row['completed_at'],
-                    "previousSection" => $student_row['previous_section_name']
+                    "previous_section_name" => $student_row['previous_section_name'],
+                    "assigned_course_code" => $student_row['retake_course_code'],
+                    "is_irregular" => ($student_row['enrollment_type'] === 'Irregular'),
+                    "enrollmentStatus" => ($student_row['enrollment_type'] === 'Irregular') ? 'irregular' : 'enrolled'
                 ));
             }
 

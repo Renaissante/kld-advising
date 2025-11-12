@@ -132,14 +132,14 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                     <TableCell className="px-3 py-2">
                       <Badge
                         variant={
-                          student.status === "Regular"
+                          student.enrollment_status === "Regular"
                             ? "default" // Assuming default is green/primary
-                            : student.status === "Irregular"
+                            : student.enrollment_status === "Irregular"
                             ? "secondary" // Assuming secondary is gray/muted
                             : "outline"
                         }
                       >
-                        {student.status}
+                        {student.enrollment_status}
                       </Badge>
                     </TableCell>
                     {/* Added consistent padding */}
