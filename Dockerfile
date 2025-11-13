@@ -1,20 +1,18 @@
-# Use PHP 8.2 with Apache
-FROM php:8.2-apache
+# Use PHP 8.2 CLI (not Apache)
+FROM php:8.2-cli
 
 # Install PostgreSQL PDO extension and other dependencies
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     unzip \
     git \
-    && docker-php-ext-install pdo_pgsql pdo \
-    && a2enmod rewrite
+    && docker-php-ext-install pdo_pgsql pdo
 
-# Set working directory
-WORKDIR /var/www/html/
+WORKDIR /app
 
-# Copy backend files (including composer.json & composer.lock)
-COPY backend/ /var/www/html/
-COPY composer.json composer.lock /var/www/html/
+# Copy all files
+COPY backend/ /app/backend/
+COPY composer.json composer.lock /app/
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -22,11 +20,12 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Suppress Apache ServerName warning
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+# Enable error display for debugging
+RUN echo "display_errors = On" > /usr/local/etc/php/php.ini && \
+    echo "error_reporting = E_ALL" >> /usr/local/etc/php/php.ini && \
+    echo "log_errors = On" >> /usr/local/etc/php/php.ini
 
-# Expose port 80
-EXPOSE 80
+EXPOSE 8080
 
-# Start Apache in the foreground
-CMD ["apache2-foreground"]
+# Default command (Railway's Procfile will override this)
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "backend"]
