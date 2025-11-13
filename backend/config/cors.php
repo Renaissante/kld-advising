@@ -2,8 +2,8 @@
 // Define your list of allowed origins
 $allowed_origins = [
     "http://localhost:5173", // For local development on the server machine
-    "http://192.168.18.6" // For accessing from other devices on the local network
- 
+    "http://192.168.18.6", // For accessing from other devices on the local network
+    "https://kld-advising.vercel.app" // Hosted frontend application
 ];
 
 // Check if the Origin header is present in the request
