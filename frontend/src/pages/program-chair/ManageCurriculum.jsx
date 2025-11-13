@@ -438,12 +438,28 @@ const ProgramChairManageCurriculum = () => {
   // Fetch program-chair specific data
   useEffect(() => {
     const fetchProgramChairData = async () => {
-      if (!user || !user.id) return;
+      if (!user || !user.id) {
+        console.warn("User or user ID not available. Skipping fetchProgramChairData.", { user });
+        return; 
+      }
+      
+      console.log("Fetching program chair data for user ID:", user.id);
       
       try {
         // Fetch programs assigned to the current program chair
         const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
-        const programData = await programResponse.json();
+        
+        // DEBUG: Log the raw response BEFORE parsing as JSON
+        const programResponseText = await programResponse.clone().text();
+        console.log("Raw Program Response:", programResponseText);
+        
+        let programData;
+        try {
+          programData = JSON.parse(programResponseText);
+        } catch (jsonError) {
+          console.error("JSON parse error for program response:", jsonError);
+          throw new Error("Invalid JSON response from program API.");
+        }
         
         if (!programResponse.ok) {
           console.error("Failed to fetch programs:", programData.message);
@@ -459,16 +475,28 @@ const ProgramChairManageCurriculum = () => {
         const curriculumResponse = await fetch(`${API_BASE_URL}/curriculum/read.php`);
         
         // DEBUG: Log the raw response
-        console.log("Curriculum Response:", await curriculumResponse.clone().text());
+        const curriculumResponseText = await curriculumResponse.clone().text();
+        console.log("Raw Curriculum Response:", curriculumResponseText);
+        
+        // Ensure curriculumData is declared only once and assigned
+        // This line was causing the redeclaration error.
+        // const curriculumData = await curriculumResponse.json(); 
+        let parsedCurriculumData;
+        try {
+          parsedCurriculumData = JSON.parse(curriculumResponseText);
+        } catch (jsonError) {
+          console.error("JSON parse error for curriculum response:", jsonError);
+          throw new Error("Invalid JSON response from curriculum API.");
+        }
         
         // Check if the response is OK before trying to parse JSON
         if (!curriculumResponse.ok) {
-          const errorData = await curriculumResponse.json();
-          console.error("Failed to fetch curriculums:", errorData.message);
+          console.error("Failed to fetch curriculums:", parsedCurriculumData.message);
           return;
         }
         
-        const curriculumData = await curriculumResponse.json();
+        // Use the parsed data for further processing
+        const curriculumData = parsedCurriculumData;
         console.log("Parsed curriculum data:", curriculumData);
         
         // Handle different response structures

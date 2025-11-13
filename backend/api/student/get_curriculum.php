@@ -96,12 +96,12 @@ try {
                 c.hour_lec,
                 c.hour_lab,
                 cg.transmutation,    -- Get transmutation from course_grades if available
-                GROUP_CONCAT(DISTINCT cp.prerequisite_course_id) AS prerequisite_ids -- Use DISTINCT for prerequisites
+                STRING_AGG(DISTINCT cp.prerequisite_course_id::text, ', ' ORDER BY cp.prerequisite_course_id::text ASC) AS prerequisite_ids -- Use DISTINCT for prerequisites
             FROM courses c
             LEFT JOIN course_grades cg ON c.id = cg.course_id AND cg.student_id = :student_id -- LEFT JOIN grades for THIS student
             LEFT JOIN course_prerequisites cp ON c.id = cp.course_id -- LEFT JOIN prerequisites
             WHERE c.curriculum_id = :curriculum_id -- Filter courses by the student's curriculum
-            GROUP BY c.id -- Group by course to aggregate prerequisites
+            GROUP BY c.id, c.course_code, c.course_title, c.year_level_id, c.semester_id, c.unit_lec, c.unit_lab, c.hour_lec, c.hour_lab, cg.transmutation -- Group by course to aggregate prerequisites
             ORDER BY c.year_level_id ASC, c.semester_id ASC, c.id ASC"; // Order logically
 
     $stmt = $conn->prepare($query);

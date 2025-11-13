@@ -450,7 +450,7 @@ try {
                                 u.email as user_name, 
                                 at.action, 
                                 at.timestamp, 
-                                GROUP_CONCAT(DISTINCT r.role_name) as role_name
+                                STRING_AGG(DISTINCT r.role_name, ', ' ORDER BY r.role_name ASC) as role_name
                             FROM audit_trail at
                             JOIN users u ON at.user_id = u.id
                             JOIN user_roles ur ON u.id = ur.user_id
@@ -464,7 +464,7 @@ try {
     // the scope of simple parameter filtering. For now, recent activity will remain
     // unfiltered by these criteria.
 
-    $auditTrailQuery .= " GROUP BY at.id ORDER BY at.timestamp DESC LIMIT 10";
+    $auditTrailQuery .= " GROUP BY at.id, at.user_id, u.email, at.action, at.timestamp ORDER BY at.timestamp DESC LIMIT 10";
     $stmt = $conn->prepare($auditTrailQuery);
     $stmt->execute($auditTrailParams);
     $recent_activities = $stmt->fetchAll(PDO::FETCH_ASSOC);

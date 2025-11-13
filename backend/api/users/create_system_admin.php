@@ -95,7 +95,14 @@ try {
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':employee_id', $userId);
     $stmt->bindParam(':name', $fullName);
-    $stmt->bindParam(':dob', $data->dob);
+    
+    // Bind dob, handling empty string for PostgreSQL DATE type
+    if (!empty($data->dob)) {
+        $stmt->bindParam(':dob', $data->dob);
+    } else {
+        $null = NULL; // Explicitly define NULL variable for bindParam
+        $stmt->bindParam(':dob', $null, PDO::PARAM_NULL);
+    }
     $stmt->execute();
 
     $sql = "INSERT INTO system_admins (employee_id) 

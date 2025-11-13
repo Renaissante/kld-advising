@@ -21,7 +21,7 @@ try {
     // ✅ Fetch user details and include employee_id (if exists)
     $query = "
         SELECT u.id, u.email, u.password_hash, e.employee_id, s.student_id,
-               GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles_list
+               STRING_AGG(r.role_name, ',') AS roles_list
         FROM users u
         LEFT JOIN employees e ON u.id = e.employee_id
         LEFT JOIN students s ON u.id = s.student_id

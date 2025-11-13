@@ -31,10 +31,10 @@ export function UserTable({ heading = "Users", data, onEdit, onArchive, onRestor
         <TableBody>
           {data.map((user) => (
             <TableRow key={user.id}>
-              <TableCell className="text-sm">{user.KLD_ID}</TableCell>
+              <TableCell className="text-sm">{user.kld_id}</TableCell>
               <TableCell className="text-sm">{user.name}</TableCell>
               <TableCell className="text-sm break-all">{user.email}</TableCell>
-              <TableCell className="text-sm capitalize">{user.roles}</TableCell>{/* Display user.roles */}
+              <TableCell className="text-sm capitalize">{user.roles_list}</TableCell>{/* Display user.roles */}
               {/* Conditional rendering for role-specific data */}
               <TableCell className="text-sm">{user.department || 'N/A'}</TableCell>
               <TableCell className="text-sm">{user.program || 'N/A'}</TableCell>

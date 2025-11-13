@@ -26,7 +26,7 @@ $baseQuery = "
         COALESCE(e.employee_id, s.student_id) AS KLD_ID,
         u.email,
         u.status,
-        GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles, /* ADDED: Get all roles as comma-separated string */
+        STRING_AGG(r.role_name, ', ') AS roles_list,
         COALESCE(e.name, s.name) AS name,
         d.name AS department,
         prog.name AS program,
@@ -96,7 +96,19 @@ if (!empty($search)) {
 array_unshift($params, $status); // Add status as the first parameter for both queries
 
 $baseQuery .= "
-    GROUP BY u.id, KLD_ID, u.email, u.status, name, department, program, year_level, specialization, section, department_id, program_id, year_level_id, section_id, advisor_id, advisor /* ADDED GROUP BY */
+    GROUP BY u.id, KLD_ID, u.email, u.status, 
+        COALESCE(e.name, s.name), 
+        d.name, 
+        prog.name, 
+        yl.level, 
+        f.specialization, 
+        sec.name, 
+        d.id, 
+        prog.id, 
+        yl.id, 
+        sec.id, 
+        adv_f.employee_id, 
+        adv_e.name
     ORDER BY u.id
     LIMIT $pageSize OFFSET $offset
 ";

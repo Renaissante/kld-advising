@@ -171,7 +171,7 @@ try {
                                 LEFT JOIN
                                     sections home_sec ON s.section_id = home_sec.id -- Student's actual home section
                                 WHERE
-                                    ice.section_id = :section_id AND ice.enrollment_type = 'retake';";
+                                    ice.section_id = :section_id AND ice.enrollment_type = 'Retake';";
 
             $students_stmt = $conn->prepare($students_query);
             $students_stmt->bindParam(':section_id', $row['id']);

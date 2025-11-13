@@ -23,6 +23,7 @@ import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
 import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
 import ExportAdvisingForms from "@/pages/dean/ExportAdvisingForms"; // Import the new component
+import DeanReportGenerator from "@/pages/dean/DeanReportGenerator"; // Import the new component
 import NotificationsManagement from "@/pages/NotificationsManagement"; // Import the new component
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
@@ -233,6 +234,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute requiredRoles="dean">
             <ExportAdvisingForms />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dean/generate-reports"
+        element={
+          <ProtectedRoute requiredRoles="dean">
+            <DeanReportGenerator />
           </ProtectedRoute>
         }
       />

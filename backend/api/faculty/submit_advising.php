@@ -33,7 +33,7 @@ try {
 
     // Prepare the INSERT statement for advised_courses
     $sql = "INSERT INTO advised_courses (student_id, course_id, advisor_id, academic_year_id, semester_id, advising_date)
-            VALUES (:student_id, :course_id, :advisor_id, :academic_year_id, :semester_id, CURDATE())";
+            VALUES (:student_id, :course_id, :advisor_id, :academic_year_id, :semester_id, CURRENT_DATE)";
     $stmt = $conn->prepare($sql);
 
     $insertedCount = 0;

@@ -17,7 +17,7 @@ header("Content-Type: application/json; charset=UTF-8");
 // $conn is assumed to be available globally from database.php
 
 // Prepare query to fetch all audit trail records
-$query = "SELECT id, user_id, action, description, entity_type, entity_id, old_values, new_values, timestamp, ip_address FROM `audit_trail` ORDER BY timestamp DESC";
+$query = "SELECT id, user_id, action, description, entity_type, entity_id, old_values, new_values, timestamp, ip_address FROM audit_trail ORDER BY timestamp DESC";
 
 $stmt = $conn->prepare($query);
 

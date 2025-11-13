@@ -97,7 +97,7 @@ try {
 
     foreach ($field_map as $data_key => $db_column) {
         if (isset($data->$data_key)) {
-            $update_fields[] = "`" . $db_column . "` = :" . $db_column;
+            $update_fields[] = "\"" . $db_column . "\" = :" . $db_column;
             // Sanitize non-ID fields
             if (str_ends_with($db_column, '_id')) {
                  $params[":" . $db_column] = filter_var($data->$data_key, FILTER_VALIDATE_INT) ?: null;

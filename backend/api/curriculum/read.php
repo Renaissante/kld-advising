@@ -1,4 +1,8 @@
 <?php
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', 'php-error.log'); // You might want to define a specific log file path
 // Include CORS headers
 include_once '../../config/cors.php';
 
@@ -8,10 +12,10 @@ include_once '../../config/database.php';
 
 try {
     $query = "SELECT c.curriculum_id as id, c.name, c.program_id, p.name as program, 
-              c.academic_year_id, ay.academic_year_name as academicYear, c.status 
+              c.academic_year_id, COALESCE(ay.academic_year_name, '') as academicYear, c.status 
               FROM curriculums c
               INNER JOIN programs p ON c.program_id = p.id
-              INNER JOIN academic_years ay ON c.academic_year_id = ay.academic_year_id
+              LEFT JOIN academic_years ay ON c.academic_year_id = ay.academic_year_id
               ORDER BY c.name ASC";
     $stmt = $conn->prepare($query);
     $stmt->execute();
@@ -26,7 +30,7 @@ try {
                 "program_id" => $row['program_id'],
                 "program" => $row['program'],
                 "academic_year_id" => $row['academic_year_id'],
-                "academicYear" => $row['academicYear'],
+                "academicYear" => $row['academicYear'] ?? '', // Safe access
                 "status" => $row['status']
             );
             array_push($curriculums, $curriculum);

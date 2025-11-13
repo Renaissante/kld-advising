@@ -49,7 +49,17 @@ try {
     $fullName = trim($data->firstName . ' ' . ($data->middleName ? $data->middleName . ' ' : '') . $data->lastName);
 
     $conn->beginTransaction();
-
+    
+    // Check if email already exists
+    $checkEmailQuery = "SELECT id FROM users WHERE email = :email";
+    $checkEmailStmt = $conn->prepare($checkEmailQuery);
+    $checkEmailStmt->bindParam(':email', $data->email);
+    $checkEmailStmt->execute();
+    if ($checkEmailStmt->fetch(PDO::FETCH_ASSOC)) {
+        http_response_code(409); // Conflict
+        echo json_encode(["message" => "Email already exists."]);
+        exit();
+    }
  
     $sql = "INSERT INTO users (id, email, password_hash, created_at) 
             VALUES (:id, :email, :password_hash, NOW())";

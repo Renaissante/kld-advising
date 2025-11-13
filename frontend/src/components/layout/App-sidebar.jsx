@@ -101,6 +101,7 @@ export function AppSidebar() {
     { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
+    { title: "Generate Reports", url: "/dean/generate-reports", icon: ClipboardList, roles: ["dean"] }, // New item for Dean Reports
     { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin", "faculty", "student", "programchair", "dean"] }, // New item for all roles
   ];
 

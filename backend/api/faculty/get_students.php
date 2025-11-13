@@ -126,7 +126,7 @@ try {
                      c.course_code, c.course_title,
                      COALESCE(g.transmutation, '') as transmutation,
                      COALESCE(g.remarks, '') as remarks,
-                     COALESCE(g.is_credited, FALSE) as is_credited
+                     COALESCE(g.is_credited, 0) as is_credited
               FROM students s
               JOIN sections sec ON s.section_id = sec.id
               JOIN courses c ON c.id = :course_id
@@ -136,7 +136,7 @@ try {
                                             AND course_id = :course_id
                                           )
               WHERE s.section_id = :section_id
-                AND COALESCE(g.is_credited, FALSE) = FALSE
+                AND COALESCE(g.is_credited, 0) = 0
               -- ORDER BY s.name -- Removed individual ORDER BY to fix UNION ALL syntax
     ";
 
@@ -152,7 +152,7 @@ try {
             c.course_title,
             COALESCE(g.transmutation, '') as transmutation,
             COALESCE(g.remarks, '') as remarks,
-            FALSE as is_credited -- Irregular students are not credited until passed
+            0 as is_credited -- Irregular students are not credited until passed
         FROM 
             students s
         JOIN 

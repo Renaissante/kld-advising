@@ -102,16 +102,25 @@ try {
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':employee_id', $data->employeeId);  
     $stmt->bindParam(':name', $fullName);
-    $stmt->bindParam(':dob', $data->dob); 
+    
+    // Bind dob, handling empty string for PostgreSQL DATE type
+    if (!empty($data->dob)) {
+        $stmt->bindParam(':dob', $data->dob);
+    } else {
+        $null = NULL; // Explicitly define NULL variable for bindParam
+        $stmt->bindParam(':dob', $null, PDO::PARAM_NULL);
+    }
     $stmt->bindParam(':department_id', $departmentId);
     $stmt->execute();
 
  
-    $sql = "INSERT INTO faculty (employee_id, department) 
-            VALUES (:employee_id, :department)";
+    $sql = "INSERT INTO faculty (employee_id, department, specialization) 
+            VALUES (:employee_id, :department, :specialization)";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':employee_id', $data->employeeId);
     $stmt->bindParam(':department', $departmentId);
+    $specialization = isset($data->specialization) ? htmlspecialchars(strip_tags($data->specialization)) : '';
+    $stmt->bindParam(':specialization', $specialization);
     $stmt->execute();
 
    

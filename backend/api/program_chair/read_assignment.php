@@ -31,7 +31,7 @@ try {
     $query = "SELECT
                 e.employee_id as faculty_id,
                 u.email,
-                GROUP_CONCAT(r.role_name ORDER BY r.role_name ASC) AS roles,
+                STRING_AGG(r.role_name, ', ' ORDER BY r.role_name ASC) AS roles,
                 e.name as faculty_name,
                 d.name as department_name,
                 f.advisor_status
