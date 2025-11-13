@@ -22,6 +22,9 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
+# Suppress Apache ServerName warning
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
 # Expose port 80
 EXPOSE 80
 
