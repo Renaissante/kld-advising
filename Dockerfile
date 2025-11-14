@@ -9,11 +9,11 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install pdo_pgsql pdo \
     && rm -rf /var/lib/apt/lists/*
 
-    WORKDIR /app/backend
+WORKDIR /app
 
-    COPY backend/ /app/backend/
-    COPY composer.json composer.lock /app/backend/
-    
+# Copy all files
+COPY backend/ /app/backend/
+COPY composer.json composer.lock /app/
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
