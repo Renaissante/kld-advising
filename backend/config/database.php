@@ -12,10 +12,10 @@ if (file_exists($envPath . '/.env')) {
 }
 
 // Now getenv() will work, or use $_ENV
-$host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'db.irnudqxgicdruxdjcbzj.supabase.co';
-$db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'postgres';
-$username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'postgres.irnudqxgicdruxdjcbzj';
-$password = $_ENV['DB_PASS']     ?? getenv('DB_PASS')     ?: '';
+$host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'ep-lingering-hat-ae844ape-pooler.c-2.us-east-2.aws.neon.tech';
+$db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'neondb';
+$username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'neondb_owner';
+$password = $_ENV['DB_PASS']     ?? getenv('DB_PASS')     ?: 'npg_k5o7pELqVNin';
 $port     = $_ENV['DB_PORT']     ?? getenv('DB_PORT')     ?: '5432';
 $driver   = $_ENV['DB_DRIVER']   ?? getenv('DB_DRIVER')   ?: 'pgsql';
 
