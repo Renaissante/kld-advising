@@ -1,26 +1,22 @@
 <?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-// Use connection pooler (better for containerized apps)
-$host     = getenv('DB_HOST')     ?: 'aws-0-ap-southeast-1.pooler.supabase.com';
-$db_name  = getenv('DB_NAME')     ?: 'postgres';
-$username = getenv('DB_USER')     ?: 'postgres.irnudqxgicdruxdjcbzj';
-$password = getenv('DB_PASS')     ?: '';
-$port     = getenv('DB_PORT')     ?: '6543'; // POOLER PORT, not 5432
-$driver   = getenv('DB_DRIVER')   ?: 'pgsql';
+// Load environment variables from .env file
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../..');
+$dotenv->load();
 
-// Force IPv4 resolution using stream context
-$context = stream_context_create([
-    'socket' => [
-        'bindto' => '0:0', // Bind to any available IPv4 address
-    ],
-]);
+// Now getenv() will work, or use $_ENV
+$host     = $_ENV['DB_HOST']     ?? 'aws-0-ap-southeast-1.pooler.supabase.com';
+$db_name  = $_ENV['DB_NAME']     ?? 'postgres';
+$username = $_ENV['DB_USER']     ?? 'postgres.irnudqxgicdruxdjcbzj';
+$password = $_ENV['DB_PASS']     ?? '';
+$port     = $_ENV['DB_PORT']     ?? '6543';
+$driver   = $_ENV['DB_DRIVER']   ?? 'pgsql';
 
 error_log("Attempting database connection...");
 error_log("Host: $host | Port: $port | User: $username | DB: $db_name");
 
 try {
-    // Use pooler connection string
     $dsn = "$driver:host=$host;port=$port;dbname=$db_name";
     
     $options = [
@@ -47,7 +43,7 @@ try {
     echo json_encode([
         "status"  => "error",
         "message" => "Database connection failed.",
-        "debug"   => getenv('APP_ENV') === 'development' ? $e->getMessage() : null
+        "debug"   => ($_ENV['APP_ENV'] ?? null) === 'development' ? $e->getMessage() : null
     ]);
     exit;
 }
