@@ -110,7 +110,9 @@ const ManageUsers = () => {
     fetchData();
 
     // --- Add WebSocket Connection ---
-    const websocket = new WebSocket(import.meta.env.VITE_WEBSOCKET_URL);
+    const websocket = new WebSocket(
+      `${location.protocol === "https:" ? "wss" : "ws"}://` + import.meta.env.VITE_WEBSOCKET_URL.split("://")[1]
+    );
 
     // Event handler for when the connection is opened
     websocket.onopen = () => {

@@ -36,7 +36,7 @@ const WebSocketHandler = () => {
       console.log("User is faculty, attempting WebSocket connection..."); // Log connection attempt
       try {
         
-        ws = new WebSocket("ws://192.168.18.6:8080");
+        ws = new WebSocket("wss://192.168.18.6:8080");
 
         ws.onopen = () => {
           console.log("WebSocket connection opened for global notifications");
