@@ -10,7 +10,7 @@ const FacultyHome = () => {
     <AppSidebar />
     <main className="w-full">
       <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
-      
+      <h1>ga</h1>
       
     </main>
   </SidebarProvider>
