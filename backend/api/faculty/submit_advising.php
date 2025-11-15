@@ -32,7 +32,7 @@ try {
     $conn->beginTransaction();
 
     // Prepare the INSERT statement for advised_courses
-    $sql = "INSERT INTO advised_courses (student_id, course_id, advisor_id, academic_year_id, semester_id, advising_date)
+    $sql = "INSERT INTO kld_advising.advised_courses (student_id, course_id, advisor_id, academic_year_id, semester_id, advising_date)
             VALUES (:student_id, :course_id, :advisor_id, :academic_year_id, :semester_id, CURRENT_DATE)";
     $stmt = $conn->prepare($sql);
 
@@ -43,7 +43,7 @@ try {
     foreach ($selectedCourseIds as $courseId) {
         try {
             $stmt->bindParam(':student_id', $studentId);
-            $stmt->bindParam(':course_id', $courseId);
+            $stmt->bindParam(':course_id', $courseId, PDO::PARAM_INT); // Ensure explicit int binding
             $stmt->bindParam(':advisor_id', $advisorId);
             $stmt->bindParam(':academic_year_id', $academicYearId);
             $stmt->bindParam(':semester_id', $semesterId);
@@ -52,8 +52,7 @@ try {
             $insertedCount++;
 
         } catch (PDOException $e) {
-            // Log the specific course ID that failed and the error
-            error_log("Failed to insert advised course for student {$studentId}, course {$courseId}: " . $e->getMessage());
+            error_log("Submit Advising: Course ID: {$courseId} failed with error: " . $e->getMessage());
             $failedInsertions[] = [
                 'course_id' => $courseId,
                 'error' => $e->getMessage()
