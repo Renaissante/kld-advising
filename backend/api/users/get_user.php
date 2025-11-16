@@ -31,7 +31,6 @@ $baseQuery = "
         d.name AS department,
         prog.name AS program,
         yl.level AS year_level,
-        f.specialization,
         sec.name AS section,
         d.id AS department_id,
         prog.id AS program_id,
@@ -84,13 +83,12 @@ if (!empty($search)) {
     $searchClause .= " OR LOWER(d.name) LIKE ?"; // Department name
     $searchClause .= " OR LOWER(prog.name) LIKE ?"; // Program name
     $searchClause .= " OR LOWER(yl.level) LIKE ?"; // Year Level
-    $searchClause .= " OR LOWER(f.specialization) LIKE ?"; // Specialization
     $searchClause .= " OR LOWER(sec.name) LIKE ?"; // Section name
     $searchClause .= " OR LOWER(adv_e.name) LIKE ?"; // Advisor name
     $searchClause .= ")"; // Close the parenthesis
     $baseQuery .= $searchClause;
     $countQuery .= $searchClause;
-    array_push($params, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery);
+    array_push($params, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery, $likeQuery);
 }
 
 array_unshift($params, $status); // Add status as the first parameter for both queries
@@ -101,7 +99,6 @@ $baseQuery .= "
         d.name, 
         prog.name, 
         yl.level, 
-        f.specialization, 
         sec.name, 
         d.id, 
         prog.id, 

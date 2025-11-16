@@ -83,7 +83,7 @@ try {
         // 2. Insert record into student_section_enrollments or update if exists
         $enroll_query = "INSERT INTO student_section_enrollments (student_id, section_id, enrollment_status)
                          VALUES (:student_id, :section_id, 'enrolled')
-                         ON DUPLICATE KEY UPDATE
+                         ON CONFLICT (student_id, section_id) DO UPDATE SET
                          enrollment_status = 'enrolled',
                          completed_at = NULL"; // Reset completed_at if re-enrolling
         $enroll_stmt = $conn->prepare($enroll_query);

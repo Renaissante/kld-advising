@@ -87,7 +87,7 @@ try {
                    WHERE student_id = :student_id
                    AND section_id = :section_id
                    AND course_id = :course_id
-                   AND enrollment_type = 'retake'";
+                   AND enrollment_type = 'Retake'";
     $checkStmt = $conn->prepare($checkQuery);
     $checkStmt->bindParam(':student_id', $studentDbId, PDO::PARAM_INT);
     $checkStmt->bindParam(':section_id', $sectionId, PDO::PARAM_INT);

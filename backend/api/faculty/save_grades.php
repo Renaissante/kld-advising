@@ -64,6 +64,20 @@ $semesterId = isset($data['semester_id']) ? $data['semester_id'] : null; // Keep
 $action = isset($data['action']) ? $data['action'] : 'save'; // 'save' or 'submit'
 $students = isset($data['students']) ? $data['students'] : [];
 
+// Before processing individual students, fetch their current grades for this course
+$studentIds = array_column($students, 'student_id');
+$existingGrades = [];
+if (!empty($studentIds)) {
+    $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
+    $getExistingGradesQuery = "SELECT student_id, remarks FROM course_grades
+                               WHERE student_id IN ($placeholders) AND course_id = ?";
+    $getExistingGradesStmt = $conn->prepare($getExistingGradesQuery);
+    $getExistingGradesStmt->execute(array_merge($studentIds, [$courseId]));
+    while ($row = $getExistingGradesStmt->fetch(PDO::FETCH_ASSOC)) {
+        $existingGrades[$row['student_id']] = $row['remarks'];
+    }
+}
+
 // Validate required data
 if (!$courseId || !$sectionId || !$academicYearId || !$semesterId || empty($students)) {
     http_response_code(400);
@@ -128,7 +142,12 @@ try {
     $successCount = 0;
     $totalCount = count($students);
     $errors = [];
+    $warnings = []; // Initialize warnings array
     $studentsToUpdateStatus = []; // Array to store student_ids that need status update
+
+    // Arrays to hold data for batch operations
+    $gradesToInsertOrUpdate = [];
+    $studentStatusChanges = [];
 
     foreach ($students as $student) {
         // Extract student data
@@ -149,125 +168,142 @@ try {
             }
         }
 
+        $gradesToInsertOrUpdate[] = [
+            'student_id' => $studentId,
+            'course_id' => $courseId,
+            'transmutation' => $transmutation,
+            'remarks' => $remarks
+        ];
 
-        // Check if an entry already exists
-        $checkQuery = "SELECT id, remarks FROM course_grades
-                       WHERE student_id = :student_id
-                       AND course_id = :course_id";
-
-        $checkStmt = $conn->prepare($checkQuery);
-        $checkStmt->bindParam(':student_id', $studentId);
-        $checkStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
-        $checkStmt->execute();
-        $existingGrade = $checkStmt->fetch(PDO::FETCH_ASSOC);
-        $oldRemarks = $existingGrade ? $existingGrade['remarks'] : null;
-
-        if ($existingGrade) {
-            // Update existing entry
-            $updateQuery = "UPDATE course_grades
-                           SET transmutation = :transmutation,
-                               remarks = :remarks,
-                               updated_at = NOW()
-                           WHERE student_id = :student_id
-                           AND course_id = :course_id";
-
-            $updateStmt = $conn->prepare($updateQuery);
-            $updateStmt->bindParam(':transmutation', $transmutation);
-            $updateStmt->bindParam(':remarks', $remarks);
-            $updateStmt->bindParam(':student_id', $studentId);
-            $updateStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
-
-            if ($updateStmt->execute()) {
-                $successCount++;
-            } else {
-                $errors[] = "Failed to update grades for student ID: $studentId";
-            }
-        } else {
-            // Insert new entry
-            $insertQuery = "INSERT INTO course_grades (
-                              student_id, course_id, transmutation, remarks
-                           ) VALUES (
-                              :student_id, :course_id, :transmutation, :remarks
-                           )";
-
-            $insertStmt = $conn->prepare($insertQuery);
-            $insertStmt->bindParam(':student_id', $studentId);
-            $insertStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
-            $insertStmt->bindParam(':transmutation', $transmutation);
-            $insertStmt->bindParam(':remarks', $remarks);
-
-            if ($insertStmt->execute()) {
-                $successCount++;
-            } else {
-                $errors[] = "Failed to save grades for student ID: $studentId";
-            }
-        }
+        // Capture previous remarks if available to determine status changes
+        $oldRemarks = isset($existingGrades[$studentId]) ? $existingGrades[$studentId] : null;
 
         // Logic to set student to 'Irregular' if a current course is failed and has un-passed prerequisites
         if ($remarks === "Failed") {
-            $prereqQuery = "SELECT course_id FROM course_prerequisites WHERE prerequisite_course_id = :course_id";
-            $prereqStmt = $conn->prepare($prereqQuery);
-            $prereqStmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
-            $prereqStmt->execute();
-            $coursesHavingThisAsPrereq = $prereqStmt->fetchAll(PDO::FETCH_COLUMN);
-
-            if (!empty($coursesHavingThisAsPrereq)) {
-                // If this course is a prerequisite for other courses, and the student failed it,
-                // they should be set to irregular (if not already).
-                $studentsToUpdateStatus[] = $studentId;
-            }
+            // We need to check if this failed course is a prerequisite for other courses
+            // This check still requires a database query. We'll collect student IDs here.
+            $studentStatusChanges[$studentId] = 'Irregular'; // Tentatively mark as irregular
         }
         // Logic to set student back to 'Regular' if grade changes from Failed to Passed
-        // and no other failed prerequisites exist.
         else if ($oldRemarks === "Failed" && $remarks === "Passed") {
-            // Check if the student has any other failed courses that have un-passed prerequisites
-            $anyOtherFailedPrereqs = false;
-            
-            $failedCoursesQuery = "SELECT cg.course_id FROM course_grades cg
-                                  JOIN course_prerequisites cp ON cg.course_id = cp.prerequisite_course_id
-                                  WHERE cg.student_id = :student_id
-                                  AND cg.remarks = 'Failed'";
-            $failedCoursesStmt = $conn->prepare($failedCoursesQuery);
-            $failedCoursesStmt->bindParam(':student_id', $studentId);
-            $failedCoursesStmt->execute();
-            $failedPrereqCourses = $failedCoursesStmt->fetchAll(PDO::FETCH_COLUMN);
-
-            if (!empty($failedPrereqCourses)) {
-                foreach ($failedPrereqCourses as $failedPrereqCourseId) {
-                    // For each failed prerequisite course, check if there are other courses that require it
-                    $checkIfRequiredQuery = "SELECT course_id FROM course_prerequisites WHERE prerequisite_course_id = :failed_prereq_course_id";
-                    $checkIfRequiredStmt = $conn->prepare($checkIfRequiredQuery);
-                    $checkIfRequiredStmt->bindParam(':failed_prereq_course_id', $failedPrereqCourseId, PDO::PARAM_INT);
-                    $checkIfRequiredStmt->execute();
-                    $isStillRequired = $checkIfRequiredStmt->fetch(PDO::FETCH_COLUMN);
-
-                    if ($isStillRequired) {
-                        $anyOtherFailedPrereqs = true;
-                        break; // Found another failed prerequisite, no need to check further
-                    }
-                }
-            }
-
-            if (!$anyOtherFailedPrereqs) {
-                // If no other failed prerequisites, add student to list to be set to Regular
-                $studentsToUpdateStatus[] = ['id' => $studentId, 'status' => 'Regular'];
-            }
+            // This also requires further checks, collecting student IDs here
+            $studentStatusChanges[$studentId] = 'Regular_Check'; // Mark for further check to become Regular
         }
     }
+
+    // Batch Insert/Update for course_grades
+    if (!empty($gradesToInsertOrUpdate)) {
+        $insertValues = [];
+        $updateAssignments = [];
+        $params = [];
+        $paramIndex = 0;
+
+        foreach ($gradesToInsertOrUpdate as $gradeEntry) {
+            $insertValues[] = "(:p" . $paramIndex . ", :p" . ($paramIndex + 1) . ", :p" . ($paramIndex + 2) . ", :p" . ($paramIndex + 3) . ")";
+            $params[":p" . $paramIndex] = $gradeEntry['student_id'];
+            $params[":p" . ($paramIndex + 1)] = $gradeEntry['course_id'];
+            $params[":p" . ($paramIndex + 2)] = $gradeEntry['transmutation'];
+            $params[":p" . ($paramIndex + 3)] = $gradeEntry['remarks'];
+            $paramIndex += 4;
+        }
+
+        // The ON CONFLICT DO UPDATE clause will ensure existing rows are updated and new rows are inserted.
+        // We're using EXCLUDED.column to refer to the values that would have been inserted.
+        $batchInsertUpdateQuery = "INSERT INTO course_grades (student_id, course_id, transmutation, remarks) VALUES " .
+                                  implode(", ", $insertValues) .
+                                  " ON CONFLICT (student_id, course_id) DO UPDATE SET " .
+                                  "transmutation = EXCLUDED.transmutation, " .
+                                  "remarks = EXCLUDED.remarks, " .
+                                  "updated_at = NOW()";
+
+        $batchStmt = $conn->prepare($batchInsertUpdateQuery);
+        $batchStmt->execute($params);
+        $successCount = $batchStmt->rowCount(); // This will be the number of rows affected (inserted or updated)
+    }
+
+    // Process student status changes based on collected data
+    $studentsToSetIrregular = [];
+    $studentsToPossiblySetRegular = [];
+
+    foreach ($studentStatusChanges as $sId => $statusAction) {
+        if ($statusAction === 'Irregular') {
+            $studentsToSetIrregular[] = $sId;
+        } else if ($statusAction === 'Regular_Check') {
+            $studentsToPossiblySetRegular[] = $sId;
+        }
+    }
+
+    // Optimized check for students to become 'Irregular'
+    if (!empty($studentsToSetIrregular)) {
+        $placeholders = implode(',', array_fill(0, count($studentsToSetIrregular), '?'));
+        // Query to check if the *failed course* for any of these students is a prerequisite for *any other course*.
+        $prereqCheckQuery = "SELECT DISTINCT s.student_id
+                             FROM students s
+                             JOIN course_grades cg ON s.student_id = cg.student_id
+                             JOIN course_prerequisites cp ON cg.course_id = cp.prerequisite_course_id
+                             WHERE s.student_id IN ($placeholders)
+                               AND cg.remarks = 'Failed'";
+
+        $prereqCheckStmt = $conn->prepare($prereqCheckQuery);
+        $prereqCheckStmt->execute($studentsToSetIrregular);
+        $actualIrregularStudents = $prereqCheckStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($actualIrregularStudents as $sid) {
+            $studentsToUpdateStatus[] = ['id' => $sid, 'status' => 'Irregular'];
+            $warnings[] = "Student ID: {$sid} has been marked Irregular due to failing a prerequisite course.";
+        }
+    }
+
+    // Optimized check for students to become 'Regular'
+    if (!empty($studentsToPossiblySetRegular)) {
+        $placeholders = implode(',', array_fill(0, count($studentsToPossiblySetRegular), '?'));
+        // Find students who have *no outstanding failed prerequisites* for any course they are enrolled in or need to take.
+        // This means, for any course a student is NOT passed in, if that course has prerequisites, all those prerequisites must be passed.
+        $studentsWithOutstandingFailedPrereqsQuery = "SELECT DISTINCT s.student_id
+                                                      FROM students s
+                                                      JOIN student_course_enrollments sce ON s.student_id = sce.student_id
+                                                      JOIN courses c_main ON sce.course_id = c_main.id
+                                                      LEFT JOIN course_prerequisites cp ON c_main.id = cp.course_id
+                                                      LEFT JOIN course_grades cg_prereq ON s.student_id = cg_prereq.student_id AND cp.prerequisite_course_id = cg_prereq.course_id
+                                                      WHERE s.student_id IN ($placeholders)
+                                                        AND (
+                                                                (cg_prereq.remarks = 'Failed') OR 
+                                                                (cp.prerequisite_course_id IS NOT NULL AND cg_prereq.remarks IS NULL)
+                                                            )";
+        $studentsWithOutstandingFailedPrereqsStmt = $conn->prepare($studentsWithOutstandingFailedPrereqsQuery);
+        $studentsWithOutstandingFailedPrereqsStmt->execute($studentsToPossiblySetRegular);
+        $studentsWithRemainingFailedPrereqs = $studentsWithOutstandingFailedPrereqsStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $studentsWhoCanBeRegular = array_diff($studentsToPossiblySetRegular, $studentsWithRemainingFailedPrereqs);
+
+        foreach ($studentsWhoCanBeRegular as $sid) {
+            $studentsToUpdateStatus[] = ['id' => $sid, 'status' => 'Regular'];
+        }
+    }
+
 
     // Commit or rollback transaction based on success
     if (empty($errors)) { // Commit only if there are no errors
         // Update student enrollment status for those who failed a prerequisite
         if (!empty($studentsToUpdateStatus)) {
+            $updateStudentStatusQueries = [];
+            $updateStudentStatusParams = [];
+
             foreach ($studentsToUpdateStatus as $studentUpdate) {
                 $studentIdToUpdate = is_array($studentUpdate) ? $studentUpdate['id'] : $studentUpdate;
                 $newStatus = is_array($studentUpdate) ? $studentUpdate['status'] : 'Irregular';
 
-                $updateStudentStatusQuery = "UPDATE students SET enrollment_status = :new_status WHERE student_id = :student_id AND enrollment_status != :new_status";
-                $updateStudentStatusStmt = $conn->prepare($updateStudentStatusQuery);
-                $updateStudentStatusStmt->bindParam(':new_status', $newStatus);
-                $updateStudentStatusStmt->bindParam(':student_id', $studentIdToUpdate);
-                $updateStudentStatusStmt->execute();
+                $updateStudentStatusQueries[] = "UPDATE students SET enrollment_status = ? WHERE student_id = ? AND enrollment_status != ?";
+                $updateStudentStatusParams[] = $newStatus;
+                $updateStudentStatusParams[] = $studentIdToUpdate;
+                $updateStudentStatusParams[] = $newStatus;
+            }
+            
+            // Execute all student status updates in a single transaction (already in a transaction)
+            foreach ($updateStudentStatusQueries as $idx => $query) {
+                $stmt = $conn->prepare($query);
+                // Assuming parameters are in order: new_status, student_id, new_status
+                $stmt->execute([$updateStudentStatusParams[$idx * 3], $updateStudentStatusParams[$idx * 3 + 1], $updateStudentStatusParams[$idx * 3 + 2]]);
             }
         }
 
@@ -344,7 +380,8 @@ try {
         echo json_encode(array(
             "success" => true,
             "message" => ($action === 'submit') ? "Grades submitted successfully" : "Grades saved successfully",
-            "count" => $successCount
+            "count" => $successCount,
+            "warnings" => $warnings // Include warnings in the response
         ));
     } else {
         $conn->rollBack();

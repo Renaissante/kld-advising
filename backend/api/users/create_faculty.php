@@ -50,16 +50,16 @@ try {
     $conn->beginTransaction();
 
  
-    $sql = "INSERT INTO users (id, email, password_hash, created_at) 
-            VALUES (:id, :email, :password_hash, NOW())";
+    $sql = "INSERT INTO users (id, email, password_hash, password_set, created_at) 
+            VALUES (:id, :email, :password_hash, FALSE, NOW())";
     $stmt = $conn->prepare($sql);
 
-    $hashedPassword = password_hash($data->password, PASSWORD_DEFAULT); // Hash the temporary password
+    // $hashedPassword = password_hash($data->password, PASSWORD_DEFAULT); // Hash the temporary password
 
     $userId = isset($data->employeeId) ? $data->employeeId : uniqid(); 
     $stmt->bindParam(':id', $userId);
     $stmt->bindParam(':email', $data->email);
-    $stmt->bindParam(':password_hash', $hashedPassword); // Use the hashed password
+    $stmt->bindParam(':password_hash', $data->password); // Use the RAW password for testing purposes
     // $stmt->bindParam(':role', $data->role); // Removed as role is now in user_roles
     $stmt->execute();
 
@@ -114,13 +114,11 @@ try {
     $stmt->execute();
 
  
-    $sql = "INSERT INTO faculty (employee_id, department, specialization) 
-            VALUES (:employee_id, :department, :specialization)";
+    $sql = "INSERT INTO faculty (employee_id, department) 
+            VALUES (:employee_id, :department)";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':employee_id', $data->employeeId);
     $stmt->bindParam(':department', $departmentId);
-    $specialization = isset($data->specialization) ? htmlspecialchars(strip_tags($data->specialization)) : '';
-    $stmt->bindParam(':specialization', $specialization);
     $stmt->execute();
 
    
@@ -133,7 +131,8 @@ try {
     $body .= "Your username is: <b>" . $data->email . "</b><br>";
     $body .= "Your temporary password is: <b>" . $data->password . "</b><br><br>";
     $body .= "Please log in using your credentials and change your password immediately:<br>";
-    $body .= "<a href=\"" . LOGIN_PAGE_URL . "\">Login Page</a><br><br>";
+    $body .= "You can set your password using this link: <a href=\"" . SET_PASSWORD_PAGE_URL . "/" . $userId . "\">Set Password</a><br><br>"; // Append userId for set password link
+    $body .= "After setting your password, you can login here: <a href=\"" . LOGIN_PAGE_URL . "\">Login Page</a><br><br>";
     $body .= "Thank you.<br>";
     $body .= "KLD Advising System Team";
 

@@ -34,5 +34,6 @@ define('SENDER_NAME', $_ENV['SENDER_NAME'] ?? getenv('SENDER_NAME') ?? '');
 
 // Login page URL for the email link
 define('LOGIN_PAGE_URL', $_ENV['LOGIN_PAGE_URL'] ?? getenv('LOGIN_PAGE_URL') ?? '');
+define('SET_PASSWORD_PAGE_URL', $_ENV['SET_PASSWORD_PAGE_URL'] ?? getenv('SET_PASSWORD_PAGE_URL') ?? ''); // New constant for set password page
 
 ?>

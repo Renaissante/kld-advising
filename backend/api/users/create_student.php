@@ -50,17 +50,17 @@ try {
     $conn->beginTransaction();
 
     // 1. Insert user data
-    $sql = "INSERT INTO users (id, email, password_hash, created_at) 
-            VALUES (:id, :email, :password_hash, NOW())";
+    $sql = "INSERT INTO users (id, email, password_hash, password_set, created_at) 
+            VALUES (:id, :email, :password_hash, FALSE, NOW())";
     $stmt = $conn->prepare($sql);
 
-    $hashedPassword = password_hash($data->password, PASSWORD_DEFAULT); // Hash the temporary password
+    // $hashedPassword = password_hash($data->password, PASSWORD_DEFAULT); // Hash the temporary password
 
     $userId = $data->studentId;
 
     $stmt->bindParam(':id', $userId);
     $stmt->bindParam(':email', $data->email);
-    $stmt->bindParam(':password_hash', $hashedPassword); // Use the hashed password
+    $stmt->bindParam(':password_hash', $data->password); // Use the RAW password for testing purposes
     // $stmt->bindParam(':role', $data->role); // Removed as role is now in user_roles
     $stmt->execute();
 

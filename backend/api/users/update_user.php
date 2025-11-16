@@ -416,6 +416,7 @@ try {
     if ($has_employee_role_after) {
         $employee_query = "UPDATE employees SET
                                 name = :name,
+                                dob = :dob,
                                 department_id = :department_id,
                                 status = 'active' -- Set status to active if role is present
                               WHERE employee_id = :employee_id";
@@ -426,7 +427,9 @@ try {
         error_log("Employee Name Update - Incoming name: " . $data->name . " for employee ID: " . $data->KLD_ID);
 
         $department_id_employee = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : null;
+        $dob_employee = isset($data->dob) && $data->dob !== "" ? $data->dob : null;
 
+        $employee_stmt->bindValue(':dob', $dob_employee, PDO::PARAM_STR);
         $employee_stmt->bindParam(':department_id', $department_id_employee);
         $employee_stmt->execute();
         if ($employee_stmt->rowCount() > 0) {
@@ -516,21 +519,19 @@ try {
     // This block now only handles updates, creation/deletion handled above
     if (in_array("faculty", $current_user_roles_after_update)) {
         // Fetch current department for faculty
-        $current_faculty_data_query = "SELECT department, specialization FROM faculty WHERE employee_id = :employee_id";
+        $current_faculty_data_query = "SELECT department FROM faculty WHERE employee_id = :employee_id";
         $current_faculty_data_stmt = $conn->prepare($current_faculty_data_query);
         $current_faculty_data_stmt->bindParam(':employee_id', $data->KLD_ID);
         $current_faculty_data_stmt->execute();
         $current_faculty_data = $current_faculty_data_stmt->fetch(PDO::FETCH_ASSOC);
 
         $department_id_faculty = isset($data->department_id) && $data->department_id !== "" ? $data->department_id : ($current_faculty_data['department'] ?? null);
-        $specialization_faculty = isset($data->specialization) && $data->specialization !== "" ? $data->specialization : ($current_faculty_data['specialization'] ?? null);
 
-        error_log("Faculty Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_faculty . ", Specialization: " . $specialization_faculty);
+        error_log("Faculty Update - Final: KLD_ID=" . $data->KLD_ID . ", Department ID=" . $department_id_faculty);
         
-        $faculty_query = "UPDATE faculty SET department = :department, specialization = :specialization, status = 'active' WHERE employee_id = :employee_id";
+        $faculty_query = "UPDATE faculty SET department = :department, status = 'active' WHERE employee_id = :employee_id";
         $faculty_stmt = $conn->prepare($faculty_query);
         $faculty_stmt->bindValue(':department', $department_id_faculty, PDO::PARAM_INT); // Bind as INT or NULL
-        $faculty_stmt->bindValue(':specialization', $specialization_faculty, PDO::PARAM_STR); // Bind as STRING or NULL
         $faculty_stmt->bindParam(':employee_id', $data->KLD_ID);
         $faculty_stmt->execute();
         if ($faculty_stmt->rowCount() > 0) {

@@ -111,15 +111,15 @@ try {
                     $roleId = $roleRow['id'];
 
                     // Insert into users table (without role column)
-                    $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
-                                VALUES (:id, :email, :password_hash, NOW())";
+                    $sqlUser = "INSERT INTO users (id, email, password_hash, password_set, created_at)
+                                VALUES (:id, :email, :password_hash, FALSE, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
                     $tempPassword = generateTemporaryPassword(); // Generate unique temporary password
-                    $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
+                    // $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
 
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
-                    $stmtUser->bindParam(':password_hash', $hashedPassword); // Use the hashed password
+                    $stmtUser->bindParam(':password_hash', $tempPassword); // Use the RAW password for testing purposes
                     // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
 
@@ -136,7 +136,11 @@ try {
                     $stmtEmployee = $conn->prepare($sqlEmployee);
                     $stmtEmployee->bindParam(':employee_id', $userId);
                     $stmtEmployee->bindParam(':name', $name);
-                    $stmtEmployee->bindParam(':dob', $dob);
+                    if ($dob !== null) {
+                        $stmtEmployee->bindParam(':dob', $dob);
+                    } else {
+                        $stmtEmployee->bindParam(':dob', $dob, PDO::PARAM_NULL);
+                    }
                     $stmtEmployee->bindParam(':department_id', $departmentId);
                     $stmtEmployee->execute();
 
@@ -337,15 +341,15 @@ try {
                     $roleId = $roleRow['id'];
 
                     // Insert into users table (without role column)
-                    $sqlUser = "INSERT INTO users (id, email, password_hash, created_at)
-                                VALUES (:id, :email, :password_hash, NOW())";
+                    $sqlUser = "INSERT INTO users (id, email, password_hash, password_set, created_at)
+                                VALUES (:id, :email, :password_hash, FALSE, NOW())";
                     $stmtUser = $conn->prepare($sqlUser);
                     $tempPassword = generateTemporaryPassword(); // Generate unique temporary password
-                    $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
+                    // $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT); // Hash it
 
                     $stmtUser->bindParam(':id', $userId);
                     $stmtUser->bindParam(':email', $email);
-                    $stmtUser->bindParam(':password_hash', $hashedPassword); // Use the hashed password
+                    $stmtUser->bindParam(':password_hash', $tempPassword); // Use the RAW password for testing purposes
                     // $stmtUser->bindParam(':role', $userRole); // Removed role column
                     $stmtUser->execute();
 
