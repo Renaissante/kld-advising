@@ -35,12 +35,12 @@ export default function LoginForm({ email, setEmail, password, setPassword, hand
             </Label>
             <Input
               id="email"
-              type="email"
+              type="text" // Changed from "email" to "text" to allow KLD-ID
               placeholder="Enter your KLD-ID or email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-md border-gray-300 focus:ring-[#205c1c] dark:bg-gray-800 dark:text-white"
-              aria-label="Email Address"
+              aria-label="KLD-ID or Email Address"
             />
           </div>
 

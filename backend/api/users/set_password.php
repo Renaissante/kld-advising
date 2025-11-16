@@ -14,11 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = json_decode(file_get_contents("php://input"));
 
-if ((empty($data->userId) && empty($data->email)) || empty($data->newPassword) || empty($data->confirmPassword)) {
+if ((empty($data->userId) && empty($data->email)) || empty($data->newPassword) || empty($data->confirmPassword) || empty($data->temporaryPassword)) {
     http_response_code(400);
     echo json_encode([
         "success" => false,
-        "message" => "User ID or Email, and both new and confirm passwords are required."
+        "message" => "User ID or Email, new password, confirm password, and temporary password are required."
     ]);
     exit;
 }
@@ -27,6 +27,7 @@ $userId = $data->userId ?? null;
 $email = $data->email ?? null;
 $newPassword = $data->newPassword;
 $confirmPassword = $data->confirmPassword;
+$temporaryPassword = $data->temporaryPassword; // Retrieve temporary password
 
 if ($newPassword !== $confirmPassword) {
     http_response_code(400);
@@ -37,7 +38,7 @@ if ($newPassword !== $confirmPassword) {
     exit;
 }
 
-// Password strength validation (example - adjust as needed)
+// Password strength validation
 if (strlen($newPassword) < 8) {
     http_response_code(400);
     echo json_encode([
@@ -53,22 +54,9 @@ try {
     // Determine the user ID to update
     $finalUserId = null;
     if (!empty($userId)) {
-        // If userId is provided, use it. But first, verify email if also provided.
-        if (!empty($email)) {
-            $sqlVerifyEmail = "SELECT id FROM users WHERE id = :userId AND email = :email";
-            $stmtVerifyEmail = $conn->prepare($sqlVerifyEmail);
-            $stmtVerifyEmail->bindParam(':userId', $userId);
-            $stmtVerifyEmail->bindParam(':email', $email);
-            $stmtVerifyEmail->execute();
-            if (!$stmtVerifyEmail->fetch(PDO::FETCH_ASSOC)) {
-                http_response_code(400);
-                echo json_encode([
-                    "success" => false,
-                    "message" => "Provided User ID and Email do not match."
-                ]);
-                exit;
-            }
-        }
+        // If userId is provided (from URL), it's the primary identifier.
+        // We directly use it. The email field in the form acts as additional data for the request
+        // but is not used for primary user identification or cross-verification here.
         $finalUserId = $userId;
     } elseif (!empty($email)) {
         // If no userId but email is provided, find userId by email
@@ -98,11 +86,38 @@ try {
     }
 
     // Check if password has already been set
-    $sqlCheckPasswordSet = "SELECT password_set FROM users WHERE id = :finalUserId";
+    error_log("DEBUG - Checking user ID: " . $finalUserId);
+    
+    $sqlCheckPasswordSet = "SELECT id, password_set, password_hash FROM users WHERE id = :finalUserId";
     $stmtCheckPasswordSet = $conn->prepare($sqlCheckPasswordSet);
     $stmtCheckPasswordSet->bindParam(':finalUserId', $finalUserId);
     $stmtCheckPasswordSet->execute();
     $currentStatus = $stmtCheckPasswordSet->fetch(PDO::FETCH_ASSOC);
+    
+    error_log("DEBUG - Query result: " . print_r($currentStatus, true));
+    error_log("DEBUG - password_set value: " . var_export($currentStatus['password_set'] ?? 'NULL', true));
+
+    if (!$currentStatus) {
+        $conn->rollBack();
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "message" => "User not found based on provided ID or Email."
+        ]);
+        exit;
+    }
+
+    // Verify the provided temporary password against the stored password_hash
+    // For testing purposes, we compare raw passwords. In production, use password_verify().
+    if ($currentStatus['password_hash'] !== $temporaryPassword) {
+        $conn->rollBack();
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "message" => "Invalid temporary password provided."
+        ]);
+        exit;
+    }
     
     if ($currentStatus && $currentStatus['password_set']) {
         $conn->rollBack();

@@ -19,6 +19,7 @@ $password = isset($data["password"]) ? trim($data["password"]) : "";
 
 try {
     // ✅ Fetch user details and include employee_id (if exists)
+    // Modified query to allow login with either email or KLD ID
     $query = "
         SELECT u.id, u.email, u.password_hash, u.password_set, e.employee_id, s.student_id,
                STRING_AGG(r.role_name, ',') AS roles_list
@@ -27,12 +28,12 @@ try {
         LEFT JOIN students s ON u.id = s.student_id
         LEFT JOIN user_roles ur ON u.id = ur.user_id
         LEFT JOIN roles r ON ur.role_id = r.id
-        WHERE u.email = :email
+        WHERE u.email = :identifier OR u.id = :identifier
         GROUP BY u.id, u.email, u.password_hash, u.password_set, e.employee_id, s.student_id
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bindParam(":email", $email, PDO::PARAM_STR);
+    $stmt->bindParam(":identifier", $email, PDO::PARAM_STR); // Use :identifier for both email and ID
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

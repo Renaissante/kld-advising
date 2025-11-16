@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import { API_BASE_URL } from '@/config/api';
@@ -27,6 +27,15 @@ const SetPasswordForm = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [tempPassword, setTempPassword] = useState(''); // New state for temporary password
+  const [showTempPassword, setShowTempPassword] = useState(false); // State for temporary password visibility
+
+  // When URL userId changes, update targetUserId
+  // useEffect(() => {
+  //   if (urlUserId) {
+  //     setEmail(urlUserId); // Assuming urlUserId will be the email/KLD-ID for set password form
+  //   }
+  // }, [urlUserId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,7 +50,8 @@ const SetPasswordForm = () => {
     }
 
     // Determine the target user ID
-    let targetUserId = user?.id || urlUserId; // Prioritize logged-in user or URL param
+    // If a userId is in the URL, use it. Otherwise, assume the email field contains the KLD-ID/Email.
+    let targetUserId = urlUserId || email; // Use urlUserId if present, otherwise use the email from the form
 
     // For security, if userId is present in URL, we require it. If not, then email is mandatory.
     if (!targetUserId && !email) {
@@ -57,8 +67,9 @@ const SetPasswordForm = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: targetUserId, // Will be null if using email lookup
-          email: email, // Always send email, backend will use for verification or lookup
+          userId: urlUserId, // Only send urlUserId if present, backend will prioritize
+          email: email, // Always send email for verification/lookup
+          temporaryPassword: tempPassword, // Send temporary password for verification
           newPassword,
           confirmPassword,
         }),
@@ -72,31 +83,8 @@ const SetPasswordForm = () => {
         if (user) {
             updateUser({ password_set: true });
         }
-        
-        if (!user && urlUserId) { // If user was not logged in, redirect to login page after setting password
-          navigate("/login");
-        } else { // If user was logged in, redirect based on active role
-          switch (activeRole) {
-            case "admin":
-              navigate("/admin/dashboard");
-              break;
-            case "student":
-              navigate("/student/home");
-              break;
-            case "faculty":
-            case "advisor":
-              navigate("/faculty/home");
-              break;
-            case "programchair":
-              navigate("/program-chair/home");
-              break;
-            case "dean":
-              navigate("/dean/home");
-              break;
-            default:
-              navigate("/login"); // Fallback
-          }
-        }
+        // Always redirect to login page after setting password
+        navigate("/login");
 
       } else {
         setError(data.message || data.error || 'Failed to set password.');
@@ -110,7 +98,7 @@ const SetPasswordForm = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex min-h-screen items-center justify-center pb-[200px]">
       <Card className="w-full max-w-[420px] shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-semibold text-gray-800 dark:text-white">
@@ -122,20 +110,47 @@ const SetPasswordForm = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {(!user && !urlUserId) && ( // Only show email input if no user is logged in AND no userId in URL
-              <div className="flex flex-col space-y-2">
-                <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email</Label>
+            {/* Email / KLD-ID input: Always show this field */}
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">
+                KLD-ID / Email
+              </Label>
+              <Input 
+                id="email" 
+                type="text" // Changed to text to allow KLD-ID
+                placeholder="Your KLD-ID or Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="rounded-md border-gray-300 focus:ring-[#205c1c] dark:bg-gray-800 dark:text-white"
+                // disabled={!!urlUserId} // Disable if userId is present in URL
+              />
+            </div>
+
+            {/* Temporary Password input: Always show this field */}
+            <div className="flex flex-col space-y-2 relative">
+              <Label htmlFor="tempPassword" className="text-gray-700 dark:text-gray-300">Temporary Password</Label>
+              <div className="relative">
                 <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="Your Email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="tempPassword" 
+                  type={showTempPassword ? "text" : "password"} 
+                  placeholder="Temporary Password"
+                  value={tempPassword}
+                  onChange={(e) => setTempPassword(e.target.value)}
                   required
-                  className="rounded-md border-gray-300 focus:ring-[#205c1c] dark:bg-gray-800 dark:text-white"
+                  className="rounded-md border-gray-300 focus:ring-[#205c1c] dark:bg-gray-800 dark:text-white pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowTempPassword(!showTempPassword)}
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 dark:text-gray-400 hover:text-[#205c1c]"
+                  aria-label="Toggle temporary password visibility"
+                >
+                  {showTempPassword ? <EyeClosed size={25} /> : <Eye size={25} />}
+                </button>
               </div>
-            )}
+            </div>
+
             <div className="flex flex-col space-y-2 relative">
               <Label htmlFor="newPassword" className="text-gray-700 dark:text-gray-300">New Password</Label>
               <div className="relative">
@@ -184,12 +199,14 @@ const SetPasswordForm = () => {
             {success && <p className="text-green-500 text-xs mt-2 text-center">Password set successfully!</p>}
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button 
+        <CardFooter className="flex justify-between items-center">
+          <Button
             type="submit" 
             onClick={handleSubmit}
             className="w-full px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-900"
             disabled={loading}
+            size="lg"
+            variant="green"
           >
             {loading ? 'Setting Password...' : 'Set Password'}
           </Button>

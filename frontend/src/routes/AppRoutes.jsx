@@ -25,6 +25,7 @@ import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Impor
 import ExportAdvisingForms from "@/pages/dean/ExportAdvisingForms"; // Import the new component
 import DeanReportGenerator from "@/pages/dean/DeanReportGenerator"; // Import the new component
 import NotificationsManagement from "@/pages/NotificationsManagement"; // Import the new component
+import SetPasswordForm from "@/components/SetPasswordForm"; // Import SetPasswordForm
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
@@ -257,6 +258,15 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Route for setting password, accessible without authentication */}
+      <Route
+        path="/set-password/:userId"
+        element={
+          <ErrorBoundary>
+            <SetPasswordForm />
+          </ErrorBoundary>
+        }
+      />
      
       {/* <Route path="*" element={<Navigate to="/login" replace />} /> */}
     </Routes>
