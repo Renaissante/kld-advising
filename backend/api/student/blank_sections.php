@@ -62,3 +62,5 @@ try {
     echo json_encode(["message" => "Failed to blank student sections: " . $e->getMessage()]);
 }
 ?>
+
+

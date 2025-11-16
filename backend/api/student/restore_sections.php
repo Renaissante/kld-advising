@@ -74,3 +74,5 @@ try {
     echo json_encode(["message" => "Failed to restore student sections: " . $e->getMessage()]);
 }
 ?>
+
+
