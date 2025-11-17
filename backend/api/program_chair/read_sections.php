@@ -3,15 +3,18 @@
 include_once '../../config/cors.php';
 
 header("Content-Type: application/json; charset=UTF-8");
-// header("Access-Control-Allow-Methods: GET");
-// header("Access-Control-Max-Age: 3600");
-// header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once '../../config/database.php';
 
 // Get academic_year_id and semester_id from request
-$academic_year_id = isset($_GET['academic_year_id']) ? $_GET['academic_year_id'] : die(json_encode(array("message" => "Missing academic_year_id parameter")));
-$semester_id = isset($_GET['semester_id']) ? $_GET['semester_id'] : die(json_encode(array("message" => "Missing semester_id parameter")));
+$academic_year_id = isset($_GET['academic_year_id']) ? $_GET['academic_year_id'] : null;
+$semester_id = isset($_GET['semester_id']) ? $_GET['semester_id'] : null;
+$ignore_academic_filters = isset($_GET['ignore_academic_filters']) ? filter_var($_GET['ignore_academic_filters'], FILTER_VALIDATE_BOOLEAN) : false;
+
+// If not ignoring academic filters and academic year/semester are missing, then it's an error
+if (!$ignore_academic_filters && (empty($academic_year_id) || empty($semester_id))) {
+    die(json_encode(array("message" => "Missing academic_year_id or semester_id parameter, or ignore_academic_filters is false")));
+}
 
 // Check if we want sections with advisors or without advisors
 $filter_type = isset($_GET['filter_type']) ? $_GET['filter_type'] : 'all';
@@ -19,14 +22,14 @@ $status_filter = isset($_GET['status']) ? $_GET['status'] : null; // Get status 
 $program_ids_filter = isset($_GET['program_ids']) ? $_GET['program_ids'] : null; // Get program_ids filter
 
 try {
-    // Base query to get sections filtered by academic year and semester
+    // Base query to get sections
     $query = "SELECT 
                 s.id, 
                 s.name,
                 s.program_id,
                 s.year_level_id, 
-                s.status, -- Add status column
-                s.capacity, -- Add capacity column
+                s.status,
+                s.capacity,
                 p.name as program_name,
                 yl.level as year_level,
                 ay.academic_year_name as academic_year,
@@ -46,11 +49,13 @@ try {
                 academic_years ay ON s.academic_year_id = ay.academic_year_id
             JOIN 
                 semesters sem ON s.semester_id = sem.semester_id
-            WHERE 
-                s.academic_year_id = :academic_year_id 
-            AND 
-                s.semester_id = :semester_id";
+            WHERE 1=1";
     
+    // Conditionally add academic year and semester filters
+    if (!$ignore_academic_filters) {
+        $query .= " AND s.academic_year_id = :academic_year_id AND s.semester_id = :semester_id";
+    }
+
     // Add status filter if provided
     if ($status_filter) {
         $query .= " AND s.status = :status";
@@ -79,8 +84,10 @@ try {
     $stmt = $conn->prepare($query);
 
     // Bind parameters
-    $stmt->bindParam(':academic_year_id', $academic_year_id);
-    $stmt->bindParam(':semester_id', $semester_id);
+    if (!$ignore_academic_filters) {
+        $stmt->bindParam(':academic_year_id', $academic_year_id);
+        $stmt->bindParam(':semester_id', $semester_id);
+    }
     if ($status_filter) {
         $stmt->bindParam(':status', $status_filter);
     }
@@ -113,40 +120,39 @@ try {
                 "academic_year" => $row['academic_year'],
                 "semester" => $row['semester'],
                 "has_advisor" => $row['has_advisor'] > 0,
-                "status" => $row['status'], // Use status from database
-                "capacity" => $row['capacity'], // Add capacity column
-                "advisor_name" => $row['advisor_name'], // Add advisor's name
-                "enrolledStudents" => array() // Initialize enrolledStudents array
+                "status" => $row['status'],
+                "capacity" => $row['capacity'],
+                "advisor_name" => $row['advisor_name'],
+                "enrolledStudents" => array()
             );
 
-            // Fetch enrolled students for this section (Regular Students)
+            // Fetch students for this section (both current and historical enrollments)
+            // Modified query: removed enrollment_status filter to show both 'enrolled' and 'completed'
             $students_query = "SELECT 
                                     s.id as student_db_id, 
                                     s.student_id, 
                                     s.name, 
                                     u.email,
-                                    'Regular' as enrollment_type, -- Explicitly mark as regular
+                                    'Regular' as enrollment_type,
                                     null as retake_course_code,
-                                    (SELECT 
-                                        prev_sec.name 
-                                     FROM 
-                                        student_section_enrollments prev_sse
-                                     JOIN 
-                                        sections prev_sec ON prev_sse.section_id = prev_sec.id
-                                     WHERE 
-                                        prev_sse.student_id = s.id 
-                                        AND prev_sse.enrollment_status = 'completed'
-                                     ORDER BY 
-                                        prev_sse.completed_at DESC
-                                     LIMIT 1
-                                    ) AS previous_section_name,
-                                    null as irregular_enrollment_id -- Added to match irregular student query
+                                    COALESCE(prev_sec.name, 'N/A') AS previous_section_name,
+                                    COALESCE(current_sec.name, 'N/A') AS current_section_name,
+                                    null as irregular_enrollment_id,
+                                    sse.id as sse_id,
+                                    sse.enrollment_status,
+                                    sse.completed_at
                                 FROM 
                                     students s
                                 JOIN 
                                     users u ON s.student_id = u.id
+                                JOIN
+                                    student_section_enrollments sse ON s.id = sse.student_id
+                                LEFT JOIN 
+                                    sections prev_sec ON sse.previous_section_id = prev_sec.id
+                                LEFT JOIN
+                                    sections current_sec ON s.section_id = current_sec.id
                                 WHERE 
-                                    s.section_id = :section_id
+                                    sse.section_id = :section_id
 
                                 UNION ALL
 
@@ -156,10 +162,14 @@ try {
                                     s.student_id,
                                     s.name,
                                     u.email,
-                                    'Irregular' as enrollment_type, -- Explicitly mark as irregular
+                                    'Irregular' as enrollment_type,
                                     c.course_code as retake_course_code,
                                     COALESCE(home_sec.name, 'N/A') as previous_section_name,
-                                    ice.id as irregular_enrollment_id -- Add irregular enrollment ID
+                                    COALESCE(home_sec.name, 'N/A') as current_section_name,
+                                    ice.id as irregular_enrollment_id,
+                                    null as sse_id,
+                                    'enrolled' as enrollment_status,
+                                    null as completed_at
                                 FROM
                                     students s
                                 JOIN
@@ -169,9 +179,11 @@ try {
                                 JOIN
                                     courses c ON ice.course_id = c.id
                                 LEFT JOIN
-                                    sections home_sec ON s.section_id = home_sec.id -- Student's actual home section
+                                    sections home_sec ON s.section_id = home_sec.id
                                 WHERE
-                                    ice.section_id = :section_id AND ice.enrollment_type = 'Retake';";
+                                    ice.section_id = :section_id AND ice.enrollment_type = 'Retake'
+                                
+                                ORDER BY enrollment_status ASC, name ASC;";
 
             $students_stmt = $conn->prepare($students_query);
             $students_stmt->bindParam(':section_id', $row['id']);
@@ -180,14 +192,16 @@ try {
 
             foreach ($enrolled_students as $student_row) {
                 array_push($section_item['enrolledStudents'], array(
-                    "id" => $student_row['enrollment_type'] === 'Irregular' ? "irregular-" . $student_row['student_db_id'] . "-" . $student_row['irregular_enrollment_id'] : $student_row['student_db_id'], // Unique ID for irregular students
+                    "id" => $student_row['enrollment_type'] === 'Irregular' ? "irregular-" . $student_row['student_db_id'] . "-" . $student_row['irregular_enrollment_id'] : "regular-" . $student_row['student_db_id'] . "-" . $student_row['sse_id'],
                     "student_id" => $student_row['student_id'],
                     "name" => $student_row['name'],
                     "email" => $student_row['email'],
                     "previous_section_name" => $student_row['previous_section_name'],
+                    "current_section_name" => $student_row['current_section_name'],
                     "assigned_course_code" => $student_row['retake_course_code'],
                     "is_irregular" => ($student_row['enrollment_type'] === 'Irregular'),
-                    "enrollmentStatus" => ($student_row['enrollment_type'] === 'Irregular') ? 'irregular' : 'enrolled'
+                    "enrollmentStatus" => $student_row['enrollment_status'], // Will be 'enrolled' or 'completed'
+                    "completed_at" => $student_row['completed_at']
                 ));
             }
 
@@ -209,4 +223,5 @@ try {
 } catch (PDOException $e) {
     http_response_code(503);
     echo json_encode(array("message" => "Database error: " . $e->getMessage()));
-} 
+}
+?>

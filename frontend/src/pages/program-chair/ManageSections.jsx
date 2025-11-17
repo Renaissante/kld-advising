@@ -47,6 +47,9 @@ export default function ManageSections() {
   const { activeAcademicYear, activeSemester } = useActive();
 
   const [sections, setSections] = useState([]) // Initialize as empty array
+  const [activeSectionsState, setActiveSectionsState] = useState([]);
+  const [archivedSectionsState, setArchivedSectionsState] = useState([]);
+  const [completedSectionsState, setCompletedSectionsState] = useState([]);
   const [availableStudents, setAvailableStudents] = useState([]) // Initialize as empty array
   const [selectedSection, setSelectedSection] = useState(null)
   const [viewingStudentsFor, setViewingStudentsFor] = useState(null)
@@ -82,7 +85,7 @@ export default function ManageSections() {
   const [isLoadingIrregularStudents, setIsLoadingIrregularStudents] = useState(false);
   const [irregularStudentsError, setIrregularStudentsError] = useState(null);
 
-  const [coursesForSelectedSection, setCoursesForSelectedSection] = useState([]);
+  const [coursesForSelectedSection, setCoursesForSelectedSection] = useState({}); // Changed to object
   const [isLoadingCoursesForSection, setIsLoadingCoursesForSection] = useState(false);
   const [coursesForSectionError, setCoursesForSectionError] = useState(null);
 
@@ -118,8 +121,8 @@ export default function ManageSections() {
   }, []); // Empty dependency array means this runs once on mount
 
   // Refactored fetch functions using useCallback
-  const fetchSections = useCallback(async () => {
-    if (!activeAcademicYear?.id || !activeSemester?.id || loadingProgramData) {
+  const fetchSections = useCallback(async (shouldIgnoreAcademicFilters = false, statusFilter = null) => {
+    if (!shouldIgnoreAcademicFilters && (!activeAcademicYear?.id || !activeSemester?.id || loadingProgramData)) {
         setIsLoadingSections(false);
       console.log("Waiting for AY/Sem or Program Chair data to fetch sections.");
       if (loadingProgramData) console.log("Program data is still loading.");
@@ -136,13 +139,27 @@ export default function ManageSections() {
       setSectionsError(null);
       try {
       const programIdsParam = assignedProgramIds.length > 0 ? `&program_ids=${assignedProgramIds.join(',')}` : '';
-      const apiUrl = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}${programIdsParam}`;
+      const academicFilters = shouldIgnoreAcademicFilters ? `&ignore_academic_filters=true` : `&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+      const statusParam = statusFilter ? `&status=${statusFilter}` : '';
+      const apiUrl = `${API_BASE_URL}/program_chair/read_sections.php?${academicFilters}${statusParam}${programIdsParam}`;
       const response = await fetch(apiUrl);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-      setSections(data || []);
+      switch (statusFilter) {
+        case "active":
+          setActiveSectionsState(data || []);
+          break;
+        case "archived":
+          setArchivedSectionsState(data || []);
+          break;
+        case "completed":
+          setCompletedSectionsState(data || []);
+          break;
+        default:
+          setSections(data || []); // Fallback or for initial load if needed, though not strictly used now
+      }
       } catch (error) {
         console.error("Error fetching sections:", error);
       setSectionsError("Failed to load sections. Please try again.");
@@ -191,21 +208,27 @@ export default function ManageSections() {
     }
   }, [user, activeAcademicYear, activeSemester]);
 
-  const fetchCoursesForRetakeDropdown = useCallback(async (sectionId) => {
-    if (!sectionId || !user?.id) return;
+  const fetchCoursesForRetakeDropdown = useCallback(async (sectionId, studentId) => {
+    if (!sectionId || !user?.id || !studentId) return; // studentId is now required
+    
+    // Only set global loading/error if we're fetching for the first time or if a new student is being added
+    // Otherwise, we'll manage individual student loading states if needed, but for now, this is fine.
     setIsLoadingCoursesForSection(true);
     setCoursesForSectionError(null);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/course/read_courses_by_section_curriculum.php?section_id=${sectionId}&program_chair_id=${user.id}`);
+      const response = await fetch(`${API_BASE_URL}/course/read_courses_by_section_curriculum.php?section_id=${sectionId}&student_id=${studentId}&program_chair_id=${user.id}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setCoursesForSelectedSection(data.data || []);
+      setCoursesForSelectedSection(prevCourses => ({
+        ...prevCourses,
+        [studentId]: data.data || []
+      }));
     } catch (error) {
-      console.error("Error fetching courses for section:", error);
-      setCoursesForSectionError("Failed to load courses for this section.");
-      setCoursesForSelectedSection([]);
+      console.error(`Error fetching courses for student ${studentId}:`, error);
+      setCoursesForSectionError(prevError => prevError || `Failed to load courses for student ${studentId}.`);
     } finally {
       setIsLoadingCoursesForSection(false);
     }
@@ -249,25 +272,31 @@ export default function ManageSections() {
 
   // Main data fetching effect
   useEffect(() => {
-    if (activeAcademicYear?.id && activeSemester?.id && !loadingProgramData) {
+    if (!loadingProgramData) {
       if (assignedProgramIds.length > 0) {
-        fetchSections();
-        fetchIrregularStudentsForAssignment(); // Fetch irregular students here
-      } else if (!loadingProgramData) {
+        // Fetch active sections (filtered by active AY/Sem)
+        if (activeAcademicYear?.id && activeSemester?.id) {
+          fetchSections(false, "active");
+        } else {
+          setActiveSectionsState([]); // Clear active sections if AY/Sem not set
+          setIsLoadingSections(false);
+        }
+        // Fetch archived and completed sections (ignore AY/Sem filters)
+        fetchSections(true, "archived");
+        fetchSections(true, "completed");
+        fetchUnassignedStudents(); // Unassigned students are always based on active AY/Sem
+        fetchIrregularStudentsForAssignment();
+      } else {
         console.log("No assigned programs for program chair, clearing sections.");
-        setSections([]);
+        setActiveSectionsState([]);
+        setArchivedSectionsState([]);
+        setCompletedSectionsState([]);
         setIsLoadingSections(false);
-        setIrregularStudentsToAssign([]); // Clear irregular students
-        setIsLoadingIrregularStudents(false); // Set irregular student loading to false
+        setAvailableStudents([]);
+        setIsLoadingStudents(false);
+        setIrregularStudentsToAssign([]);
+        setIsLoadingIrregularStudents(false);
       }
-      fetchUnassignedStudents();
-    } else if (!activeAcademicYear?.id || !activeSemester?.id) {
-      setSections([]);
-      setIsLoadingSections(false);
-      setAvailableStudents([]);
-      setIsLoadingStudents(false);
-      setIrregularStudentsToAssign([]); // Clear irregular students
-      setIsLoadingIrregularStudents(false); // Set irregular student loading to false
     }
   }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds, fetchSections, fetchUnassignedStudents, fetchIrregularStudentsForAssignment]);
 
@@ -287,9 +316,9 @@ export default function ManageSections() {
     return unassignedStudents.filter(
       (student) =>
         student.name.toLowerCase().includes(query) ||
-        student.studentId.toLowerCase().includes(query) ||
+        (student.student_id && student.student_id.toLowerCase().includes(query)) ||
         student.email.toLowerCase().includes(query) ||
-        (student.previousSection && student.previousSection.toLowerCase().includes(query)),
+        (student.previous_section_name && student.previous_section_name.toLowerCase().includes(query)),
     )
   }
 
@@ -334,7 +363,9 @@ export default function ManageSections() {
 
       toast.success(data.message || `${newSection.name} has been created successfully.`);
       setIsCreateDialogOpen(false);
-      fetchSections(); // Refresh the list of sections
+      fetchSections(false, "active"); // Refresh active sections
+      fetchSections(true, "archived"); // Refresh archived sections (in case creating an active one affects archived count/display)
+      fetchSections(true, "completed"); // Refresh completed sections
 
     setNewSection({
       name: "",
@@ -369,7 +400,9 @@ export default function ManageSections() {
       toast.success(data.message || `${studentName} has been unassigned from ${sectionName}.`);
 
       // Re-fetch sections and unassigned students to update the UI
-      fetchSections();
+      fetchSections(false, "active");
+      fetchSections(true, "archived"); // Also refresh archived if a student from an archived section was removed
+      fetchSections(true, "completed"); // Also refresh completed
       fetchUnassignedStudents();
 
     } catch (error) {
@@ -400,7 +433,9 @@ export default function ManageSections() {
       toast.success(data.message || `${sectionName} has been permanently deleted.`);
 
       // Refresh the list of sections
-      fetchSections();
+      fetchSections(false, "active"); // Re-fetch active sections
+      fetchSections(true, "archived"); // Re-fetch archived sections
+      fetchSections(true, "completed"); // Re-fetch completed sections
       fetchUnassignedStudents(); // Refresh unassigned students list after section deletion
 
     } catch (error) {
@@ -434,13 +469,10 @@ export default function ManageSections() {
       const data = await response.json();
       toast.success(data.message);
 
-      // Optimistically update the UI or refetch sections
-      setSections((prevSections) =>
-        prevSections.map((section) =>
-          section.id === sectionId ? { ...section, status: newStatus } : section
-        )
-      );
-      fetchSections(); // Re-fetch sections to get updated student counts
+      // Re-fetch all sections to get updated counts and status
+      fetchSections(false, "active");
+      fetchSections(true, "archived");
+      fetchSections(true, "completed");
       fetchUnassignedStudents(); // Re-fetch unassigned students as section_id might be set to NULL
     } catch (error) {
       console.error(`Error updating section status to ${newStatus}:`, error);
@@ -485,7 +517,9 @@ export default function ManageSections() {
       }
 
       toast.success(data.message || `${editedSection.name} updated successfully.`);
-      fetchSections(); // Refresh the list of sections
+      fetchSections(false, "active"); // Refresh active sections
+      fetchSections(true, "archived"); // Refresh archived sections
+      fetchSections(true, "completed"); // Refresh completed sections
 
     } catch (error) {
       console.error("Error updating section:", error);
@@ -540,7 +574,7 @@ export default function ManageSections() {
 
       // After assignment, re-fetch all sections and unassigned students to update UI
       // (Alternatively, optimize by only updating affected section and unassigned students list)
-      fetchSections();
+      fetchSections(false, "active"); // Refresh active sections
       fetchUnassignedStudents();
 
     } catch (error) {
@@ -591,7 +625,7 @@ export default function ManageSections() {
       }
 
       // Refresh data after assignment
-      fetchSections();
+      fetchSections(false, "active"); // Refresh active sections
       fetchIrregularStudentsForAssignment();
 
     } catch (error) {
@@ -603,7 +637,7 @@ export default function ManageSections() {
       setIrregularStudentCourseAssignments({});
       setSearchQuery("");
       setIrregularAssignmentActiveTab("available");
-      setCoursesForSelectedSection([]);
+      setCoursesForSelectedSection({}); // Clear courses when dialog closes
     }
   };
 
@@ -632,9 +666,9 @@ export default function ManageSections() {
     return students.length; // Default count all if no specific filter
   };
 
-  const activeSections = sections.filter((s) => s.status === "active" && s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
-  const archivedSections = sections.filter((s) => s.status === "archived" && s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
-  const completedSections = sections.filter((s) => s.status === "completed" && s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
+  const filteredActiveSections = activeSectionsState.filter((s) => s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
+  const filteredArchivedSections = archivedSectionsState.filter((s) => s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
+  const filteredCompletedSections = completedSectionsState.filter((s) => s.name.toLowerCase().includes(sectionSearchQuery.toLowerCase()))
 
   return (
     <SidebarProvider>
@@ -879,9 +913,9 @@ export default function ManageSections() {
 
           <Tabs defaultValue="active" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="active">Active Sections ({activeSections.length})</TabsTrigger>
-              <TabsTrigger value="archived">Archived ({archivedSections.length})</TabsTrigger>
-              <TabsTrigger value="completed">Completed ({completedSections.length})</TabsTrigger>
+              <TabsTrigger value="active">Active Sections ({filteredActiveSections.length})</TabsTrigger>
+              <TabsTrigger value="archived">Archived ({filteredArchivedSections.length})</TabsTrigger>
+              <TabsTrigger value="completed">Completed ({filteredCompletedSections.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="active" className="space-y-4">
@@ -897,7 +931,7 @@ export default function ManageSections() {
                     <p>Error loading sections: {sectionsError}</p>
                   </div>
                 ) : (
-                  activeSections.map((section) => (
+                  filteredActiveSections.map((section) => (
                   <div key={section.id} className="space-y-4">
                     <Card>
                       <CardHeader>
@@ -989,7 +1023,7 @@ export default function ManageSections() {
                                   setSelectedSection(section);
                                 }}
                               >
-                                Assign Students
+                                Assign Student
                               </Button>
                               <Button
                                 variant="outline"
@@ -997,7 +1031,16 @@ export default function ManageSections() {
                                 onClick={() => {
                                   setShowAssignIrregularStudentsDialogForSectionId(section.id);
                                   setSelectedSection(section);
-                                  fetchCoursesForRetakeDropdown(section.id); // Fetch courses for the selected section
+                                  // Fetch courses for selected irregular students when dialog is opened
+                                  if (selectedIrregularStudentsForAssignment.length > 0 && section.id) {
+                                    selectedIrregularStudentsForAssignment.forEach(studentId => {
+                                      fetchCoursesForRetakeDropdown(section.id, studentId);
+                                    });
+                                  } else if (section.id) {
+                                    // If no irregular students are selected yet, still fetch courses for the section context
+                                    // This might be for future use if we want to show all courses without pre-selected students
+                                    // For now, it's safe to not call it if no students are selected, but keeping the structure for clarity.
+                                  }
                                 }}
                               >
                                 Assign Students for Retake
@@ -1131,7 +1174,7 @@ export default function ManageSections() {
                       <TableBody>
                                 {currentStudents.map((student) => (
                           <TableRow key={student.id}>
-                            <TableCell className="font-medium">{student.student_id}</TableCell>
+                            <TableCell className="font-medium">{student.student_id || "N/A"}</TableCell>
                             <TableCell>{student.name}</TableCell>
                             <TableCell>{student.email}</TableCell>
                             <TableCell>{student.previous_section_name || "N/A"}</TableCell>
@@ -1194,7 +1237,7 @@ export default function ManageSections() {
                                           if (!student) return null;
                                           return (
                                             <TableRow key={student.id}>
-                                              <TableCell className="font-medium">{student.student_id}</TableCell>
+                                              <TableCell className="font-medium">{student.student_id || "N/A"}</TableCell>
                                               <TableCell>{student.name}</TableCell>
                                               <TableCell>{student.email}</TableCell>
                                               <TableCell>{student.previous_section_name || "N/A"}</TableCell>
@@ -1257,7 +1300,7 @@ export default function ManageSections() {
                             setSearchQuery("");
                             setSelectedIrregularStudentsForAssignment([]);
                             setIrregularStudentCourseAssignments({});
-                            setCoursesForSelectedSection([]); // Clear courses when dialog closes
+                            setCoursesForSelectedSection({}); // Clear courses when dialog closes
                         }
                     }}>
                         <DialogContent className="sm:max-w-4xl">
@@ -1311,22 +1354,23 @@ export default function ManageSections() {
                                                 <TableBody>
                                                     {irregularStudentsToAssign.filter(student =>
                                                         (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                         student.student_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                                                         (student.student_id && student.student_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         (student.home_section_name && student.home_section_name.toLowerCase().includes(searchQuery.toLowerCase())))
                                                     ).map((student) => (
                                                         <TableRow key={student.id}>
                                                             
-                                                            <TableCell className="font-medium text-sm">{student.student_id}</TableCell>
+                                                            <TableCell className="font-medium text-sm">{student.student_id || "N/A"}</TableCell>
                                                             <TableCell>{student.name}</TableCell>
-                                                            <TableCell className="text-sm">{student.home_section_name}</TableCell>
+                                                            <TableCell className="text-sm">{student.home_section_name || "N/A"}</TableCell>
                                                             <TableCell>
-                                                                <Badge className="bg-yellow-100 text-yellow-800">{student.year_level}</Badge>
+                                                                <Badge className="bg-yellow-100 text-yellow-800">{student.year_level || "N/A"}</Badge>
                                                             </TableCell>
                                                             <TableCell>
                                                                 {student.failed_courses && student.failed_courses.length > 0 ? (
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {student.failed_courses.map(course => (
-                                                                            <Badge key={course.course_id} variant="destructive">{course.course_code}</Badge>
+                                                                            <Badge key={course.course_id} variant="destructive">{course.course_code || "N/A"}</Badge>
                                                                         ))}
                                                                     </div>
                                                                 ) : (
@@ -1338,11 +1382,27 @@ export default function ManageSections() {
                                                                     size="sm"
                                                                     variant={selectedIrregularStudentsForAssignment.includes(student.id) ? "secondary" : "outline"}
                                                                     onClick={() => {
-                                                                        setSelectedIrregularStudentsForAssignment((prev) =>
-                                                                            prev.includes(student.id)
-                                                                                ? prev.filter((id) => id !== student.id)
-                                                                                : [...prev, student.id]
-                                                                        );
+                                                                        setSelectedIrregularStudentsForAssignment((prev) => {
+                                                                            const isSelected = prev.includes(student.id);
+                                                                            if (isSelected) {
+                                                                                // Deselect: remove from selected list and clear course assignment
+                                                                                setIrregularStudentCourseAssignments(current => {
+                                                                                    const { [student.id]: _, ...rest } = current;
+                                                                                    return rest;
+                                                                                });
+                                                                                setCoursesForSelectedSection(current => {
+                                                                                    const { [student.id]: _, ...rest } = current;
+                                                                                    return rest;
+                                                                                });
+                                                                                return prev.filter((id) => id !== student.id);
+                                                                            } else {
+                                                                                // Select: add to selected list and fetch courses for this student
+                                                                                if (selectedSection) {
+                                                                                    fetchCoursesForRetakeDropdown(selectedSection.id, student.id);
+                                                                                }
+                                                                                return [...prev, student.id];
+                                                                            }
+                                                                        });
                                                                     }}
                                                                 >
                                                                     {selectedIrregularStudentsForAssignment.includes(student.id) ? "Deselect" : "Select"}
@@ -1352,8 +1412,9 @@ export default function ManageSections() {
                                                     ))}
                                                     {irregularStudentsToAssign.filter(student =>
                                                         (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                         student.student_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                                                         (student.student_id && student.student_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                                                         student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                         (student.home_section_name && student.home_section_name.toLowerCase().includes(searchQuery.toLowerCase())))
                                                     ).length === 0 && (
                                                         <TableRow>
                                                             <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
@@ -1408,7 +1469,7 @@ export default function ManageSections() {
                                                                             disabled={!selectedSection} // Disable if no section selected
                                                                         >
                                                                             <option value="">Select a course...</option>
-                                                                            {coursesForSelectedSection.map((course) => (
+                                                                            {coursesForSelectedSection[student.id]?.map((course) => (
                                                                                 <option key={course.course_id} value={course.course_id}>
                                                                                     {course.course_code} - {course.course_title}
                                                                                 </option>
@@ -1456,7 +1517,7 @@ export default function ManageSections() {
                                         setSearchQuery("");
                                         setSelectedIrregularStudentsForAssignment([]);
                                         setIrregularStudentCourseAssignments({});
-                                        setCoursesForSelectedSection([]);
+                                        setCoursesForSelectedSection({});
                                     }}
                                 >
                                     Cancel
@@ -1477,7 +1538,7 @@ export default function ManageSections() {
                   </div>
                   ))
                 )}
-                {activeSections.length === 0 && (
+                {filteredActiveSections.length === 0 && (
                   <Card>
                     <CardContent className="text-center py-8">
                       <p className="text-muted-foreground">
@@ -1502,7 +1563,7 @@ export default function ManageSections() {
                     <p>Error loading sections: {sectionsError}</p>
                   </div>
                 ) : (
-                  archivedSections.map((section) => (
+                  filteredArchivedSections.map((section) => (
                   <div key={section.id} className="space-y-4">
                     <Card>
                     <CardHeader>
@@ -1629,7 +1690,7 @@ export default function ManageSections() {
                 </div>
                 ))
               )}
-              {archivedSections.length === 0 && (
+              {filteredArchivedSections.length === 0 && (
                 <Card>
                   <CardContent className="text-center py-8">
                     <p className="text-muted-foreground">No archived sections found.</p>
@@ -1652,7 +1713,7 @@ export default function ManageSections() {
                     <p>Error loading sections: {sectionsError}</p>
                   </div>
                 ) : (
-                  completedSections.map((section) => (
+                  filteredCompletedSections.map((section) => (
                   <div key={section.id} className="space-y-4">
                     <Card>
                     <CardHeader>
@@ -1775,7 +1836,7 @@ export default function ManageSections() {
                 </div>
                 ))
               )}
-              {completedSections.length === 0 && (
+              {filteredCompletedSections.length === 0 && (
                 <Card>
                   <CardContent className="text-center py-8">
                     <p className="text-muted-foreground">No completed sections found.</p>

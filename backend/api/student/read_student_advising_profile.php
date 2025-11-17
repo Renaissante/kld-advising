@@ -13,22 +13,12 @@ $student_id = isset($_GET['student_id']) ? trim($_GET['student_id'], '\" ') : di
 error_log("Received student_id for profile: " . $student_id);
 
 // Prepare a SQL query to select comprehensive student advising profile details
-// This query assumes the following table structure:
-// - students: student_id, name, program_id, current_section_id, current_year_level_id, status
-// - programs: id, program_name, department_id
-// - departments: id, department_name
-// - sections: id, section_name, year_level_id
-// - year_levels: id, year_level_name
-// - advised_courses: student_id, course_id, academic_year_id, semester_id, advisor_id
-// - courses: id, unit_lec, unit_lab
-// - employees: employee_id, name
-
 $query = "SELECT
             COALESCE(s.name, 'N/A') AS student_name,
             COALESCE(s.student_id, 'N/A') AS student_number,
             COALESCE(d.name, 'N/A') AS institute_name,
             COALESCE(sec.name, 'N/A') AS program_year_section,
-            COALESCE(s.status, 'N/A') AS student_status,
+            COALESCE(s.enrollment_status::text, 'N/A') AS student_status,
             COALESCE(e.name, 'N/A') AS current_advisor_name,
             -- Total units earned (sum of passed courses from course_grades)
             (SELECT COALESCE(SUM(c_sum.unit_lec + c_sum.unit_lab), 0)
@@ -36,27 +26,63 @@ $query = "SELECT
              JOIN courses c_sum ON ac_sum.course_id = c_sum.id
              LEFT JOIN course_grades cg_sum ON ac_sum.student_id = cg_sum.student_id AND ac_sum.course_id = cg_sum.course_id
              WHERE ac_sum.student_id = s.student_id AND cg_sum.remarks = 'Passed') AS total_units_earned,
-            -- Last Enrollment Period from student_section_enrollments
+            -- Current Enrollment Period (most recent enrollment - active or completed)
             (SELECT
-                COALESCE(CONCAT(ay_last.academic_year_name, ' ', sem_last.semester_name), 'N/A')
-             FROM student_section_enrollments sse_last
-             JOIN sections sec_last ON sse_last.section_id = sec_last.id
-             JOIN academic_years ay_last ON sec_last.academic_year_id = ay_last.academic_year_id
-             JOIN semesters sem_last ON sec_last.semester_id = sem_last.semester_id
-             WHERE sse_last.student_id = s.id AND sse_last.enrollment_status = 'completed'
-             ORDER BY sse_last.completed_at DESC, sse_last.enrolled_at DESC
-             LIMIT 1) AS last_enrollment_period
+                COALESCE(CONCAT(ay_current.academic_year_name, ' ', sem_current.semester_name), 'N/A')
+             FROM student_section_enrollments sse_current
+             JOIN sections sec_current ON sse_current.section_id = sec_current.id
+             JOIN academic_years ay_current ON sec_current.academic_year_id = ay_current.academic_year_id
+             JOIN semesters sem_current ON sec_current.semester_id = sem_current.semester_id
+             WHERE sse_current.student_id = s.id 
+             ORDER BY 
+               CASE 
+                 WHEN sse_current.enrollment_status = 'enrolled' THEN 1
+                 WHEN sse_current.enrollment_status = 'completed' THEN 2
+                 ELSE 3
+               END,
+               sse_current.enrolled_at DESC
+             LIMIT 1) AS current_enrollment_period,
+            -- Next Enrollment Period (calculated based on current enrollment)
+            (SELECT
+                CASE 
+                  WHEN sem_current.semester_name ILIKE '%second%' THEN
+                    -- If Second Semester, next is First Semester of next academic year
+                    CONCAT(
+                      CAST(SPLIT_PART(ay_current.academic_year_name, '-', 1)::INTEGER + 1 AS TEXT),
+                      '-',
+                      CAST(SPLIT_PART(ay_current.academic_year_name, '-', 2)::INTEGER + 1 AS TEXT),
+                      ' First Semester'
+                    )
+                  WHEN sem_current.semester_name ILIKE '%first%' THEN
+                    -- If First Semester, next is Second Semester of same academic year
+                    CONCAT(ay_current.academic_year_name, ' Second Semester')
+                  ELSE
+                    'N/A'
+                END
+             FROM student_section_enrollments sse_current
+             JOIN sections sec_current ON sse_current.section_id = sec_current.id
+             JOIN academic_years ay_current ON sec_current.academic_year_id = ay_current.academic_year_id
+             JOIN semesters sem_current ON sec_current.semester_id = sem_current.semester_id
+             WHERE sse_current.student_id = s.id 
+             ORDER BY 
+               CASE 
+                 WHEN sse_current.enrollment_status = 'enrolled' THEN 1
+                 WHEN sse_current.enrollment_status = 'completed' THEN 2
+                 ELSE 3
+               END,
+               sse_current.enrolled_at DESC
+             LIMIT 1) AS next_enrollment_period
 
           FROM students s
           LEFT JOIN programs p ON s.program_id = p.id
           LEFT JOIN departments d ON s.department_id = d.id
           LEFT JOIN sections sec ON s.section_id = sec.id
           LEFT JOIN year_levels yl ON s.year_level_id = yl.id
-          LEFT JOIN advised_courses ac ON s.student_id = ac.student_id -- Used only for advisor_id for current semester, consider refining this if current advisor is from sections
+          LEFT JOIN advised_courses ac ON s.student_id = ac.student_id
           LEFT JOIN employees e ON ac.advisor_id = e.employee_id
           LEFT JOIN courses c ON ac.course_id = c.id
           WHERE s.student_id = :student_id
-          GROUP BY s.id, s.name, s.student_id, s.status, d.name, p.name, yl.level, sec.name, e.name";
+          GROUP BY s.id, s.name, s.student_id, s.enrollment_status, d.name, p.name, yl.level, sec.name, e.name";
 
 // Add logging for the prepared query
 error_log("Prepared SQL query for profile: " . $query);

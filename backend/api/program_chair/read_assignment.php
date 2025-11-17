@@ -63,42 +63,6 @@ try {
             // $faculty_id now correctly refers to the value from employees.employee_id (which matches users.id)
             $faculty_id = $row['faculty_id'];
 
-            // --- Calculate Sections Assigned (section_faculty uses faculty_id) --- This query is OK
-            $sections_assigned_query = "SELECT COUNT(sf.section_id) as count
-                                        FROM section_faculty sf
-                                        WHERE sf.faculty_id = :faculty_id AND sf.status = 'active'"; // Added status filter
-            $sections_assigned_stmt = $conn->prepare($sections_assigned_query);
-            if ($sections_assigned_stmt === false) throw new PDOException("Failed to prepare sections_assigned query: " . implode(" - ", $conn->errorInfo()));
-            $sections_assigned_stmt->bindParam(':faculty_id', $faculty_id);
-            $sections_assigned_stmt->execute();
-            $sections_assigned_count = $sections_assigned_stmt->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-
-            // --- CORRECTED Calculate Advised Sections Count (section_advisors uses advisor_id) ---
-            $advised_sections_query = "SELECT COUNT(sa.section_id) as count
-                                       FROM section_advisors sa
-                                       WHERE sa.advisor_id = :faculty_id"; // Use advisor_id column
-            $advised_sections_stmt = $conn->prepare($advised_sections_query);
-            if ($advised_sections_stmt === false) throw new PDOException("Failed to prepare advised_sections query: " . implode(" - ", $conn->errorInfo()));
-            $advised_sections_stmt->bindParam(':faculty_id', $faculty_id); // Bind the user's ID
-            $advised_sections_stmt->execute();
-            $advised_sections_count = $advised_sections_stmt->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-
-            // --- CORRECTED Calculate Advisees Count (section_advisors uses advisor_id) ---
-            $advisees_query = "SELECT COUNT(s.id) as count
-                               FROM students s
-                               JOIN section_advisors sa ON s.section_id = sa.section_id
-                               WHERE sa.advisor_id = :faculty_id AND s.section_id IS NOT NULL"; // Use advisor_id column
-            $advisees_stmt = $conn->prepare($advisees_query);
-            if ($advisees_stmt === false) throw new PDOException("Failed to prepare advisees query: " . implode(" - ", $conn->errorInfo()));
-            $advisees_stmt->bindParam(':faculty_id', $faculty_id); // Bind the user's ID
-            $advisees_stmt->execute();
-            $advisees_count = $advisees_stmt->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-
-            // Add counts to the faculty member's data
-            $row['sectionsAssigned'] = (int)$sections_assigned_count;
-            $row['advisedSectionsCount'] = (int)$advised_sections_count;
-            $row['adviseesAssigned'] = (int)$advisees_count;
-
             // Add the faculty member to the list
             $faculty_list[] = $row;
         }

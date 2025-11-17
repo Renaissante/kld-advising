@@ -3,22 +3,22 @@
 include_once '../../config/cors.php';
 
 // Set headers for content type
-header("Content-Type: application/json; charset=UTF-8"); // Standard content type
+header("Content-Type: application/json; charset=UTF-8");
 
-// Handle OPTIONS request (preflight) - Keep this for frontend interaction
+// Handle OPTIONS request (preflight)
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     header("Access-Control-Allow-Methods: GET, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization"); // Allow necessary headers
+    header("Access-Control-Allow-Headers: Content-Type, Authorization");
     exit(0);
 }
 
 // Include database configuration
-include_once '../../config/database.php'; // Use database.php (assuming it provides $conn)
+include_once '../../config/database.php';
 
 // Check database connection
 if (!isset($conn) || $conn === null) {
     http_response_code(500);
-    error_log("Database connection failed in get_students_by_section.php."); // Add error logging
+    error_log("Database connection failed in get_students_by_section.php.");
     echo json_encode(array("success" => false, "message" => "Database connection failed."));
     exit();
 }
@@ -26,11 +26,11 @@ if (!isset($conn) || $conn === null) {
 // --- Authorization Check (Based on Passed ID) ---
 // Check if faculty_id is provided
 if (!isset($_GET['faculty_id'])) {
-    http_response_code(401); // Unauthorized (or 400 Bad Request)
+    http_response_code(401);
     echo json_encode(array("success" => false, "message" => "Unauthorized: Missing faculty identifier."));
     exit();
 }
-$faculty_id = $_GET['faculty_id']; // Use the passed faculty ID
+$faculty_id = $_GET['faculty_id'];
 
 // Fetch user roles from DB based on faculty_id to verify permissions
 try {
@@ -44,13 +44,13 @@ try {
     $user_roles = $role_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
 
     if (empty($user_roles)) {
-        http_response_code(403); // Forbidden
+        http_response_code(403);
         error_log("Forbidden access attempt: Invalid faculty_id or no roles found for user: " . $faculty_id);
         echo json_encode(array("success" => false, "message" => "Forbidden: Invalid faculty identifier or no roles assigned."));
         exit();
     }
 
-    $allowedRoles = ['faculty', 'dean', 'programchair']; // Define allowed roles
+    $allowedRoles = ['faculty', 'dean', 'programchair'];
     $hasPermission = false;
     foreach ($user_roles as $role_name) {
         if (in_array($role_name, $allowedRoles)) {
@@ -60,40 +60,37 @@ try {
     }
 
     if (!$hasPermission) {
-        http_response_code(403); // Forbidden
+        http_response_code(403);
         error_log("Forbidden access attempt by user ID: " . $faculty_id . " with roles: " . implode(', ', $user_roles));
         echo json_encode(array("success" => false, "message" => "Forbidden: User does not have permission to view students for this section."));
         exit();
     }
 } catch (PDOException $e) {
-     http_response_code(503); // Service Unavailable for DB errors during auth check
+     http_response_code(503);
      error_log("Database error during authorization check in get_students_by_section.php: " . $e->getMessage());
      echo json_encode(array(
          "success" => false,
          "message" => "Database error during authorization: " . $e->getMessage()
      ));
-     exit(); // Stop execution if auth fails
+     exit();
 }
 // --- End Authorization Check ---
 
 
 // --- Input Validation ---
-// Check if section_id is provided in GET request
 if (!isset($_GET['section_id'])) {
-    http_response_code(400); // Bad Request
+    http_response_code(400);
     echo json_encode(array("success" => false, "message" => "Missing required parameter: section_id"));
     exit();
 }
 
-// Validate section_id
 $section_id = filter_input(INPUT_GET, 'section_id', FILTER_VALIDATE_INT);
 if ($section_id === false || $section_id <= 0) {
-    http_response_code(400); // Bad Request
+    http_response_code(400);
     echo json_encode(array("success" => false, "message" => "Invalid section_id provided"));
     exit();
 }
 
-// Keep AY and Sem ID checks as they might be used elsewhere or for future features
 if (!isset($_GET['academic_year_id'])) {
     http_response_code(400);
     echo json_encode(array("success" => false, "message" => "Missing required parameter: academic_year_id"));
@@ -123,54 +120,80 @@ if ($active_sem_id === false || $active_sem_id <= 0) {
 try {
     error_log("Fetching students for section $section_id, AY ID: $active_ay_id, Sem ID: $active_sem_id requested by faculty $faculty_id.");
 
-    // --- Fetch Students, Units, and Advising Status ---
-    // NOTE: This query assumes you have a table named 'advised_courses'
-    // with columns 'student_id', 'academic_year_id', and 'semester_id'
-    // that records completed advising sessions.
-    // You may need to adjust the table name and column names based on your actual database schema.
+    // First, get the section's academic year and semester
+    $section_info_query = "SELECT academic_year_id, semester_id FROM sections WHERE id = :section_id";
+    $section_info_stmt = $conn->prepare($section_info_query);
+    $section_info_stmt->bindParam(':section_id', $section_id, PDO::PARAM_INT);
+    $section_info_stmt->execute();
+    $section_info = $section_info_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$section_info) {
+        http_response_code(404);
+        echo json_encode(array("success" => false, "message" => "Section not found"));
+        exit();
+    }
+
+    $section_ay_id = $section_info['academic_year_id'];
+    $section_sem_id = $section_info['semester_id'];
+
+    // Modified query: Use section's AY/Semester for advising status check
     $sql = "SELECT
                 s.student_id AS id,
                 s.name,
                 s.enrollment_status,
-                -- Subquery to calculate total units of courses ACTUALLY advised for this student
+                COALESCE(current_sec.name, enrolled_sec.name) AS current_section,
+                sse.enrollment_status AS section_enrollment_status,
+                sse.completed_at,
+                -- Calculate units based on the SECTION'S academic year/semester
                 (SELECT COALESCE(SUM(c.unit_lec + c.unit_lab), 0)
                  FROM advised_courses ac
                  JOIN courses c ON ac.course_id = c.id
                  WHERE ac.student_id = s.student_id
-                   AND ac.academic_year_id = :active_ay_id
-                   AND ac.semester_id = :active_sem_id
+                   AND ac.academic_year_id = :section_ay_id
+                   AND ac.semester_id = :section_sem_id
                 ) AS units,
-                -- Determine advising status
+                -- Count of advised courses for debugging
+                (SELECT COUNT(*)
+                 FROM advised_courses ac
+                 WHERE ac.student_id = s.student_id
+                   AND ac.academic_year_id = :section_ay_id
+                   AND ac.semester_id = :section_sem_id
+                ) AS advised_course_count,
+                -- Check advising status based on SECTION'S academic year/semester
                 CASE
                     WHEN EXISTS (
                         SELECT 1
                         FROM advised_courses ac
                         WHERE ac.student_id = s.student_id
-                        AND ac.academic_year_id = :active_ay_id
-                        AND ac.semester_id = :active_sem_id
-                        -- Add any other conditions to determine 'Done' status, e.g., a 'status' column in advised_courses
-                        -- AND ac.status = 'Completed'
+                          AND ac.academic_year_id = :section_ay_id
+                          AND ac.semester_id = :section_sem_id
+                        LIMIT 1
                     ) THEN 'Done'
                     ELSE 'Pending'
                 END AS advising_status
             FROM
                 students s
+            JOIN
+                student_section_enrollments sse ON s.id = sse.student_id
+            JOIN
+                sections enrolled_sec ON sse.section_id = enrolled_sec.id
+            LEFT JOIN
+                sections current_sec ON s.section_id = current_sec.id
             WHERE
-                s.section_id = :section_id -- Filter students by the selected section
+                sse.section_id = :section_id
             ORDER BY
-                s.name";
+                sse.enrollment_status ASC, s.name ASC";
 
-    // Prepare statement using $conn
+    // Prepare statement
     $stmt = $conn->prepare($sql);
     if ($stmt === false) {
         throw new PDOException("Failed to prepare student query: " . implode(" - ", $conn->errorInfo()));
     }
 
-    // Bind parameters
+    // Bind parameters - now using section's AY/Semester
     $stmt->bindParam(':section_id', $section_id, PDO::PARAM_INT);
-    $stmt->bindParam(':active_ay_id', $active_ay_id, PDO::PARAM_INT); // Bind AY ID for advising status check AND units calculation
-    $stmt->bindParam(':active_sem_id', $active_sem_id, PDO::PARAM_INT); // Bind Semester ID for advising status check AND units calculation
-
+    $stmt->bindParam(':section_ay_id', $section_ay_id, PDO::PARAM_INT);
+    $stmt->bindParam(':section_sem_id', $section_sem_id, PDO::PARAM_INT);
 
     // Execute query
     $stmt->execute();
@@ -178,35 +201,30 @@ try {
     // Fetch all results
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $num = count($students);
-    // --- End Fetch Students, Units, and Advising Status ---
-
 
     // --- Send Response ---
-    http_response_code(200); // OK
-    // Modify student objects to ensure units is an integer and advising_status is included
+    http_response_code(200);
     $students_data = array_map(function($student) {
-        $student['units'] = (int)$student['units']; // Ensure units is an integer
-        // advising_status is already included by the SQL query
+        $student['units'] = (int)$student['units'];
         return $student;
     }, $students);
 
     echo json_encode(array(
         "success" => true,
         "count" => $num,
-        "data" => $students_data, // Send the modified array
+        "data" => $students_data,
         "message" => ($num > 0) ? "Students retrieved successfully." : "No students found in this section."
     ));
-    // --- End Send Response ---
 
 } catch (PDOException $e) {
-    http_response_code(503); // Service Unavailable for DB errors
+    http_response_code(503);
     error_log("Database error in get_students_by_section.php: " . $e->getMessage());
     echo json_encode(array(
         "success" => false,
         "message" => "Database error: " . $e->getMessage()
     ));
 } catch (Exception $e) {
-    http_response_code(500); // Internal Server Error
+    http_response_code(500);
     error_log("General error in get_students_by_section.php: " . $e->getMessage());
     echo json_encode(array(
         "success" => false,

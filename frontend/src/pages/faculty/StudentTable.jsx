@@ -27,7 +27,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
   const ws = useRef(null);
 
   useEffect(() => {
-    ws.current = new WebSocket("wss://192.168.18.6:8080"); // Replace with your WebSocket server address
+    ws.current = new WebSocket("ws://192.168.18.6:8080"); // Replace with your WebSocket server address
 
     ws.current.onopen = () => {
       console.log("WebSocket connection established");

@@ -17,16 +17,16 @@ export const ActiveProvider = ({ children }) => {
       const academicYearResponse = await fetch(`${API_BASE_URL}/academic_year/read.php`);
       const academicYears = await academicYearResponse.json();
       
-      // Find active academic year
-      const activeYear = academicYears.find(year => year.status === 'Active');
+      // Find current academic year
+      const activeYear = academicYears.find(year => year.is_current === true);
       setActiveAcademicYear(activeYear || null);
 
       // Fetch semesters
       const semesterResponse = await fetch(`${API_BASE_URL}/semester/read.php`);
       const semesters = await semesterResponse.json();
       
-      // Find active semester
-      const activeSem = semesters.find(sem => sem.status === 'Active');
+      // Find current semester
+      const activeSem = semesters.find(sem => sem.is_current === true);
       setActiveSemester(activeSem || null);
 
       // Fetch advising period status only if activeYear and activeSem are found

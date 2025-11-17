@@ -57,7 +57,8 @@ const AdvisingPage = () => {
       setAcademicYears([]);
       setSemesters([]);
       try {
-        const apiUrl = `${API_BASE_URL}/faculty/get_sections.php?faculty_id=${user.id}`;
+        const statusFilter = activeTab === "current" ? "active" : "completed";
+        const apiUrl = `${API_BASE_URL}/faculty/get_sections.php?faculty_id=${user.id}&status_filter=${statusFilter}`;
         const response = await fetch(apiUrl);
 
         if (!response.ok) {
@@ -102,7 +103,7 @@ const AdvisingPage = () => {
     };
 
     fetchSections();
-  }, [user]);
+  }, [user, activeTab]);
 
   useEffect(() => {
     const fetchUnavailableAdvisorStudents = async () => {
@@ -233,6 +234,40 @@ const AdvisingPage = () => {
     );
   };
 
+  const handleSendAdvisingFormEmail = async (student) => {
+    if (!user?.id || !student?.id || !activeAcademicYear?.id || !activeSemester?.id) {
+      toast.error("Missing faculty, student, academic year, or semester information.");
+      return;
+    }
+
+    toast.info("Sending advising form email...");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/email/send_advising_form.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          student_id: student.id,
+          faculty_id: user.id,
+          academic_year_id: activeAcademicYear.id,
+          semester_id: activeSemester.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to send advising form email.");
+      }
+
+      toast.success(result.message || "Advising form email sent successfully!");
+    } catch (error) {
+      console.error("Error sending advising form email:", error);
+      toast.error(error.message || "Failed to send advising form email.");
+    }
+  };
 
   const hasAvailableSections = useMemo(() => {
     if (!allSections || allSections.length === 0) {
@@ -376,6 +411,7 @@ const AdvisingPage = () => {
               <StudentTable
                 students={unavailableAdvisorStudents}
                 onAdviseStudent={handleAdviseStudent}
+                onSendAdvisingFormEmail={handleSendAdvisingFormEmail}
                 sectionName="Students With Unavailable Advisors"
                 activeTab={activeTab}
               />
@@ -415,6 +451,7 @@ const AdvisingPage = () => {
               <StudentTable
                         students={students}
                 onAdviseStudent={handleAdviseStudent}
+                onSendAdvisingFormEmail={handleSendAdvisingFormEmail}
                 sectionName={selectedSection.name || ""}
                 activeTab={activeTab}
               />

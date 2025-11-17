@@ -22,21 +22,15 @@ if (!empty($data->semester_name)) {
             exit();
         }
 
-        // Check if there's already an active semester
-        $check_active_query = "SELECT COUNT(*) FROM semesters WHERE status = 'Active'";
-        $check_active_stmt = $conn->prepare($check_active_query);
-        $check_active_stmt->execute();
-        $has_active_semester = $check_active_stmt->fetchColumn() > 0;
-
-        // Set status to Inactive if there's already an active semester
-        $status = $has_active_semester ? 'Inactive' : 'Active';
-
         // Create semester
         $query = "INSERT INTO semesters (semester_name, status) VALUES (:semester_name, :status)";
         $stmt = $conn->prepare($query);
 
         // Sanitize and bind data
         $semester_name = htmlspecialchars(strip_tags($data->semester_name));
+
+        // Set status to Active by default if not provided, otherwise use provided status
+        $status = isset($data->status) ? htmlspecialchars(strip_tags($data->status)) : "Active";
 
         $stmt->bindParam(":semester_name", $semester_name);
         $stmt->bindParam(":status", $status);

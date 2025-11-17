@@ -29,6 +29,7 @@ import SetPasswordForm from "@/components/SetPasswordForm"; // Import SetPasswor
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
 
+
 export default function AppRoutes() {
   const { user, activeRole } = useContext(AuthContext); // Access user and activeRole
 
@@ -88,7 +89,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/admin/curriculum"
+        path="/admin/academic-structure"
         element={
           <ProtectedRoute requiredRoles="admin">
             <ManageCurriculum />
@@ -97,7 +98,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/admin/audit-trail"
+        path="/admin/audit-logs"
         element={
           <ProtectedRoute requiredRoles="admin">
             <AuditTrail />
@@ -211,6 +212,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      
       
       <Route
         path="/dean/home"

@@ -115,12 +115,12 @@ try {
     }
 
     // Fetch Active Academic Year
-    $stmt = $conn->prepare("SELECT academic_year_id, academic_year_name FROM academic_years WHERE status = 'active' LIMIT 1");
+    $stmt = $conn->prepare("SELECT academic_year_id, academic_year_name FROM academic_years WHERE is_current = TRUE LIMIT 1");
     $stmt->execute();
     $dashboard_data['activeAcademicYear'] = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Fetch Active Semester
-    $stmt = $conn->prepare("SELECT semester_id, semester_name FROM semesters WHERE status = 'active' LIMIT 1");
+    $stmt = $conn->prepare("SELECT semester_id, semester_name FROM semesters WHERE is_current = TRUE LIMIT 1");
     $stmt->execute();
     $dashboard_data['activeSemester'] = $stmt->fetch(PDO::FETCH_ASSOC);
 

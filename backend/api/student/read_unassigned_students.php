@@ -58,10 +58,10 @@ try {
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $student_item = array(
                 "id" => $row['student_db_id'], // Use the database ID of the student entry
-                "studentId" => $row['student_id'], // The user ID which is also the student ID
+                "student_id" => $row['student_id'], // The user ID which is also the student ID
                 "name" => $row['name'],
                 "email" => $row['email'],
-                "previousSection" => $row['previous_section_name']
+                "previous_section_name" => $row['previous_section_name']
             );
             array_push($students_arr, $student_item);
         }

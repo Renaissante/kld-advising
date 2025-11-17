@@ -8,10 +8,6 @@ require_once '../../config/database.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
-// Remove direct fetching of academic_year and semester from GET, as they will be active ones
-// $academicYear = isset($_GET['academic_year']) ? $_GET['academic_year'] : '';
-// $semester = isset($_GET['semester']) ? $_GET['semester'] : '';
-
 $program = isset($_GET['program']) ? $_GET['program'] : '';
 $section = isset($_GET['section']) ? $_GET['section'] : '';
 $yearLevel = isset($_GET['year_level']) ? $_GET['year_level'] : '';
@@ -19,12 +15,12 @@ $searchQuery = isset($_GET['search_query']) ? $_GET['search_query'] : '';
 
 try {
     // Fetch the active academic year and semester
-    $activeAcademicYearQuery = "SELECT academic_year_id, academic_year_name FROM academic_years WHERE status = 'active' LIMIT 1";
+    $activeAcademicYearQuery = "SELECT academic_year_id, academic_year_name FROM academic_years WHERE is_current = TRUE LIMIT 1";
     $activeAcademicYearStmt = $conn->prepare($activeAcademicYearQuery);
     $activeAcademicYearStmt->execute();
     $activeAcademicYear = $activeAcademicYearStmt->fetch(PDO::FETCH_ASSOC);
 
-    $activeSemesterQuery = "SELECT semester_id, semester_name FROM semesters WHERE status = 'active' LIMIT 1";
+    $activeSemesterQuery = "SELECT semester_id, semester_name FROM semesters WHERE is_current = TRUE LIMIT 1";
     $activeSemesterStmt = $conn->prepare($activeSemesterQuery);
     $activeSemesterStmt->execute();
     $activeSemester = $activeSemesterStmt->fetch(PDO::FETCH_ASSOC);
@@ -95,23 +91,13 @@ try {
         WHERE 1=1
         AND ay.academic_year_id = :active_academic_year_id
         AND sem.semester_id = :active_semester_id
+        AND sse.enrollment_status = 'enrolled'
     ";
 
     $params = [
         ':active_academic_year_id' => $academicYearId,
         ':active_semester_id' => $semesterId,
     ];
-
-    // The academic_year and semester filters are now implicitly handled by fetching the active ones
-    // No need for these conditional appends anymore
-    // if (!empty($academicYear)) {
-    //     $query .= " AND ay.academic_year_name = :academic_year";
-    //     $params[':academic_year'] = $academicYear;
-    // }
-    // if (!empty($semester)) {
-    //     $query .= " AND sem.semester_name = :semester";
-    //     $params[':semester'] = $semester;
-    // }
 
     if (!empty($program)) {
         $query .= " AND p.name = :program";
@@ -131,7 +117,21 @@ try {
     }
 
     // Add a GROUP BY to ensure unique advising forms per student for the active period
-    $query .= " GROUP BY s.student_id";
+    $query .= " GROUP BY 
+                 s.student_id, 
+                 s.id,
+                 s.name, 
+                 s.status,
+                 i.name,
+                 p.name,
+                 yl.level,
+                 sec.name,
+                 ay.academic_year_name,
+                 ay.academic_year_id,
+                 sem.semester_name,
+                 sem.semester_id,
+                 adv_emp.name
+                 ORDER BY s.name";
 
     $stmt = $conn->prepare($query);
     $stmt->execute($params);

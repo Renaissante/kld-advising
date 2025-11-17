@@ -54,8 +54,10 @@ const ManageGrades = () => {
     setError(null);
 
     try {
-      // Include faculty_id in URL for direct testing
-      const response = await fetch(`${API_BASE_URL}/faculty/get_courses.php?faculty_id=${user.id}`, {
+      // Determine the status filter based on the activeTab
+      const statusFilter = activeTab === "current" ? "active" : "completed";
+      // Include faculty_id and status_filter in URL
+      const response = await fetch(`${API_BASE_URL}/faculty/get_courses.php?faculty_id=${user.id}&status_filter=${statusFilter}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ const ManageGrades = () => {
     } finally {
       setCoursesLoading(false);
     }
-  }, [user]);
+  }, [user, activeTab]);
 
   // Fetch courses on component mount
   useEffect(() => {
@@ -107,51 +109,18 @@ const ManageGrades = () => {
   const getDisplayedCourses = () => {
     let coursesToDisplay = [];
 
-  
-    // console.log("Active AY:", activeAcademicYear?.year);
-    // console.log("Active Semester:", activeSemester?.name);
-    // console.log("Active Semester ID:", activeSemester?.id);
-    // console.log("All Courses:", allCourses);
-
     if (activeTab === "current") {
-      // Filter for current semester courses using activeAcademicYear and activeSemester
       coursesToDisplay = allCourses.filter(course =>
         course.ay === activeAcademicYear?.year && course.sem === activeSemester?.name
       );
-      // console.log("Current semester courses:", coursesToDisplay);
-    } else {
-      // For the "all" tab (previous semesters)
+    } else { // activeTab === "all" (Previous Semesters)
       if (selectedHistoricalAy && selectedHistoricalSem) {
-        // Filter based on selected historical values
         coursesToDisplay = allCourses.filter(course =>
           course.ay === selectedHistoricalAy && course.sem === selectedHistoricalSem
         );
-        // console.log("Selected historical courses:", coursesToDisplay);
       } else {
-        // Show courses from previous semesters only
-        // Convert values to ensure proper comparison
-        const activeAY = activeAcademicYear?.year || "";
-        const activeSemID = parseInt(activeSemester?.id) || 0;
-
-        // First priority: courses from previous academic years
-        const previousAYCourses = allCourses.filter(course => {
-          // Compare as strings to handle academic year format like "2023-2024"
-          return String(course.ay) < String(activeAY);
-        });
-
-        // console.log("Previous AY courses:", previousAYCourses);
-
-        // Second priority: courses from earlier semesters in the current academic year
-        const currentAYPreviousSemCourses = allCourses.filter(course => {
-          const courseSemID = parseInt(course.semester_id) || 0;
-          return String(course.ay) === String(activeAY) && courseSemID < activeSemID;
-        });
-
-        // console.log("Current AY previous semester courses:", currentAYPreviousSemCourses);
-
-        // Combine both sets of courses
-        coursesToDisplay = [...previousAYCourses, ...currentAYPreviousSemCourses];
-        // console.log("All previous courses:", coursesToDisplay);
+        // If no specific historical AY/Sem selected, display all courses fetched for 'inactive' status
+        coursesToDisplay = allCourses;
       }
     }
 
@@ -160,8 +129,6 @@ const ManageGrades = () => {
       course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    // console.log("Filtered displayed courses:", filteredCourses);
     return filteredCourses;
   };
 

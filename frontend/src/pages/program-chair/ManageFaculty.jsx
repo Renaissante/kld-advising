@@ -324,9 +324,7 @@ export default function ManageFaculty() {
                           {/* Use dynamic data keys */}
                           <TableHead className="px-3 py-2 font-medium w-[250px]">Name</TableHead>
                           <TableHead className="px-3 py-2 font-medium w-[120px]">Department</TableHead>
-                          <TableHead className="px-3 py-2 font-medium w-[130px]">Sections Assigned</TableHead>
-                          <TableHead className="px-3 py-2 font-medium w-[130px]">Advised Sections</TableHead>
-                          <TableHead className="px-3 py-2 font-medium w-[100px]">Advisees</TableHead>
+                          
                           <TableHead className="px-3 py-2 font-medium w-[130px]">Advisor Status</TableHead>
                           <TableHead className="text-right px-3 py-2 font-medium w-[100px]">Actions</TableHead>
                     </TableRow>
@@ -344,9 +342,7 @@ export default function ManageFaculty() {
                           </div>
                         </TableCell>
                               <TableCell className="px-3 py-2">{faculty.department_name}</TableCell>
-                        <TableCell className="px-3 py-2">{faculty.sectionsAssigned}</TableCell>
-                              <TableCell className="px-3 py-2">{faculty.advisedSectionsCount}</TableCell>
-                        <TableCell className="px-3 py-2">{faculty.adviseesAssigned}</TableCell>
+                        
                         <TableCell className="px-3 py-2">
                           <Button
                             variant={faculty.advisor_status === 'available' ? 'outline' : 'destructive'}
@@ -384,7 +380,7 @@ export default function ManageFaculty() {
                           : // Show message when filtered list is empty
                           (
                       <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center">
+                        <TableCell colSpan={4} className="h-24 text-center">
                                 {searchQuery ? "No matching faculty found." : "No faculty members available."}
                         </TableCell>
                       </TableRow>

@@ -21,7 +21,8 @@ import {
   Archive,
   Check,
   CalendarDays, // Import CalendarDays for the new component
-  Bell
+  Bell,
+  Layers
 } from "lucide-react"
 import {
   Sidebar,
@@ -90,7 +91,7 @@ export function AppSidebar() {
       { title: "Active Users", url: "/admin/users/active-users", icon: Users },
       { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
     ] },
-    { title: "Curriculum Data", url: "/admin/curriculum", icon: Inbox, roles: ["admin"] },
+    { title: "Academic Structure", url: "/admin/academic-structure", icon: Layers, roles: ["admin"] },
     { title: "Grades", url: "/faculty/grades", icon: BookA, roles: ["faculty"] },
     { title: "Advise", url: "/faculty/advise", basePath: "/faculty/credit-courses", icon: NotebookPen, roles: ["faculty"] },
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
@@ -98,7 +99,7 @@ export function AppSidebar() {
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
     { title: "Manage Faculty", url: "/program-chair/manage-faculty", basePath: "/program-chair/faculty-assignment", icon: ListPlus, roles: ["programchair"] },
     { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
-    { title: "Audit Trail", url: "/admin/audit-trail", icon: ClipboardList, roles: ["admin"] },
+    { title: "Audit Logs", url: "/admin/audit-logs", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
     { title: "Generate Reports", url: "/dean/generate-reports", icon: ClipboardList, roles: ["dean"] }, // New item for Dean Reports

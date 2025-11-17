@@ -255,31 +255,31 @@ try {
     }
 
     // Optimized check for students to become 'Regular'
-    if (!empty($studentsToPossiblySetRegular)) {
-        $placeholders = implode(',', array_fill(0, count($studentsToPossiblySetRegular), '?'));
-        // Find students who have *no outstanding failed prerequisites* for any course they are enrolled in or need to take.
-        // This means, for any course a student is NOT passed in, if that course has prerequisites, all those prerequisites must be passed.
-        $studentsWithOutstandingFailedPrereqsQuery = "SELECT DISTINCT s.student_id
-                                                      FROM students s
-                                                      JOIN student_course_enrollments sce ON s.student_id = sce.student_id
-                                                      JOIN courses c_main ON sce.course_id = c_main.id
-                                                      LEFT JOIN course_prerequisites cp ON c_main.id = cp.course_id
-                                                      LEFT JOIN course_grades cg_prereq ON s.student_id = cg_prereq.student_id AND cp.prerequisite_course_id = cg_prereq.course_id
-                                                      WHERE s.student_id IN ($placeholders)
-                                                        AND (
-                                                                (cg_prereq.remarks = 'Failed') OR 
-                                                                (cp.prerequisite_course_id IS NOT NULL AND cg_prereq.remarks IS NULL)
-                                                            )";
-        $studentsWithOutstandingFailedPrereqsStmt = $conn->prepare($studentsWithOutstandingFailedPrereqsQuery);
-        $studentsWithOutstandingFailedPrereqsStmt->execute($studentsToPossiblySetRegular);
-        $studentsWithRemainingFailedPrereqs = $studentsWithOutstandingFailedPrereqsStmt->fetchAll(PDO::FETCH_COLUMN);
+    // if (!empty($studentsToPossiblySetRegular)) {
+    //     $placeholders = implode(',', array_fill(0, count($studentsToPossiblySetRegular), '?'));
+    //     // Find students who have *no outstanding failed prerequisites* for any course they are enrolled in or need to take.
+    //     // This means, for any course a student is NOT passed in, if that course has prerequisites, all those prerequisites must be passed.
+    //     $studentsWithOutstandingFailedPrereqsQuery = "SELECT DISTINCT s.student_id
+    //                                                   FROM students s
+    //                                                   JOIN course_grades sce ON s.student_id = sce.student_id
+    //                                                   JOIN courses c_main ON sce.course_id = c_main.id
+    //                                                   LEFT JOIN course_prerequisites cp ON c_main.id = cp.course_id
+    //                                                   LEFT JOIN course_grades cg_prereq ON s.student_id = cg_prereq.student_id AND cp.prerequisite_course_id = cg_prereq.course_id
+    //                                                   WHERE s.student_id IN ($placeholders)
+    //                                                     AND (
+    //                                                             (cg_prereq.remarks = 'Failed') OR 
+    //                                                             (cp.prerequisite_course_id IS NOT NULL AND cg_prereq.remarks IS NULL)
+    //                                                         )";
+    //     $studentsWithOutstandingFailedPrereqsStmt = $conn->prepare($studentsWithOutstandingFailedPrereqsQuery);
+    //     $studentsWithOutstandingFailedPrereqsStmt->execute($studentsToPossiblySetRegular);
+    //     $studentsWithRemainingFailedPrereqs = $studentsWithOutstandingFailedPrereqsStmt->fetchAll(PDO::FETCH_COLUMN);
 
-        $studentsWhoCanBeRegular = array_diff($studentsToPossiblySetRegular, $studentsWithRemainingFailedPrereqs);
+    //     $studentsWhoCanBeRegular = array_diff($studentsToPossiblySetRegular, $studentsWithRemainingFailedPrereqs);
 
-        foreach ($studentsWhoCanBeRegular as $sid) {
-            $studentsToUpdateStatus[] = ['id' => $sid, 'status' => 'Regular'];
-        }
-    }
+    //     foreach ($studentsWhoCanBeRegular as $sid) {
+    //         $studentsToUpdateStatus[] = ['id' => $sid, 'status' => 'Regular'];
+    //     }
+    // }
 
 
     // Commit or rollback transaction based on success

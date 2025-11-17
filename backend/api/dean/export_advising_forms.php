@@ -24,12 +24,12 @@ error_log("Export request received: Program = " . $program . ", Section = " . $s
 
 try {
     // Fetch the active academic year and semester
-    $activeAcademicYearQuery = "SELECT academic_year_id, academic_year_name FROM academic_years WHERE status = 'active' LIMIT 1";
+    $activeAcademicYearQuery = "SELECT academic_year_id, academic_year_name FROM academic_years WHERE is_current = TRUE LIMIT 1";
     $activeAcademicYearStmt = $conn->prepare($activeAcademicYearQuery);
     $activeAcademicYearStmt->execute();
     $activeAcademicYear = $activeAcademicYearStmt->fetch(PDO::FETCH_ASSOC);
 
-    $activeSemesterQuery = "SELECT semester_id, semester_name FROM semesters WHERE status = 'active' LIMIT 1";
+    $activeSemesterQuery = "SELECT semester_id, semester_name FROM semesters WHERE is_current = TRUE LIMIT 1";
     $activeSemesterStmt = $conn->prepare($activeSemesterQuery);
     $activeSemesterStmt->execute();
     $activeSemester = $activeSemesterStmt->fetch(PDO::FETCH_ASSOC);

@@ -37,13 +37,8 @@ if (
         $start_date = htmlspecialchars(strip_tags($data->start_date));
         $end_date = htmlspecialchars(strip_tags($data->end_date));
         
-        // Check if there's already an active academic year
-        $check_active_query = "SELECT COUNT(*) FROM academic_years WHERE status = 'Active'";
-        $check_active_stmt = $conn->prepare($check_active_query);
-        $check_active_stmt->execute();
-        
-        // Set status to Inactive if there's already an active academic year
-        $status = $check_active_stmt->fetchColumn() > 0 ? "Inactive" : "Active";
+        // Set status to Active by default if not provided, otherwise use provided status
+        $status = isset($data->status) ? htmlspecialchars(strip_tags($data->status)) : "Active";
 
         $stmt->bindParam(":academic_year_name", $academic_year_name);
         $stmt->bindParam(":start_date", $start_date);

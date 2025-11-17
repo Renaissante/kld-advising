@@ -94,7 +94,7 @@ try {
     }
 
     // Get course details for reference
-    $courseQuery = "SELECT c.course_code, c.course_title, s.name
+    $courseQuery = "SELECT c.course_code, c.course_title, s.name, s.status as section_status
                     FROM courses c
                     JOIN sections s ON s.id = :section_id
                     WHERE c.id = :course_id";
@@ -121,23 +121,32 @@ try {
         exit();
     }
 
-    // Now fetch students enrolled in this section
-    $query = "SELECT s.id, s.student_id, s.name, sec.name as section,
-                     c.course_code, c.course_title,
-                     COALESCE(g.transmutation, '') as transmutation,
-                     COALESCE(g.remarks, '') as remarks,
-                     COALESCE(g.is_credited, 0) as is_credited
+    // Modified query: Use student_section_enrollments to find students who were/are enrolled in this section
+    // This allows us to see students even after they've moved to a different section
+    $query = "SELECT 
+                  s.id, 
+                  s.student_id, 
+                  s.name, 
+                  COALESCE(current_sec.name, enrolled_sec.name) as section,
+                  c.course_code, 
+                  c.course_title,
+                  COALESCE(g.transmutation, '') as transmutation,
+                  COALESCE(g.remarks, '') as remarks,
+                  COALESCE(g.is_credited, 0) as is_credited,
+                  sse.enrollment_status,
+                  sse.completed_at
               FROM students s
-              JOIN sections sec ON s.section_id = sec.id
+              JOIN student_section_enrollments sse ON s.id = sse.student_id
+              JOIN sections enrolled_sec ON sse.section_id = enrolled_sec.id
+              LEFT JOIN sections current_sec ON s.section_id = current_sec.id
               JOIN courses c ON c.id = :course_id
               LEFT JOIN course_grades g ON g.id = (
                                             SELECT MAX(id) FROM course_grades 
                                             WHERE student_id = s.student_id 
                                             AND course_id = :course_id
                                           )
-              WHERE s.section_id = :section_id
+              WHERE sse.section_id = :section_id
                 AND COALESCE(g.is_credited, 0) = 0
-              -- ORDER BY s.name -- Removed individual ORDER BY to fix UNION ALL syntax
     ";
 
     // Add a UNION ALL to include irregular students enrolled in this course for retake
@@ -147,18 +156,20 @@ try {
             s.id, 
             s.student_id, 
             s.name, 
-            sec.name as section,
+            COALESCE(sec.name, 'N/A') as section,
             c.course_code, 
             c.course_title,
             COALESCE(g.transmutation, '') as transmutation,
             COALESCE(g.remarks, '') as remarks,
-            0 as is_credited -- Irregular students are not credited until passed
+            0 as is_credited,
+            'enrolled' as enrollment_status,
+            null as completed_at
         FROM 
             students s
         JOIN 
             irregular_course_enrollments ice ON s.id = ice.student_id
-        JOIN 
-            sections sec ON ice.section_id = sec.id
+        LEFT JOIN 
+            sections sec ON s.section_id = sec.id
         JOIN 
             courses c ON ice.course_id = c.id
         LEFT JOIN 
@@ -171,11 +182,7 @@ try {
     ";
 
     // Add the global ORDER BY clause for the entire UNION ALL query
-    $query .= " ORDER BY name ASC";
-
-    // DEBUG: Print the query to identify syntax error
-    // echo "<pre>$query</pre>";
-    // exit();
+    $query .= " ORDER BY enrollment_status ASC, name ASC";
 
     $stmt = $conn->prepare($query);
     if ($stmt === false) {
@@ -184,14 +191,6 @@ try {
 
     $stmt->bindParam(':course_id', $courseId, PDO::PARAM_INT);
     $stmt->bindParam(':section_id', $sectionId, PDO::PARAM_INT);
-    // $stmt->bindParam(':course_curriculum_id', $courseCurriculumId, PDO::PARAM_INT); // Removed: no longer used in query
-    // $stmt->bindParam(':academic_year_id', $academic_year_id, PDO::PARAM_INT); // Removed: course_grades does not have AY/Sem
-    // $stmt->bindParam(':semester_id', $semester_id, PDO::PARAM_INT); // Removed: course_grades does not have AY/Sem
-    // Bind parameters again for the UNION ALL part (if they are named differently, or use same names)
-    // For PDO, if parameters have the same name, they only need to be bound once.
-    // $stmt->bindParam(':section_id_union', $sectionId, PDO::PARAM_INT);
-    // $stmt->bindParam(':course_id_union', $courseId, PDO::PARAM_INT);
-    // $stmt->bindParam(':course_curriculum_id_union', $courseCurriculumId, PDO::PARAM_INT);
     $stmt->execute();
 
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);

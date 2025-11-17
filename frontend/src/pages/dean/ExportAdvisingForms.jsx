@@ -80,7 +80,7 @@ const ExportAdvisingForms = () => {
 
     useEffect(() => {
         fetchFilterData();
-    }, [fetchFilterData]);
+    }, [fetchFilterData, selectedAcademicYear, selectedSemester]);
 
     // Dependent dropdown logic
     useEffect(() => {
@@ -180,9 +180,9 @@ const ExportAdvisingForms = () => {
             // const matchesAcademicYear = selectedAcademicYear === "all" || (form?.academic_year_name ?? '') === selectedAcademicYear;
             // const matchesSemester = selectedSemester === "all" || (form?.semester_name ?? '') === selectedSemester;
 
-            // Removed: const matchesStatus = form?.status === "Completed"; // Only include completed forms
+            const matchesStatus = form?.status === "Completed"; // Only include completed forms
 
-            return matchesSearch && matchesSection && matchesYearLevel && matchesProgram;
+            return matchesSearch && matchesSection && matchesYearLevel && matchesProgram && matchesStatus;
         });
         setFilteredAdvisingForms(filtered);
         setCurrentPage(1); // Reset to first page on filter change
@@ -303,7 +303,7 @@ const ExportAdvisingForms = () => {
                                     <div className="flex items-start justify-between">
                                         <div>
                                             <p className="text-sm text-muted-foreground mb-1">Total Forms</p>
-                                           <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{allAdvisingForms.length}</p>
+                                           <p className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{filteredAdvisingForms.length}</p>
                                             <p className="text-xs text-gray-500 mt-1">All advising records</p>
                                         </div>
                                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">

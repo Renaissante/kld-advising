@@ -8,16 +8,19 @@ import { Table, TableHead, TableRow, TableHeader, TableCell, TableBody } from "@
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogPortal } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { PlusSquare, Trash2, Edit } from "lucide-react";
+import { PlusSquare, Trash2, Edit, ArrowRightCircle } from "lucide-react";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { Label } from "@/components/ui/label";
 import { PaginationComponent } from "@/components/shared/PaginationComponent";
 import { useActive } from '@/contexts/ActiveContext';
 import { API_BASE_URL } from '@/config/api';
+
+
+
 const ManageCurriculum = () => {
+ 
   const [selectedTab, setSelectedTab] = useState("academic_year");
   const [showStatusDialog, setShowStatusDialog] = useState(false);
-  const [showMaxActiveDialog, setShowMaxActiveDialog] = useState(false);
   const [yearToUpdate, setYearToUpdate] = useState(null);
   const [semesterToUpdate, setSemesterToUpdate] = useState(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
@@ -134,6 +137,17 @@ const ManageCurriculum = () => {
     });
   }, [activeAcademicYear, activeSemester]);
 
+  // Update progress form when active academic year or semester changes
+  useEffect(() => {
+    if (activeAcademicYear && activeSemester) {
+      setProgressForm(prev => ({
+        ...prev,
+        fromAcademicYearId: activeAcademicYear.id,
+        fromSemesterId: activeSemester.id,
+      }));
+    }
+  }, [activeAcademicYear, activeSemester]);
+
   // Add dialog state management
   const handleDialogChange = (dialogType, isOpen) => {
     // Set the specific dialog state
@@ -164,9 +178,6 @@ const ManageCurriculum = () => {
           setYearToUpdate(null);
           setSemesterToUpdate(null);
         }
-        break;
-      case 'maxActive':
-        setShowMaxActiveDialog(isOpen);
         break;
       case 'validation':
         setShowValidationDialog(isOpen);
@@ -1108,6 +1119,109 @@ const ManageCurriculum = () => {
     }
   };
 
+  // Add new state for progress students dialog
+  const [showProgressStudentsDialog, setShowProgressStudentsDialog] = useState(false);
+  const [progressForm, setProgressForm] = useState({
+    fromAcademicYearId: null,
+    fromSemesterId: null,
+    toAcademicYearId: null,
+    toSemesterId: null
+  });
+  const [affectedStudentsCount, setAffectedStudentsCount] = useState(0);
+  // const [progressionSuccessful, setProgressionSuccessful] = useState(false); // Removed state
+
+  // Effect to fetch affected students count
+  useEffect(() => {
+    const fetchAffectedStudentsCount = async () => {
+      const { fromAcademicYearId, fromSemesterId, toAcademicYearId, toSemesterId } = progressForm;
+
+      if (fromAcademicYearId && fromSemesterId && toAcademicYearId && toSemesterId) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/student/read_affected_students_count.php`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from_academic_year_id: fromAcademicYearId,
+              from_semester_id: fromSemesterId,
+              to_academic_year_id: toAcademicYearId,
+              to_semester_id: toSemesterId,
+            })
+          });
+
+          const data = await response.json();
+          if (response.ok && data.affected_students_count !== undefined) {
+            setAffectedStudentsCount(data.affected_students_count);
+          } else {
+            console.error("Failed to fetch affected students count:", data.message);
+            setAffectedStudentsCount(0);
+          }
+        } catch (error) {
+          console.error("Error fetching affected students count:", error);
+          setAffectedStudentsCount(0);
+        }
+      } else {
+        setAffectedStudentsCount(0); // Reset count if not all required fields are selected
+      }
+    };
+
+    fetchAffectedStudentsCount();
+  }, [progressForm.fromAcademicYearId, progressForm.fromSemesterId, progressForm.toAcademicYearId, progressForm.toSemesterId]);
+
+  // Add handler for progress students
+  const handleProgressStudents = async () => {
+    if (!progressForm.fromAcademicYearId || !progressForm.fromSemesterId || !progressForm.toAcademicYearId || !progressForm.toSemesterId) {
+      showError("Please select all options for progress students.");
+      return;
+    }
+
+    // Add validation to prevent progressing to the same academic year and semester
+    if (progressForm.fromAcademicYearId === progressForm.toAcademicYearId &&
+        progressForm.fromSemesterId === progressForm.toSemesterId) {
+      showError("Cannot progress students to the same academic year and semester.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/student/progress_students.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from_academic_year_id: progressForm.fromAcademicYearId,
+          from_semester_id: progressForm.fromSemesterId,
+          to_academic_year_id: progressForm.toAcademicYearId,
+          to_semester_id: progressForm.toSemesterId
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAffectedStudentsCount(data.affected_students_count);
+        showError(data.message || "Students successfully progressed to new period.");
+        setShowProgressStudentsDialog(false);
+        await refreshActiveData();
+        
+        // Close dialog here
+        // Removed logic to reset 'to' fields and affected count from here
+        // setProgressForm(prev => ({
+        //   ...prev,
+        //   toAcademicYearId: null,
+        //   toSemesterId: null
+        // }));
+        // setAffectedStudentsCount(0);
+      } else {
+        showError(data.message || "Failed to progress students to new period.");
+      }
+    } catch (error) {
+      showError("Error connecting to the server");
+      console.error("Error:", error);
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -1120,119 +1234,136 @@ const ManageCurriculum = () => {
             <main className="w-full p-4 md:p-6 overflow-auto">
               <div className="flex justify-between items-start">
                 <h1 className="text-xl font-semibold text-[#1b4b2a]">{tabTitles[selectedTab]}</h1>
-                <Dialog open={showAddDialog} onOpenChange={(open) => handleDialogChange('add', open)}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="p-2">
-                      <PlusSquare size={24} />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogPortal>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add {tabTitles[selectedTab].replace("Manage ", "")}</DialogTitle>
-                      </DialogHeader>
-                      
-                      {selectedTab === "academic_year" && (
-                        <>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="academicYear">Academic Year</Label>
+                <div className="flex items-start space-x-4"> {/* New div for buttons */}
+                  <Dialog open={showAddDialog} onOpenChange={(open) => handleDialogChange('add', open)}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="p-2">
+                        <PlusSquare size={24} /> Create
+                      </Button>
+                    </DialogTrigger>
+                    <DialogPortal>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add {tabTitles[selectedTab].replace("Manage ", "")}</DialogTitle>
+                        </DialogHeader>
+                        
+                        {selectedTab === "academic_year" && (
+                          <>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="academicYear">Academic Year</Label>
+                              <Input
+                                id="academicYear"
+                                placeholder="YYYY-YYYY (e.g., 2024-2025)"
+                                value={newAcademicYear.year}
+                                onChange={handleAcademicYearInput}
+                                className={!isValidAcademicYear(newAcademicYear.year) && newAcademicYear.year ? "border-red-500" : ""}
+                              />
+                              {!isValidAcademicYear(newAcademicYear.year) && newAcademicYear.year && (
+                                <p className="text-sm text-red-500">Please enter a valid academic year (e.g., 2024-2025)</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="startDate">Start Date</Label>
+                              <DatePicker
+                                id="startDate"
+                                value={newAcademicYear.startDate}
+                                onChange={(date) => setNewAcademicYear({ ...newAcademicYear, startDate: date })}
+                                required
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="endDate">End Date</Label>
+                              <DatePicker
+                                id="endDate"
+                                value={newAcademicYear.endDate}
+                                onChange={(date) => setNewAcademicYear({ ...newAcademicYear, endDate: date })}
+                                required
+                              />
+                            </div>
+                            <DialogFooter>
+                              <Button variant="green" onClick={handleAddAcademicYear}>Save</Button>
+                            </DialogFooter>
+                          </>
+                        )}
+
+                        {selectedTab === "program" && (
+                          <>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="programName">Program Name</Label>
+                              <Input
+                                id="programName"
+                                placeholder="Program Name"
+                                value={newProgram.name}
+                                onChange={(e) => setNewProgram({ ...newProgram, name: e.target.value })}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="department">Department</Label>
+                              <Select
+                                value={newProgram.department_id?.toString() || "null"}
+                                onValueChange={(value) => setNewProgram({ ...newProgram, department_id: value === "null" ? null : parseInt(value) })}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Select Department (Optional)" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="null">None</SelectItem>
+                                  {departments.map((department) => (
+                                    <SelectItem key={department.id} value={department.id.toString()}>
+                                      {department.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="green" onClick={handleAddProgram}>Save</Button>
+                            </DialogFooter>
+                          </>
+                        )}
+
+                        {selectedTab === "semester" && (
+                          <>
                             <Input
-                              id="academicYear"
-                              placeholder="YYYY-YYYY (e.g., 2024-2025)"
-                              value={newAcademicYear.year}
-                              onChange={handleAcademicYearInput}
-                              className={!isValidAcademicYear(newAcademicYear.year) && newAcademicYear.year ? "border-red-500" : ""}
+                              placeholder="Semester Name"
+                              value={newSemester.name}
+                              onChange={(e) => setNewSemester({ ...newSemester, name: e.target.value })}
                             />
-                            {!isValidAcademicYear(newAcademicYear.year) && newAcademicYear.year && (
-                              <p className="text-sm text-red-500">Please enter a valid academic year (e.g., 2024-2025)</p>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="startDate">Start Date</Label>
-                            <DatePicker
-                              id="startDate"
-                              value={newAcademicYear.startDate}
-                              onChange={(date) => setNewAcademicYear({ ...newAcademicYear, startDate: date })}
-                              required
-                            />
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="endDate">End Date</Label>
-                            <DatePicker
-                              id="endDate"
-                              value={newAcademicYear.endDate}
-                              onChange={(date) => setNewAcademicYear({ ...newAcademicYear, endDate: date })}
-                              required
-                            />
-                          </div>
-                          <DialogFooter>
-                            <Button variant="green" onClick={handleAddAcademicYear}>Save</Button>
-                          </DialogFooter>
-                        </>
-                      )}
+                            <DialogFooter>
+                              <Button variant="green" onClick={handleAddSemester}>Save</Button>
+                            </DialogFooter>
+                          </>
+                        )}
 
-                      {selectedTab === "program" && (
-                        <>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="programName">Program Name</Label>
+                        {selectedTab === "year_level" && (
+                          <>
                             <Input
-                              id="programName"
-                              placeholder="Program Name"
-                              value={newProgram.name}
-                              onChange={(e) => setNewProgram({ ...newProgram, name: e.target.value })}
+                              placeholder="Year Level"
+                              value={newYearLevel.name}
+                              onChange={(e) => setNewYearLevel({ ...newYearLevel, name: e.target.value })}
                             />
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="department">Department</Label>
-                            <Select
-                              value={newProgram.department_id?.toString() || "null"}
-                              onValueChange={(value) => setNewProgram({ ...newProgram, department_id: value === "null" ? null : parseInt(value) })}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Select Department (Optional)" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="null">None</SelectItem>
-                                {departments.map((department) => (
-                                  <SelectItem key={department.id} value={department.id.toString()}>
-                                    {department.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="green" onClick={handleAddProgram}>Save</Button>
-                          </DialogFooter>
-                        </>
-                      )}
-
-                      {selectedTab === "semester" && (
-                        <>
-                          <Input
-                            placeholder="Semester Name"
-                            value={newSemester.name}
-                            onChange={(e) => setNewSemester({ ...newSemester, name: e.target.value })}
-                          />
-                          <DialogFooter>
-                            <Button variant="green" onClick={handleAddSemester}>Save</Button>
-                          </DialogFooter>
-                        </>
-                      )}
-
-                      {selectedTab === "year_level" && (
-                        <>
-                          <Input
-                            placeholder="Year Level"
-                            value={newYearLevel.name}
-                            onChange={(e) => setNewYearLevel({ ...newYearLevel, name: e.target.value })}
-                          />
-                          <DialogFooter>
-                            <Button variant="green" onClick={handleAddYearLevel}>Save</Button>
-                          </DialogFooter>
-                        </>
-                      )}
-                    </DialogContent>
-                  </DialogPortal>
-                </Dialog>
+                            <DialogFooter>
+                              <Button variant="green" onClick={handleAddYearLevel}>Save</Button>
+                            </DialogFooter>
+                          </>
+                        )}
+                      </DialogContent>
+                    </DialogPortal>
+                  </Dialog>
+                  <Button
+                    variant="outline"
+                    className="p-2 ml-4"
+                    onClick={() => {
+                      setProgressForm(prev => ({
+                        ...prev,
+                        toAcademicYearId: null,
+                        toSemesterId: null
+                      }));
+                      setAffectedStudentsCount(0);
+                      setShowProgressStudentsDialog(true);
+                    }}
+                  >
+                    <ArrowRightCircle size={24} /> Progress
+                  </Button>
+                </div>
               </div>
 
               <Tabs defaultValue="academic_year" onValueChange={setSelectedTab}>
@@ -1253,7 +1384,8 @@ const ManageCurriculum = () => {
                           <TableHead className="w-[20%]">Start Date</TableHead>
                           <TableHead className="w-[20%]">End Date</TableHead>
                           <TableHead className="w-[15%]">Status</TableHead>
-                          <TableHead className="w-[20%] text-right">Actions</TableHead>
+                          <TableHead className="w-[10%]">Current</TableHead>
+                          <TableHead className="w-[15%] text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1271,6 +1403,13 @@ const ManageCurriculum = () => {
                               >
                                 {year.status}
                               </Button>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                year.is_current ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                              }`}>
+                                {year.is_current ? "Current" : "Not Current"}
+                              </span>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -1319,7 +1458,8 @@ const ManageCurriculum = () => {
                         <TableRow className="hover:bg-transparent">
                           <TableHead className="w-[40%]">Semester</TableHead>
                           <TableHead className="w-[20%]">Status</TableHead>
-                          <TableHead className="w-[40%] text-right">Actions</TableHead>
+                          <TableHead className="w-[10%]">Current</TableHead>
+                          <TableHead className="w-[30%] text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1335,6 +1475,13 @@ const ManageCurriculum = () => {
                               >
                                 {semester.status}
                               </Button>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                semester.is_current ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                              }`}>
+                                {semester.is_current ? "Current" : "Not Current"}
+                              </span>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -1478,6 +1625,108 @@ const ManageCurriculum = () => {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
                 <Button variant="destructive" onClick={handleDeleteAcademicYear}>Delete</Button>
+              </DialogFooter>
+            </DialogContent>
+          </DialogPortal>
+        </Dialog>
+
+        {/* Progress Students Dialog */}
+        <Dialog open={showProgressStudentsDialog} onOpenChange={setShowProgressStudentsDialog}>
+          <DialogPortal>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Progress to New Period</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="fromAcademicYear">From Academic Year</Label>
+                  <Select
+                    value={progressForm.fromAcademicYearId?.toString() || ""}
+                    onValueChange={(value) => setProgressForm({ ...progressForm, fromAcademicYearId: parseInt(value) })}
+                    disabled // Make read-only
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Academic Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {academicYears.filter(year => year.is_current).map((year) => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {year.year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="fromSemester">From Semester</Label>
+                  <Select
+                    value={progressForm.fromSemesterId?.toString() || ""}
+                    onValueChange={(value) => setProgressForm({ ...progressForm, fromSemesterId: parseInt(value) })}
+                    disabled // Make read-only
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Semester" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {semesters.filter(sem => sem.is_current).map((sem) => (
+                        <SelectItem key={sem.id} value={sem.id.toString()}>
+                          {sem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="toAcademicYear">To Academic Year</Label>
+                  <Select
+                    value={progressForm.toAcademicYearId?.toString() || ""}
+                    onValueChange={(value) => setProgressForm({ ...progressForm, toAcademicYearId: parseInt(value) })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
+                    <SelectContent>
+                      {academicYears.filter(year => year.status === 'Active' && year.id >= progressForm.fromAcademicYearId).map((year) => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {year.year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="toSemester">To Semester</Label>
+                  <Select
+                    value={progressForm.toSemesterId?.toString() || ""}
+                    onValueChange={(value) => setProgressForm({ ...progressForm, toSemesterId: parseInt(value) })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select Semester" /></SelectTrigger>
+                    <SelectContent>
+                      {semesters.filter(sem => 
+                        sem.status === 'Active' && 
+                        (progressForm.toAcademicYearId === progressForm.fromAcademicYearId 
+                          ? sem.id >= progressForm.fromSemesterId 
+                          : true)
+                      ).map((sem) => (
+                        <SelectItem key={sem.id} value={sem.id.toString()}>
+                          {sem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(progressForm.toAcademicYearId && progressForm.toSemesterId) && (
+                  <div className="text-red-500 text-sm">
+                    ⚠️ This will affect:
+                    <ul>
+                      <li>• {affectedStudentsCount} students enrolled in sections</li>
+                      <li>• Their section_id will be cleared</li>
+                      <li>• Enrollment history will be preserved</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowProgressStudentsDialog(false)}>Cancel</Button>
+                <Button variant="green" onClick={handleProgressStudents} disabled={!progressForm.fromAcademicYearId || !progressForm.fromSemesterId || !progressForm.toAcademicYearId || !progressForm.toSemesterId}>Confirm Progression</Button>
               </DialogFooter>
             </DialogContent>
           </DialogPortal>

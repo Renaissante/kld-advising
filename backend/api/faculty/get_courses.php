@@ -28,6 +28,7 @@ if (!isset($conn) || $conn === null) {
 
 // Get faculty ID - check query parameter first (for testing), then session
 $facultyId = isset($_GET['faculty_id']) ? $_GET['faculty_id'] : null;
+$statusFilter = isset($_GET['status_filter']) ? $_GET['status_filter'] : 'active'; // Default to 'active'
 
 // If no query parameter, check session
 if (!$facultyId && isset($_SESSION['user_id'])) {
@@ -67,7 +68,7 @@ try {
             JOIN academic_years ay ON s.academic_year_id = ay.academic_year_id
             JOIN semesters sem ON s.semester_id = sem.semester_id
             LEFT JOIN year_levels yl ON s.year_level_id = yl.id
-            WHERE sf.faculty_id = :faculty_id AND sf.status = 'active' AND s.status='active'
+            WHERE sf.faculty_id = :faculty_id AND sf.status::TEXT = :status_filter
             ORDER BY ay.academic_year_name DESC, sem.semester_id, c.course_code, s.name";
 
     // Prepare statement
@@ -78,6 +79,7 @@ try {
 
     // Bind faculty ID
     $stmt->bindParam(':faculty_id', $facultyId);
+    $stmt->bindParam(':status_filter', $statusFilter);
 
     // Execute query
     $stmt->execute();

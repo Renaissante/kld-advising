@@ -7,7 +7,7 @@ header("Content-Type: application/json; charset=UTF-8");
 include_once '../../config/database.php';
 
 try {
-    $query = "SELECT * FROM academic_years ORDER BY academic_year_name ASC";
+    $query = "SELECT * FROM academic_years ORDER BY academic_year_id DESC";
     $stmt = $conn->prepare($query);
     $stmt->execute();
 
@@ -20,7 +20,8 @@ try {
                 "year" => $row['academic_year_name'],
                 "startDate" => $row['start_date'],
                 "endDate" => $row['end_date'],
-                "status" => $row['status']
+                "status" => $row['status'],
+                "is_current" => (bool)$row['is_current']
             );
             array_push($academic_years, $academic_year);
         }

@@ -36,12 +36,33 @@ if (!$sectionId) {
 }
 
 try {
-    // First, get the curriculum_id associated with the given section_id
-    $curriculumQuery = "SELECT c.curriculum_id, s.year_level_id, s.semester_id
-                        FROM sections s
-                        JOIN programs p ON s.program_id = p.id
-                        JOIN curriculums c ON p.id = c.program_id
-                        WHERE s.id = :section_id LIMIT 1";
+    // First, get the section's year_level_id and semester_id
+    $sectionQuery = "SELECT s.year_level_id, s.semester_id, s.academic_year_id
+                     FROM sections s
+                     WHERE s.id = :section_id LIMIT 1";
+    $sectionStmt = $conn->prepare($sectionQuery);
+    $sectionStmt->bindParam(':section_id', $sectionId, PDO::PARAM_INT);
+    $sectionStmt->execute();
+    $sectionResult = $sectionStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$sectionResult) {
+        http_response_code(404);
+        echo json_encode(array("success" => false, "message" => "Section not found."));
+        exit();
+    }
+
+    $sectionYearLevelId = $sectionResult['year_level_id'];
+    $sectionSemesterId = $sectionResult['semester_id'];
+    $sectionAcademicYearId = $sectionResult['academic_year_id'];
+
+    // Find the most common curriculum_id among students in this section
+    $curriculumQuery = "SELECT st.curriculum_id, COUNT(*) as student_count
+                        FROM students st
+                        WHERE st.section_id = :section_id
+                        AND st.curriculum_id IS NOT NULL
+                        GROUP BY st.curriculum_id
+                        ORDER BY student_count DESC
+                        LIMIT 1";
     $curriculumStmt = $conn->prepare($curriculumQuery);
     $curriculumStmt->bindParam(':section_id', $sectionId, PDO::PARAM_INT);
     $curriculumStmt->execute();
@@ -49,20 +70,29 @@ try {
 
     if (!$curriculumResult || $curriculumResult['curriculum_id'] === null) {
         http_response_code(200);
-        echo json_encode(array("success" => true, "count" => 0, "data" => [], "message" => "Section or its program has no assigned curriculum."));
+        echo json_encode(array(
+            "success" => true, 
+            "count" => 0, 
+            "data" => [], 
+            "message" => "No students with assigned curriculum found in this section."
+        ));
         exit();
     }
 
-    $sectionCurriculumId = $curriculumResult['curriculum_id'];
-    $sectionYearLevelId = $curriculumResult['year_level_id'];
-    $sectionSemesterId = $curriculumResult['semester_id'];
+    $majorCurriculumId = $curriculumResult['curriculum_id'];
 
-    // Now, fetch all courses belonging to this curriculum and year level/semester
+    // Now, fetch courses belonging to this curriculum that match the section's year level and semester
     $query = "
         SELECT 
             c.id AS course_id,
             c.course_code,
-            c.course_title
+            c.course_title,
+            c.year_level_id,
+            c.semester_id,
+            c.unit_lec,
+            c.unit_lab,
+            c.hour_lec,
+            c.hour_lab
         FROM 
             courses c
         WHERE 
@@ -78,9 +108,10 @@ try {
         throw new PDOException("Failed to prepare query: " . implode(" - ", $conn->errorInfo()));
     }
 
-    $stmt->bindParam(':curriculum_id', $sectionCurriculumId, PDO::PARAM_INT);
+    $stmt->bindParam(':curriculum_id', $majorCurriculumId, PDO::PARAM_INT);
     $stmt->bindParam(':year_level_id', $sectionYearLevelId, PDO::PARAM_INT);
     $stmt->bindParam(':semester_id', $sectionSemesterId, PDO::PARAM_INT);
+    
     $stmt->execute();
     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -88,7 +119,14 @@ try {
     echo json_encode(array(
         "success" => true,
         "count" => count($courses),
-        "data" => $courses
+        "data" => $courses,
+        "section_info" => array(
+            "curriculum_id" => $majorCurriculumId,
+            "year_level_id" => $sectionYearLevelId,
+            "semester_id" => $sectionSemesterId,
+            "academic_year_id" => $sectionAcademicYearId,
+            "student_count" => $curriculumResult['student_count']
+        )
     ));
 
 } catch (PDOException $e) {

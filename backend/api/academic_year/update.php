@@ -49,22 +49,20 @@ if (!empty($data->id)) {
                 exit();
             }
 
-            // If trying to set status to Active, check if there's already an active academic year
-            if ($data->status === 'Active') {
-                $check_active_query = "SELECT COUNT(*) FROM academic_years WHERE status = 'Active' AND academic_year_id != :id";
-                $check_active_stmt = $conn->prepare($check_active_query);
-                $check_active_stmt->bindParam(":id", $data->id);
-                $check_active_stmt->execute();
-                
-                if ($check_active_stmt->fetchColumn() > 0) {
-                    http_response_code(400);
-                    echo json_encode(array("message" => "Cannot activate this academic year. There is already an active academic year."));
-                    exit();
-                }
-            }
-
             $update_fields[] = "status = :status";
             $params[":status"] = htmlspecialchars(strip_tags($data->status));
+        }
+
+        if (isset($data->is_current)) {
+            // If trying to set to current, first set all others to not current
+            if ($data->is_current === true) {
+                $reset_current_query = "UPDATE academic_years SET is_current = FALSE WHERE academic_year_id != :id";
+                $reset_current_stmt = $conn->prepare($reset_current_query);
+                $reset_current_stmt->bindParam(":id", $data->id);
+                $reset_current_stmt->execute();
+            }
+            $update_fields[] = "is_current = :is_current";
+            $params[":is_current"] = $data->is_current ? 1 : 0; // SQLite stores BOOLEAN as 0 or 1
         }
 
         if (empty($update_fields)) {
@@ -97,7 +95,8 @@ if (!empty($data->id)) {
                     "year" => $updated_record['academic_year_name'],
                     "startDate" => $updated_record['start_date'],
                     "endDate" => $updated_record['end_date'],
-                    "status" => $updated_record['status']
+                    "status" => $updated_record['status'],
+                    "is_current" => (bool)$updated_record['is_current']
                 )
             ));
         } else {

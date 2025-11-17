@@ -18,7 +18,8 @@ try {
             $semester = array(
                 "id" => $row['semester_id'],
                 "name" => $row['semester_name'],
-                "status" => $row['status']
+                "status" => $row['status'],
+                "is_current" => (bool)$row['is_current']
             );
             array_push($semesters, $semester);
         }
