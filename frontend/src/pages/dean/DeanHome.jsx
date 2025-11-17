@@ -151,14 +151,6 @@ const DeanHome = () => {
     setCurrentPage(1) // Reset to first page on sort change
   }
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen text-xl">Loading dashboard data...</div>
-  }
-
-  if (error) {
-    return <div className="flex justify-center items-center h-screen text-xl text-red-500">Error: {error}</div>
-  }
-
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -175,8 +167,23 @@ const DeanHome = () => {
               </p>
             </div>
 
-         
- 
+            {error && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <Card className="border-dashed">
+                <CardContent className="p-8">
+                  <div className="flex items-center justify-center text-muted-foreground gap-3">
+                    <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    <span>Loading dashboard data...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
             {/* Metrics Cards - 4 Equal Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Students Enrolled Card */}
@@ -314,11 +321,9 @@ const DeanHome = () => {
               </CardContent>
             </Card>
 
-            {/* Main Content Area - Left Large, Right Sidebar */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Main Content Area - 3 columns */}
-              <div className="lg:col-span-2">
-                <Tabs defaultValue="sections" className="space-y-6">
+            {/* Main Content Area */}
+            <div className="grid grid-cols-1 gap-6">
+              <Tabs defaultValue="sections" className="space-y-6">
                   <TabsList className="grid w-full grid-cols-3 bg-muted/60 dark:bg-muted/30"> {/* Changed to 3 columns */}
                     <TabsTrigger value="sections">Section Details</TabsTrigger>
                     <TabsTrigger value="programs">Program Performance</TabsTrigger>
@@ -686,113 +691,10 @@ const DeanHome = () => {
                   {/* Critical Alerts Tab */}
                   <TabsContent value="alerts" className="hidden"> {/* Removed Critical Alerts Tab */}
                     </TabsContent>
-                </Tabs>
-              </div>
-
-              {/* Right Sidebar - 1 column */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Key Dates & Deadlines */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Key Dates & Deadlines</CardTitle>
-                    <CardDescription>Important upcoming academic dates</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 h-[310px]">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 font-semibold text-sm dark:bg-red-900/30 dark:text-red-400">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Advising Deadline</p>
-                        <p className="text-sm text-muted-foreground mt-1">October 20, 2025</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-semibold text-sm dark:bg-orange-900/30 dark:text-orange-400">
-                        <GraduationCap className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Grading Submission Deadline</p>
-                        <p className="text-sm text-muted-foreground mt-1">November 15, 2025</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm dark:bg-blue-900/30 dark:text-blue-400">
-                        <Users className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Next Enrollment Period</p>
-                        <p className="text-sm text-muted-foreground mt-1">December 1, 2025 - December 15, 2025</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 font-semibold text-sm dark:bg-purple-900/30 dark:text-purple-400">
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Semester Start Date</p>
-                        <p className="text-sm text-muted-foreground mt-1">January 6, 2026</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Recent Activity */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      Recent Activity
-                      <button className="text-sm text-blue-600 hover:text-blue-800">View all</button>
-                  </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 h-[310px]"> {/* Adjusted height, removed overflow */}
-                    {dashboardData.recentActivity.slice(0, RECENT_ACTIVITY_LIMIT).map((activity, index) => {
-                      // Determine icon based on activity type
-                      const ActivityIcon = activity.type === "advising" 
-                        ? CheckCircle 
-                        : activity.type === "grading" 
-                          ? GraduationCap 
-                          : activity.type === "update" 
-                            ? FileText 
-                            : User;
-
-                      return (
-                        <div key={activity.id || index} className="flex items-start gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              activity.type === "advising"
-                                ? "bg-green-100 dark:bg-green-900/30"
-                                : activity.type === "grading"
-                                  ? "bg-blue-100 dark:bg-blue-900/30"
-                                  : activity.type === "update"
-                                    ? "bg-purple-100 dark:bg-purple-900/30"
-                                    : "bg-gray-100 dark:bg-gray-800"
-                            }`}
-                          >
-                            <ActivityIcon
-                              className={`w-4 h-4 ${
-                                activity.type === "advising"
-                                  ? "text-green-600 dark:text-green-400"
-                                  : activity.type === "grading"
-                                    ? "text-blue-600 dark:text-blue-400"
-                                    : activity.type === "update"
-                                      ? "text-purple-600 dark:text-purple-400"
-                                      : "text-gray-600 dark:text-gray-400"
-                              }`}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{activity.user} ({activity.role})</p>
-                            <p className="text-sm text-muted-foreground">{activity.action}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              </div>
+              </Tabs>
             </div>
+            </>
+            )}
           </div>
         </div>
       </main>

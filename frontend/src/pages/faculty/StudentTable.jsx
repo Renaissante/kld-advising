@@ -204,10 +204,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                             <FileText className="mr-2 h-4 w-4" />
                             <span>Credit Courses</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Mail className="mr-2 h-4 w-4" />
-                            <span>Send Message</span>
-                          </DropdownMenuItem>
+                          
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

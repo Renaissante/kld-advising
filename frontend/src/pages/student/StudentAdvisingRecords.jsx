@@ -11,32 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { API_BASE_URL } from '@/config/api';
 import { Skeleton } from "@/components/ui/skeleton"; 
 
-// Mock data for demonstration
-// const advisingRecords = [
-//   {
-//     id: 1,
-//     title: "Course Planning Form",
-//     academicYear: "2024-2025",
-//     semester: "Fall",
-//     submittedDate: "2024-08-15",
-//     advisor: "Dr. Smith",
-//   },
-//   {
-//     id: 2,
-//     title: "Degree Audit Review",
-//     academicYear: "2024-2025",
-//     semester: "Fall",
-//     submittedDate: "2024-09-01",
-//     advisor: "Dr. Johnson",
-//   },
-//   {
-//     id: 3,
-//     title: "Course Planning Form",
-//     academicYear: "2023-2024",
-//     semester: "Spring",
-//     submittedDate: "2024-01-20",
-//     advisor: "Dr. Smith",
-//   },]
+
 
 export default function StudentAdvisingRecords() {
   const { user } = useAuth();
@@ -85,6 +60,42 @@ export default function StudentAdvisingRecords() {
     setSelectedAcademicYear(academicYearName);
     setSelectedSemester(semesterName);
     setShowForm(true);
+  };
+
+  const handleDownload = async (record) => {
+    if (!user?.student_id) return;
+    const params = new URLSearchParams({
+      student_id: user.student_id,
+      academic_year: record.academic_year_name,
+      semester: record.semester_name,
+      format: 'pdf',
+    });
+    const url = `${API_BASE_URL}/dean/export_advising_forms.php?${params.toString()}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to download form.');
+      }
+      const blob = await response.blob();
+      // Try to get filename from headers
+      let filename = 'advising_form.pdf';
+      const disposition = response.headers.get('Content-Disposition');
+      if (disposition) {
+        const match = disposition.match(/filename="(.+)"/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      alert('Error downloading form: ' + error.message);
+    }
   };
 
   if (loading) {
@@ -158,7 +169,7 @@ export default function StudentAdvisingRecords() {
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button size="sm" variant="outline" onClick={() => handleDownload(record)}>
                         <Download className="h-4 w-4" />
                       </Button>
               </div>

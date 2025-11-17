@@ -226,6 +226,21 @@ export default function AdvisingModal({
             if (onAdvisingComplete && student?.id) {
                 onAdvisingComplete(student.id, totalSelectedUnits); // Pass totalSelectedUnits
             }
+            // Send advising form PDF to student via email
+            try {
+                await fetch(`${API_BASE_URL}/email/send_advising_form_to_student.php`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    student_id: student.id,
+                    academic_year: activeAcademicYear.year || activeAcademicYear.name,
+                    semester: activeSemester.name,
+                  }),
+                });
+                toast.success("Advising form sent to student via email.");
+            } catch {
+                toast.error("Could not email the advising form to the student.");
+            }
             onClose(); // Close the modal on successful or partial submission
         } else {
             // Handle success: false from backend
@@ -250,6 +265,10 @@ export default function AdvisingModal({
 
   // Calculate total units for advised courses (only relevant if advising is completed)
   const totalAdvisedUnits = advisedCourses.reduce((acc, curr) => acc + curr.units, 0);
+
+  // Determine if all eligible courses that can be selected are currently selected
+  const allSelectableEligibleCoursesIds = eligibleCourses.filter(course => course.can_select).map(course => course.id);
+  const allEligibleSelected = allSelectableEligibleCoursesIds.length > 0 && allSelectableEligibleCoursesIds.every(id => selectedCourses.includes(id));
 
 
   return (
@@ -411,6 +430,31 @@ export default function AdvisingModal({
 
                    {/* Tab Content: Eligible Courses */}
                    <TabsContent value="eligible">
+                      <div className="flex justify-end mb-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (allEligibleSelected) {
+                              // Deselect all eligible courses
+                              setSelectedCourses(prev => prev.filter(id => !allSelectableEligibleCoursesIds.includes(id)));
+                            } else {
+                              // Select all eligible courses that can be selected
+                              setSelectedCourses(prev => [
+                                ...new Set([...prev, ...allSelectableEligibleCoursesIds])
+                              ]);
+                            }
+                          }}
+                          disabled={!eligibleCourses.length || (!allSelectableEligibleCoursesIds.length && !allEligibleSelected)}
+                        >
+                          {allEligibleSelected ? (
+                            <X className="h-4 w-4 mr-1.5" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-1.5" />
+                          )}
+                          {allEligibleSelected ? "Deselect All" : "Select All"}
+                        </Button>
+                      </div>
                       <div className="rounded-md border">
                         <Table>
                           <TableHeader>

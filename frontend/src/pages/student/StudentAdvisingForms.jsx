@@ -98,6 +98,9 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
   // Get failed courses from graded courses
   const failedCourses = gradedCourses.filter(course => course.remarks === "Failed");
 
+  // Exclude failed courses from main graded courses
+  const nonFailedGradedCourses = gradedCourses.filter(course => course.remarks !== "Failed");
+
   // Calculate total units for advised courses
   const totalAdvisedUnits = advisedCourses.reduce((sum, record) => sum + (record.units || 0), 0);
 
@@ -145,8 +148,8 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
               </TableHeader>
               <TableBody>
                 {/* Display rows with graded courses (left) and advised courses (right) */}
-                {Array.from({ length: Math.max(gradedCourses.length, advisedCourses.length) }).map((_, index) => {
-                  const gradedCourse = gradedCourses[index];
+                {Array.from({ length: Math.max(nonFailedGradedCourses.length, advisedCourses.length) }).map((_, index) => {
+                  const gradedCourse = nonFailedGradedCourses[index];
                   const advisedCourse = advisedCourses[index];
 
                   return (
@@ -220,19 +223,6 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
                     ))}
                   </>
                 )}
-
-                {/* Placeholder rows for Failed courses if none exist */}
-                {failedCourses.length === 0 && ([...Array(3)].map((_, i) => (
-                  <TableRow key={`empty-failed-${i}`}>
-                    <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6"></TableCell>
-                    <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                  </TableRow>
-                )))}
 
               </TableBody>
 

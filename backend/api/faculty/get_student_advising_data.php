@@ -68,9 +68,6 @@ if (!$studentId || !$activeAcademicYearId || !$activeSemesterId) {
 
 try {
     // --- 1. Fetch Student's Section Info and Curriculum for Active AY/Sem ---
-    // This is needed to determine the student's current year level and semester within the curriculum
-    // and to find courses for the next semester/year level.
-    // Also verify that the student belongs to a section assigned to this faculty as an ADVISOR
     $studentSectionQuery = "SELECT
                                 s.id AS section_id,
                                 s.year_level_id AS current_year_level_id,
@@ -84,13 +81,10 @@ try {
                              AND s.academic_year_id = :active_academic_year_id
                              AND s.semester_id = :active_semester_id
                              AND (
-                               -- Case 1: Student is in a section advised by the requesting faculty
-                               (sa_assigned.advisor_id = :faculty_id)
-                               -- Case 2: Student's assigned advisor is unavailable, allowing any faculty to advise
+                               (sa_assigned.advisor_id = :faculty_id1)
                                OR (f_assigned.advisor_status = 'unavailable')
                              )
                              LIMIT 1";
-
 
     $stmtStudentSection = $conn->prepare($studentSectionQuery);
     if ($stmtStudentSection === false) {
@@ -99,15 +93,13 @@ try {
     $stmtStudentSection->bindParam(':student_id', $studentId);
     $stmtStudentSection->bindParam(':active_academic_year_id', $activeAcademicYearId);
     $stmtStudentSection->bindParam(':active_semester_id', $activeSemesterId);
-    $stmtStudentSection->bindParam(':faculty_id', $facultyId); // The requesting faculty's ID
+    $stmtStudentSection->bindParam(':faculty_id1', $facultyId);
     $stmtStudentSection->execute();
     $studentSectionInfo = $stmtStudentSection->fetch(PDO::FETCH_ASSOC);
 
     if (!$studentSectionInfo) {
-        // Student not found in a section for the active AY/Sem assigned to this faculty as an ADVISOR
-        // OR student's advisor is unavailable (allowing other faculty to advise)
         http_response_code(404);
-        echo json_encode(array("success" => false, "message" => "Student not found in your assigned advising sections or their advisor is not currently unavailable.")); // Updated message
+        echo json_encode(array("success" => false, "message" => "Student not found in your assigned advising sections or their advisor is not currently unavailable."));
         exit();
     }
 
@@ -141,13 +133,12 @@ try {
 
     $advisingCompleted = count($advisedCoursesList) > 0;
 
-    $fullGradeHistory = []; // Initialize array
-    $eligibleCourses = []; // Initialize array
-    $gradeHistoryMap = []; // Map course_id to grade entry for quick lookup
+    $fullGradeHistory = [];
+    $eligibleCourses = [];
+    $gradeHistoryMap = [];
 
     if (!$advisingCompleted) {
-        // --- 3. Fetch Student's Complete Grade History (Only if advising is NOT completed) ---
-        // This is needed to check prerequisites from any previous semester
+        // --- 3. Fetch Student's Complete Grade History ---
         $fullGradeHistoryQuery = "SELECT
                                        cg.id,
                                        cg.transmutation,
@@ -170,60 +161,58 @@ try {
         $stmtFullGradeHistory->execute();
         $fullGradeHistory = $stmtFullGradeHistory->fetchAll(PDO::FETCH_ASSOC);
 
-        // Create a map for quick lookup by course_id
         foreach ($fullGradeHistory as $grade) {
             $gradeHistoryMap[$grade['course_id']] = $grade;
         }
 
-
-        // --- 4. Determine Next Semester/Year Level in Curriculum (Only if advising is NOT completed) ---
-        // Use the current year level and semester from the active section to find the next in the curriculum sequence
+        // --- 4. Determine Next Semester/Year Level in Curriculum ---
         $nextYearLevelId = $currentYearLevelId;
         $nextSemesterId = null;
 
-        // Get all semesters ordered by ID
         $semestersQuery = "SELECT semester_id FROM semesters ORDER BY semester_id ASC";
         $stmtSemesters = $conn->query($semestersQuery);
-        $allSemesters = $stmtSemesters->fetchAll(PDO::FETCH_COLUMN, 0); // Get just the IDs
+        $allSemesters = $stmtSemesters->fetchAll(PDO::FETCH_COLUMN, 0);
 
         $currentSemIndex = array_search($currentSemesterId, $allSemesters);
 
         if ($currentSemIndex !== false && $currentSemIndex < count($allSemesters) - 1) {
-            // If not the last semester, the next semester is the next one in the list
             $nextSemesterId = $allSemesters[$currentSemIndex + 1];
-            $nextYearLevelId = $currentYearLevelId; // Stay in the same year level
+            $nextYearLevelId = $currentYearLevelId;
         } else {
-            // If it's the last semester (or not found, though that shouldn't happen if studentSectionInfo is valid)
-            // Move to the next year level and the first semester
-            $nextSemesterId = $allSemesters[0]; // First semester ID
+            $nextSemesterId = $allSemesters[0];
 
-            // Get all year levels ordered by ID
             $yearLevelsQuery = "SELECT id FROM year_levels ORDER BY id ASC";
             $stmtYearLevels = $conn->query($yearLevelsQuery);
-            $allYearLevels = $stmtYearLevels->fetchAll(PDO::FETCH_COLUMN, 0); // Get just the IDs
+            $allYearLevels = $stmtYearLevels->fetchAll(PDO::FETCH_COLUMN, 0);
 
             $currentYearIndex = array_search($currentYearLevelId, $allYearLevels);
 
             if ($currentYearIndex !== false && $currentYearIndex < count($allYearLevels) - 1) {
-                $nextYearLevelId = $allYearLevels[$currentYearIndex + 1]; // Next year level
+                $nextYearLevelId = $allYearLevels[$currentYearIndex + 1];
             } else {
-                // Student is in the last semester of the last year level in the curriculum
-                $nextYearLevelId = null; // No next year level in curriculum
-                $nextSemesterId = null; // No next semester in curriculum
+                $nextYearLevelId = null;
+                $nextSemesterId = null;
             }
         }
 
-        // --- 5. Fetch Eligible Courses for Next Semester/Year Level in Curriculum (Only if advising is NOT completed) ---
+        // --- 5. Fetch Eligible Courses ---
         if ($curriculumId && $nextYearLevelId !== null && $nextSemesterId !== null) {
             $eligibleCoursesQuery = "SELECT
-                                        id,
-                                        course_code,
-                                        course_title,
-                                        (unit_lec + unit_lab) AS units
-                                     FROM courses
-                                     WHERE curriculum_id = :curriculum_id
-                                       AND year_level_id = :next_year_level_id
-                                       AND semester_id = :next_semester_id";
+                                    c.id,
+                                    c.course_code,
+                                    c.course_title,
+                                    (c.unit_lec + c.unit_lab) AS units
+                                FROM courses c
+                                WHERE c.curriculum_id = :curriculum_id
+                                  AND c.year_level_id = :next_year_level_id
+                                  AND c.semester_id = :next_semester_id
+                                  AND NOT EXISTS (
+                                        SELECT 1
+                                        FROM course_grades cg
+                                        WHERE cg.course_id = c.id
+                                          AND cg.student_id = :student_id
+                                          AND cg.remarks = 'Passed'
+                                      )";
 
             $stmtEligibleCourses = $conn->prepare($eligibleCoursesQuery);
              if ($stmtEligibleCourses === false) {
@@ -232,16 +221,12 @@ try {
             $stmtEligibleCourses->bindParam(':curriculum_id', $curriculumId);
             $stmtEligibleCourses->bindParam(':next_year_level_id', $nextYearLevelId);
             $stmtEligibleCourses->bindParam(':next_semester_id', $nextSemesterId);
+            $stmtEligibleCourses->bindParam(':student_id', $studentId);
             $stmtEligibleCourses->execute();
             $eligibleCourses = $stmtEligibleCourses->fetchAll(PDO::FETCH_ASSOC);
 
-            // --- 6. Fetch All Courses in the Student's Curriculum (needed for prerequisite details) ---
-            $allCurriculumCoursesQuery = "SELECT
-                                              id,
-                                              course_code,
-                                              course_title
-                                          FROM courses
-                                          WHERE curriculum_id = :curriculum_id";
+            // --- 6. Fetch All Courses in Curriculum ---
+            $allCurriculumCoursesQuery = "SELECT id, course_code, course_title FROM courses WHERE curriculum_id = :curriculum_id";
             $stmtAllCurriculumCourses = $conn->prepare($allCurriculumCoursesQuery);
             if ($stmtAllCurriculumCourses === false) {
                  throw new PDOException("Failed to prepare all curriculum courses query: " . implode(" - ", $conn->errorInfo()));
@@ -250,39 +235,31 @@ try {
             $stmtAllCurriculumCourses->execute();
             $allCurriculumCourses = $stmtAllCurriculumCourses->fetchAll(PDO::FETCH_ASSOC);
 
-            // Create a map for quick lookup by course_id
             $allCurriculumCoursesMap = [];
             foreach ($allCurriculumCourses as $course) {
                 $allCurriculumCoursesMap[$course['id']] = $course;
             }
 
-
-            // --- 7. Fetch Prerequisite Relationships for Eligible Courses ---
-            $prerequisitesMap = []; // Map course_id to array of prerequisite_course_ids
+            // --- 7. Fetch Prerequisites ---
+            $prerequisitesMap = [];
             if (!empty($eligibleCourses)) {
                 $eligibleCourseIds = array_column($eligibleCourses, 'id');
                 $placeholders = implode(',', array_fill(0, count($eligibleCourseIds), '?'));
 
-                $prerequisitesQuery = "SELECT
-                                           course_id,
-                                           prerequisite_course_id
-                                       FROM course_prerequisites
-                                       WHERE course_id IN ($placeholders)";
-
+                $prerequisitesQuery = "SELECT course_id, prerequisite_course_id FROM course_prerequisites WHERE course_id IN ($placeholders)";
                 $stmtPrerequisites = $conn->prepare($prerequisitesQuery);
                  if ($stmtPrerequisites === false) {
                      throw new PDOException("Failed to prepare prerequisites query: " . implode(" - ", $conn->errorInfo()));
                 }
                 $stmtPrerequisites->execute($eligibleCourseIds);
-                // Fetch all prerequisites and group them by course_id for easier lookup
                 $prerequisitesRaw = $stmtPrerequisites->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($prerequisitesRaw as $prereq) {
                     $prerequisitesMap[$prereq['course_id']][] = $prereq['prerequisite_course_id'];
                 }
             }
 
-            // --- 8. Determine Selectability and Prerequisite Reason for Eligible Courses ---
-            foreach ($eligibleCourses as &$course) { // Use reference to modify array in place
+            // --- 8. Check Selectability ---
+            foreach ($eligibleCourses as &$course) {
                 $course['can_select'] = true;
                 $course['prerequisite_reason'] = null;
 
@@ -293,10 +270,8 @@ try {
                     foreach ($prereqIds as $prereqId) {
                         $gradeEntry = $gradeHistoryMap[$prereqId] ?? null;
 
-                        // Check if prerequisite was taken and passed (transmutation not 5.00 or 0.00)
-                        if (!$gradeEntry || (floatval($gradeEntry['transmutation']) === 5.00 || floatval($gradeEntry['transmutation']) === 0.00)) {
+                        if (!$gradeEntry || $gradeEntry['remarks'] !== 'Passed') {
                             $course['can_select'] = false;
-                            // Find the course code for the failed prerequisite
                             $prereqCourse = $allCurriculumCoursesMap[$prereqId] ?? ['course_code' => 'Unknown Course'];
                             $failedPrereqCodes[] = $prereqCourse['course_code'];
                         }
@@ -307,39 +282,31 @@ try {
                     }
                 }
             }
-            unset($course); // Unset the reference
+            unset($course);
         }
     }
 
-
-    // --- 9. Prepare and Send Response ---
+    // --- 9. Response ---
     http_response_code(200);
     echo json_encode(array(
         "success" => true,
         "data" => array(
-            "full_grade_history" => $fullGradeHistory, // Kept for displaying current grades
-            "advising_completed" => $advisingCompleted, // New flag
-            "advised_courses" => $advisedCoursesList, // List of advised courses if completed
-            "eligible_courses" => $eligibleCourses, // List of eligible courses if NOT completed
-            "current_year_level_id" => $currentYearLevelId, // Added current year level ID
-            "current_semester_id" => $currentSemesterId // Added current semester ID
+            "full_grade_history" => $fullGradeHistory,
+            "advising_completed" => $advisingCompleted,
+            "advised_courses" => $advisedCoursesList,
+            "eligible_courses" => $eligibleCourses,
+            "current_year_level_id" => $currentYearLevelId,
+            "current_semester_id" => $currentSemesterId
         )
     ));
 
 } catch (PDOException $e) {
     http_response_code(503);
     error_log("Database error in get_student_advising_data.php: " . $e->getMessage());
-    echo json_encode(array(
-        "success" => false,
-        "message" => "Database error: " . $e->getMessage()
-    ));
+    echo json_encode(array("success" => false, "message" => "Database error: " . $e->getMessage()));
 } catch (Exception $e) {
-    // Catch other potential errors
     http_response_code(500);
     error_log("General error in get_student_advising_data.php: " . $e->getMessage());
-    echo json_encode(array(
-        "success" => false,
-        "message" => "Server error: " . $e->getMessage()
-    ));
+    echo json_encode(array("success" => false, "message" => "Server error: " . $e->getMessage()));
 }
 ?>

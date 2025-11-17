@@ -6,23 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogPortal } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Curriculum } from "@/components/curriculum/Curriculum";
 import { useAuth } from "@/hooks/useAuth";
 import { Trash2, SquarePlus, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import Tracks from "@/components/curriculum/Tracks";
 import { API_BASE_URL } from '@/config/api';
+import { ArchiveRestore, Archive } from "lucide-react"; // Ensure Eye and Archive icons are imported
+import { Badge } from "@/components/ui/badge"; // Ensure Badge component is imported
 const ProgramChairManageCurriculum = () => {
   const { user } = useAuth();
   const [selectedCurriculum, setSelectedCurriculum] = useState(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [showCurriculumDialog, setShowCurriculumDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [curriculumToDelete, setCurriculumToDelete] = useState(null);
+  // Removed delete-related states
+  // const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // const [curriculumToDelete, setCurriculumToDelete] = useState(null);
   
 
   // General Data
@@ -240,51 +242,51 @@ const ProgramChairManageCurriculum = () => {
     }
   };
 
-  // Function to handle deleting a curriculum
-  const handleDeleteCurriculum = async () => {
-    if (!curriculumToDelete) return;
+  // Removed delete-related functions
+  // const handleDeleteCurriculum = async () => {
+  //   if (!curriculumToDelete) return;
     
-    try {
-      const response = await fetch(`${API_BASE_URL}/curriculum/delete.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          curriculum_id: curriculumToDelete
-        })
-      });
+  //   try {
+  //     const response = await fetch(`${API_BASE_URL}/curriculum/delete.php`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({
+  //         curriculum_id: curriculumToDelete
+  //       })
+  //     });
       
-      const data = await response.json();
+  //     const data = await response.json();
       
-      if (response.ok && data.success) {
-        // Remove the deleted curriculum from the state
-        setCurriculums(prevCurriculums => 
-          prevCurriculums.filter(c => c.id !== curriculumToDelete)
-        );
+  //     if (response.ok && data.success) {
+  //       // Remove the deleted curriculum from the state
+  //       setCurriculums(prevCurriculums => 
+  //         prevCurriculums.filter(c => c.id !== curriculumToDelete)
+  //       );
         
-        // If the deleted curriculum was selected, clear the selection
-        if (selectedCurriculum === curriculumToDelete) {
-          setSelectedCurriculum(null);
-        }
+  //       // If the deleted curriculum was selected, clear the selection
+  //       if (selectedCurriculum === curriculumToDelete) {
+  //         setSelectedCurriculum(null);
+  //       }
         
-        setShowDeleteDialog(false);
-        setCurriculumToDelete(null);
-      } else {
-        showError(data.message || "Failed to delete curriculum");
-      }
-    } catch (error) {
-      showError("Error connecting to the server");
-      console.error("Error:", error);
-    }
-  };
+  //       setShowDeleteDialog(false);
+  //       setCurriculumToDelete(null);
+  //     } else {
+  //       showError(data.message || "Failed to delete curriculum");
+  //     }
+  //   } catch (error) {
+  //     showError("Error connecting to the server");
+  //     console.error("Error:", error);
+  //   }
+  // };
 
-  // Function to show the delete confirmation dialog
-  const confirmDeleteCurriculum = (id, e) => {
-    e.stopPropagation(); // Prevent selecting the curriculum when clicking the delete button
-    setCurriculumToDelete(id);
-    setShowDeleteDialog(true);
-  };
+  // Removed delete-related functions
+  // const confirmDeleteCurriculum = (id, e) => {
+  //   e.stopPropagation(); // Prevent selecting the curriculum when clicking the delete button
+  //   setCurriculumToDelete(id);
+  //   setShowDeleteDialog(true);
+  // };
 
   // Update showError to not close other dialogs
   const showError = (message) => {
@@ -543,33 +545,33 @@ const ProgramChairManageCurriculum = () => {
     </Dialog>
   );
 
-  // Add delete confirmation dialog
-  const DeleteConfirmationDialog = ({ open, onOpenChange }) => {
-    const curriculum = curriculums.find(c => c.id === curriculumToDelete);
+  // Removed delete-related dialog
+  // const DeleteConfirmationDialog = ({ open, onOpenChange }) => {
+  //   const curriculum = curriculums.find(c => c.id === curriculumToDelete);
     
-    return (
-      <Dialog open={open} onOpenChange={(isOpen) => {
-        onOpenChange(isOpen);
-        if (!isOpen) {
-          setCurriculumToDelete(null);
-        }
-      }}>
-        <DialogPortal>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm Archive</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to archive this curriculum "{curriculum?.name}"?</p>
+  //   return (
+  //     <Dialog open={open} onOpenChange={(isOpen) => {
+  //       onOpenChange(isOpen);
+  //       if (!isOpen) {
+  //         setCurriculumToDelete(null);
+  //       }
+  //     }}>
+  //       <DialogPortal>
+  //         <DialogContent>
+  //           <DialogHeader>
+  //             <DialogTitle>Confirm Archive</DialogTitle>
+  //           </DialogHeader>
+  //           <p>Are you sure you want to archive this curriculum "{curriculum?.name}"?</p>
            
-            <DialogFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteCurriculum}>Save</Button>
-            </DialogFooter>
-          </DialogContent>
-        </DialogPortal>
-      </Dialog>
-    );
-  };
+  //           <DialogFooter className="flex justify-between">
+  //             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+  //             <Button variant="destructive" onClick={handleDeleteCurriculum}>Save</Button>
+  //           </DialogFooter>
+  //         </DialogContent>
+  //       </DialogPortal>
+  //     </Dialog>
+  //   );
+  // };
 
   // New states for curriculum status update
   const [showCurriculumStatusDialog, setShowCurriculumStatusDialog] = useState(false);
@@ -651,7 +653,8 @@ const ProgramChairManageCurriculum = () => {
       <main className="w-full">
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
         <ValidationDialog open={showValidationDialog} onOpenChange={setShowValidationDialog} />
-        <DeleteConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
+        {/* Removed delete-related dialog */}
+        {/* <DeleteConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} /> */}
         <CurriculumStatusDialog open={showCurriculumStatusDialog} onOpenChange={setShowCurriculumStatusDialog} />
 
         <div className="flex mt-4">
@@ -689,7 +692,7 @@ const ProgramChairManageCurriculum = () => {
           {/* Right Sidebar */}
           <div className="w-[30%] px-2">
             <div className="sticky top-[7.5rem] space-y-6 mt-4">
-              <Card className="h-[calc(100vh-30rem)]">
+              <Card className="h-[calc(100vh-28rem)]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <h2 className="text-lg font-semibold text-[#1b4b2a]">Curriculums</h2>
                   <Dialog open={showCurriculumDialog} onOpenChange={setShowCurriculumDialog}>
@@ -736,45 +739,43 @@ const ProgramChairManageCurriculum = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                   <Separator className="mt-2"/>
-                  <div className="h-[calc(100vh-37rem)]">
+                  <div className="h-[calc(100vh-25rem)]"> {/* Increased height for scrollable area */}
                     <ScrollArea className="h-full mt-4">
                       <div className="px-4">
                         {curriculums.length > 0 ? (
                           curriculums.map((curriculum) => (
                             <div
                               key={curriculum.id}
-                              className={`px-4 py-2 cursor-pointer rounded-md transition-colors flex justify-between items-center ${
-                                selectedCurriculum === curriculum.id
-                                  ? "bg-accent text-accent-foreground font-medium"
-                                  : "hover:bg-muted/50"
-                              }`}
+                              className={`px-4 py-2 cursor-pointer rounded-md transition-colors flex justify-between items-center ${selectedCurriculum === curriculum.id ? "bg-accent text-accent-foreground font-medium" : "hover:bg-muted/50"}`}
                               onClick={() => {
                                 setSelectedCurriculum(curriculum.id);
                                 console.log("Selected Curriculum ID set to:", curriculum.id);
                               }}
                             >
-                              <span>{curriculum.name}</span>
-                            <div className="flex gap-2"> 
+                              <div className="flex items-center gap-2">
+                                <span>{curriculum.name}</span>
+                                <Badge variant={curriculum.status === "Active" ? "default" : "secondary"}>
+                                  {curriculum.status}
+                                </Badge>
+                              </div>
+                              <div className="flex gap-2">
                                 <Button
-                                  variant={curriculum.status === "Active" ? "green" : "destructive"} // Use green for Active, destructive for Inactive
+                                  variant="ghost" // Use ghost variant for icon button
                                   size="sm"
-                                  className="w-16"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleToggleCurriculumStatus(curriculum.id);
                                   }}
+                                  title={curriculum.status === "Active" ? "Archive Curriculum" : "Unarchive Curriculum"}
                                 >
-                                  {curriculum.status === "Active" ? "Active" : "Inactive"}
+                                  {curriculum.status === "Active" ? (
+                                    <Archive /> // Eye icon for Active status
+                                  ) : (
+                                    <ArchiveRestore /> // Archive icon for Inactive/Archived status
+                                  )}
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-
-                                  onClick={(e) => confirmDeleteCurriculum(curriculum.id, e)}
-                                >
-                                 Archive
-                                </Button>
-                            </div>
+                                {/* Removed the separate Archive button */}
+                              </div>
                             </div>
                           ))
                         ) : (
@@ -786,7 +787,15 @@ const ProgramChairManageCurriculum = () => {
                 </CardContent>
               </Card>
 
-              <Tracks />
+              {/* Removed Tracks component */}
+              {/* <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-[#1b4b2a]">Curriculum Tracks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tracks />
+                </CardContent>
+              </Card> */}
             </div>
           </div>
         </div>

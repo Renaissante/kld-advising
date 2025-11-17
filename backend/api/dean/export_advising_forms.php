@@ -18,6 +18,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : null; // Added
 $yearLevel = isset($_GET['year_level']) ? $_GET['year_level'] : null; // Added
 $searchQuery = isset($_GET['search_query']) ? $_GET['search_query'] : null; // Added
 $format = isset($_GET['format']) ? $_GET['format'] : 'pdf'; // default to pdf
+$studentIdParam = isset($_GET['student_id']) ? $_GET['student_id'] : null;
 
 // Log received parameters for debugging
 error_log("Export request received: Program = " . $program . ", Section = " . $section . ", Year Level = " . $yearLevel . ", Search Query = " . $searchQuery . ", Format = " . $format);
@@ -141,6 +142,10 @@ try {
         $query .= " AND (s.name LIKE :search_query OR s.student_id LIKE :search_query OR adv_emp.name LIKE :search_query)";
         $params[':search_query'] = '%' . $searchQuery . '%';
     }
+    if ($studentIdParam) {
+        $query .= " AND s.student_id = :student_id_param";
+        $params[':student_id_param'] = $studentIdParam;
+    }
 
     $stmt = $conn->prepare($query);
     $stmt->execute($params);
@@ -163,43 +168,32 @@ try {
                 'student_name' => $row['student_name'],
                 'student_number' => $row['student_number'],
                 'institute_name' => $row['institute_name'],
-                'section_name' => $row['section_name'], // Ensure section_name is available
                 'program_year_section' => $row['program_year_section'],
+                'section_name' => $row['section_name'],
                 'student_status' => $row['student_status'],
-                'total_units_earned' => $row['total_units_earned'],
                 'academic_year_name' => $row['academic_year_name'],
                 'semester_name' => $row['semester_name'],
                 'advisor_name' => $row['advisor_name'],
-                'advised_courses' => []
+                'advised_courses' => [],
+                'graded_courses' => [],
             ];
         }
-        // Fetch advised courses for the current student and active academic year/semester
-        $advisedCoursesQuery = "SELECT
-                                    c.course_code,
-                                    c.course_title,
-                                    cg.transmutation AS grade,
-                                    cg.remarks AS remarks,
-                                    (c.unit_lec + c.unit_lab) AS units,
-                                    pr.course_code AS prerequisite_code,
-                                    pr.course_title AS prerequisite_title
-                                FROM
-                                    advised_courses ac
-                                JOIN
-                                    courses c ON ac.course_id = c.id
-                                LEFT JOIN
-                                    course_prerequisites cp ON ac.course_id = cp.course_id
-                                LEFT JOIN
-                                    courses pr ON cp.prerequisite_course_id = pr.id
-                                LEFT JOIN
-                                    course_grades cg ON ac.student_id = cg.student_id AND ac.course_id = cg.course_id
-                                WHERE
-                                    ac.student_id = :student_id AND ac.academic_year_id = :academic_year_id AND ac.semester_id = :semester_id";
+        // Fetch advised courses for the current student and active academic year/semester (as on student form)
+        $advisedCoursesQuery = "SELECT ac.advised_course_id, c.course_code, c.course_title, (c.unit_lec + c.unit_lab) AS units, ay.academic_year_name, sem.semester_name, e.name as advisor_name, ac.advising_date FROM advised_courses ac LEFT JOIN courses c ON ac.course_id = c.id LEFT JOIN academic_years ay ON ac.academic_year_id = ay.academic_year_id LEFT JOIN semesters sem ON ac.semester_id = sem.semester_id LEFT JOIN employees e ON ac.advisor_id = e.employee_id WHERE ac.student_id = :student_id AND ac.academic_year_id = :academic_year_id AND ac.semester_id = :semester_id ORDER BY ac.advising_date DESC";
         $advisedCoursesStmt = $conn->prepare($advisedCoursesQuery);
         $advisedCoursesStmt->bindParam(':student_id', $studentId);
         $advisedCoursesStmt->bindParam(':academic_year_id', $academicYearId);
         $advisedCoursesStmt->bindParam(':semester_id', $semesterId);
         $advisedCoursesStmt->execute();
         $groupedAdvisingData[$studentId]['advised_courses'] = $advisedCoursesStmt->fetchAll(PDO::FETCH_ASSOC);
+        // Fetch graded courses (current term, like left table)
+        $gradedCoursesQuery = "SELECT subq.course_grade_id, subq.course_id, subq.course_code, subq.course_title, subq.grade, subq.remarks, subq.year_level_id, subq.course_semester_id, subq.year_level_name, subq.course_semester_name, subq.academic_year_name, subq.semester_name, STRING_AGG(DISTINCT pr.course_code, ', ' ORDER BY pr.course_code) AS prerequisite_code, STRING_AGG(DISTINCT pr.course_title, ', ' ORDER BY pr.course_title) AS prerequisite_title, subq.units FROM ( SELECT DISTINCT ON (c.id) cg.id as course_grade_id, c.id as course_id, c.course_code, c.course_title, (c.unit_lec + c.unit_lab) AS units, cg.transmutation AS grade, cg.remarks, c.year_level_id, c.semester_id as course_semester_id, yl.level AS year_level_name, sem_course.semester_name as course_semester_name, ay.academic_year_name, sem.semester_name FROM students st INNER JOIN student_section_enrollments sse ON st.id = sse.student_id INNER JOIN sections sec ON sse.section_id = sec.id INNER JOIN academic_years ay ON sec.academic_year_id = ay.academic_year_id INNER JOIN semesters sem ON sec.semester_id = sem.semester_id INNER JOIN section_faculty sf ON sf.section_id = sec.id INNER JOIN courses c ON sf.course_id = c.id LEFT JOIN year_levels yl ON c.year_level_id = yl.id LEFT JOIN semesters sem_course ON c.semester_id = sem_course.semester_id LEFT JOIN course_grades cg ON cg.student_id = st.student_id AND cg.course_id = c.id WHERE st.student_id = :student_id AND sse.enrollment_status = 'enrolled' AND ay.academic_year_id = :academic_year_id AND sem.semester_id = :semester_id AND sf.status = 'active' ORDER BY c.id, cg.id DESC ) subq LEFT JOIN course_prerequisites cp ON subq.course_id = cp.course_id LEFT JOIN courses pr ON cp.prerequisite_course_id = pr.id GROUP BY subq.course_grade_id, subq.course_id, subq.course_code, subq.course_title, subq.grade, subq.remarks, subq.year_level_id, subq.course_semester_id, subq.year_level_name, subq.course_semester_name, subq.academic_year_name, subq.semester_name, subq.units";
+        $gradedCoursesStmt = $conn->prepare($gradedCoursesQuery);
+        $gradedCoursesStmt->bindParam(':student_id', $studentId);
+        $gradedCoursesStmt->bindParam(':academic_year_id', $academicYearId);
+        $gradedCoursesStmt->bindParam(':semester_id', $semesterId);
+        $gradedCoursesStmt->execute();
+        $groupedAdvisingData[$studentId]['graded_courses'] = $gradedCoursesStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     if ($format === 'doc') {
@@ -276,64 +270,55 @@ try {
             $table->addCell(500, $cellStyle)->addText('Units', $boldFontStyle);
             $table->addCell(1000, $cellStyle)->addText('Adviser\'s Signature', $boldFontStyle);
     
-            if (empty($studentData['advised_courses'])) {
+            // Main table rows: combine graded/advised course rows as in student advising form
+            // Exclude failed courses from main graded_courses
+            $nonFailedGradedCourses = array_filter($studentData['graded_courses'], function($c) { return ($c['remarks'] ?? '') !== 'Failed'; });
+            $maxRows = max(count($nonFailedGradedCourses), count($studentData['advised_courses']));
+            for ($i = 0; $i < $maxRows; $i++) {
+                $graded = array_values($nonFailedGradedCourses)[$i] ?? null;
+                $advised = $studentData['advised_courses'][$i] ?? null;
                 $table->addRow();
-                $cell = $table->addCell(10500, array_merge($cellStyle, array('gridSpan' => 7)));
-                $cell->addText('No advising records found for this academic year and semester.', $fontStyle, array('alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER));
-            } else {
-                foreach ($studentData['advised_courses'] as $course) {
-                    $table->addRow();
-                    $table->addCell(1500, $cellStyle)->addText($course['course_code'] ?? '', $fontStyle);
-                    $table->addCell(2500, $cellStyle)->addText($course['course_title'] ?? '', $fontStyle);
-                    $table->addCell(1000, $cellStyle)->addText($course['grade'] ?? '', $fontStyle);
-                    $prereqText = $course['prerequisite_code'] ? $course['prerequisite_code'] . ' - ' . ($course['prerequisite_title'] ?? '') : 'N/A';
-                    $table->addCell(1500, $cellStyle)->addText($prereqText, $fontStyle);
-                    $table->addCell(2500, $cellStyle)->addText($course['course_code'] . ' - ' . ($course['course_title'] ?? ''), $fontStyle);
-                    $table->addCell(500, $cellStyle)->addText($course['units'] ?? '', $fontStyle);
-                    $table->addCell(1000, $cellStyle)->addText('', $fontStyle);
-                }
+                // Graded columns (left)
+                $table->addCell(1500, $cellStyle)->addText($graded['course_code'] ?? '', $fontStyle);
+                $table->addCell(2500, $cellStyle)->addText($graded['course_title'] ?? '', $fontStyle);
+                $table->addCell(1000, $cellStyle)->addText($graded['grade'] ?? '', $fontStyle);
+                $table->addCell(1500, $cellStyle)->addText($graded['prerequisite_code'] ?? '', $fontStyle);
+                // Advised side (right)
+                $advisedDisplay = $advised ? (($advised['course_code'] ?? '') . ' - ' . ($advised['course_title'] ?? '')) : '';
+                $table->addCell(2500, $cellStyle)->addText($advisedDisplay, $fontStyle);
+                $table->addCell(500, $cellStyle)->addText($advised['units'] ?? '', $fontStyle);
+                $table->addCell(1000, $cellStyle)->addText('', $fontStyle);
             }
     
             $section->addTextBreak(1);
     
             // Failed Courses Section
-            $failedCourses = array_filter($studentData['advised_courses'], function($c) { 
+            $failedCourses = array_filter($studentData['graded_courses'], function($c) { 
                 return ($c['remarks'] ?? '') === 'Failed'; 
             });
-            
-            $failedTable = $section->addTable($tableStyle);
-            $failedTable->addRow();
-            $cell = $failedTable->addCell(10500, array_merge($cellStyle, array('gridSpan' => 7)));
-            $cell->addText('Failed course/s', $boldFontStyle, array('alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER));
-    
-            $failedTable->addRow();
-            $failedTable->addCell(1500, $cellStyle)->addText('Course Code', $boldFontStyle);
-            $failedTable->addCell(2500, $cellStyle)->addText('Course Title', $boldFontStyle);
-            $failedTable->addCell(1000, $cellStyle)->addText('Grade', $boldFontStyle);
-            $failedTable->addCell(1500, $cellStyle)->addText('Term', $boldFontStyle);
-            $failedTable->addCell(2500, $cellStyle)->addText('AY', $boldFontStyle);
-            $failedTable->addCell(500, $cellStyle)->addText('', $boldFontStyle);
-            $failedTable->addCell(1000, $cellStyle)->addText('', $boldFontStyle);
-    
+
             if (!empty($failedCourses)) {
+                $failedTable = $section->addTable($tableStyle);
+                $failedTable->addRow();
+                $cell = $failedTable->addCell(10500, array_merge($cellStyle, array('gridSpan' => 7)));
+                $cell->addText('Failed course/s', $boldFontStyle, array('alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER));
+
+                $failedTable->addRow();
+                $failedTable->addCell(1500, $cellStyle)->addText('Course Code', $boldFontStyle);
+                $failedTable->addCell(2500, $cellStyle)->addText('Course Title', $boldFontStyle);
+                $failedTable->addCell(1000, $cellStyle)->addText('Grade', $boldFontStyle);
+                $failedTable->addCell(1500, $cellStyle)->addText('Term', $boldFontStyle);
+                $failedTable->addCell(2500, $cellStyle)->addText('AY', $boldFontStyle);
+                $failedTable->addCell(500, $cellStyle)->addText('', $boldFontStyle);
+                $failedTable->addCell(1000, $cellStyle)->addText('', $boldFontStyle);
+
                 foreach ($failedCourses as $failedCourse) {
                     $failedTable->addRow();
                     $failedTable->addCell(1500, $cellStyle)->addText($failedCourse['course_code'] ?? '', $fontStyle);
                     $failedTable->addCell(2500, $cellStyle)->addText($failedCourse['course_title'] ?? '', $fontStyle);
                     $failedTable->addCell(1000, $cellStyle)->addText($failedCourse['grade'] ?? 'N/A', $fontStyle);
-                    $failedTable->addCell(1500, $cellStyle)->addText($studentData['semester_name'] ?? '', $fontStyle);
-                    $failedTable->addCell(2500, $cellStyle)->addText($studentData['academic_year_name'] ?? '', $fontStyle);
-                    $failedTable->addCell(500, $cellStyle)->addText('', $fontStyle);
-                    $failedTable->addCell(1000, $cellStyle)->addText('', $fontStyle);
-                }
-            } else {
-                for ($i = 0; $i < 3; $i++) {
-                    $failedTable->addRow();
-                    $failedTable->addCell(1500, $cellStyle)->addText('', $fontStyle);
-                    $failedTable->addCell(2500, $cellStyle)->addText('', $fontStyle);
-                    $failedTable->addCell(1000, $cellStyle)->addText('', $fontStyle);
-                    $failedTable->addCell(1500, $cellStyle)->addText('', $fontStyle);
-                    $failedTable->addCell(2500, $cellStyle)->addText('', $fontStyle);
+                    $failedTable->addCell(1500, $cellStyle)->addText($failedCourse['semester_name'] ?? '', $fontStyle);
+                    $failedTable->addCell(2500, $cellStyle)->addText($failedCourse['academic_year_name'] ?? '', $fontStyle);
                     $failedTable->addCell(500, $cellStyle)->addText('', $fontStyle);
                     $failedTable->addCell(1000, $cellStyle)->addText('', $fontStyle);
                 }
@@ -342,14 +327,16 @@ try {
             $section->addTextBreak(1);
     
             // Footer
-            $totalUnits = array_reduce($studentData['advised_courses'], function($sum, $item) { 
+            $totalUnitsEarned = array_reduce($studentData['graded_courses'], function($sum, $item) { 
                 return $sum + (($item['units'] ?? 0) ?: 0); 
             }, 0);
-            
+            $totalUnitsToBeEnrolled = array_reduce($studentData['advised_courses'], function($sum, $item) { 
+                return $sum + (($item['units'] ?? 0) ?: 0); 
+            }, 0);
             $footerTable = $section->addTable($tableStyle);
             $footerTable->addRow();
-            $footerTable->addCell(5000, $cellStyle)->addText('Total number of units enrolled: ' . $totalUnits . ' Units', $fontStyle);
-            $footerTable->addCell(5000, $cellStyle)->addText('Total number of units to be enrolled: 16 Units', $fontStyle);
+            $footerTable->addCell(5000, $cellStyle)->addText('Total number of units enrolled: ' . $totalUnitsEarned . ' Units', $fontStyle);
+            $footerTable->addCell(5000, $cellStyle)->addText('Total number of units to be enrolled: ' . $totalUnitsToBeEnrolled . ' Units', $fontStyle);
     
             $footerTable->addRow();
             $footerTable->addCell(5000, $cellStyle)->addText('Student\'s Signature: ', $fontStyle);
@@ -441,25 +428,29 @@ try {
          $html .= '</thead>';
             $html .= '<tbody>';
 
-            // Advised Courses Table Body
-            if (empty($studentData['advised_courses'])) {
-                $html .= '<tr><td colspan="7" style="text-align: center;">No advising records found for this academic year and semester.</td></tr>';
-            } else {
-                foreach ($studentData['advised_courses'] as $course) {
-                    $html .= '<tr>';
-                    $html .= '<td>' . htmlspecialchars($course['course_code'] ?? '') . '</td>';
-                    $html .= '<td>' . htmlspecialchars($course['course_title'] ?? '') . '</td>';
-                    $html .= '<td style="text-align: center;">' . htmlspecialchars($course['grade'] ?? '') . '</td>';
-                    $html .= '<td>' . htmlspecialchars($course['prerequisite_code'] ? $course['prerequisite_code'] . ' - ' . ($course['prerequisite_title'] ?? '') : 'N/A') . '</td>';
-                    $html .= '<td>' . htmlspecialchars($course['course_code'] . ' - ' . ($course['course_title'] ?? '')) . '</td>';
-                    $html .= '<td style="text-align: center;">' . htmlspecialchars($course['units'] ?? '') . '</td>';
-                    $html .= '<td></td>'; // Adviser's Signature
-                    $html .= '</tr>';
-                }
+            // Main table rows: combine graded/advised course rows as in student advising form
+            // Exclude failed courses from main graded_courses
+            $nonFailedGradedCourses = array_filter($studentData['graded_courses'], function($c) { return ($c['remarks'] ?? '') !== 'Failed'; });
+            $maxRows = max(count($nonFailedGradedCourses), count($studentData['advised_courses']));
+            for ($i = 0; $i < $maxRows; $i++) {
+                $graded = array_values($nonFailedGradedCourses)[$i] ?? null;
+                $advised = $studentData['advised_courses'][$i] ?? null;
+                $html .= '<tr>';
+                // Graded columns (left)
+                $html .= '<td>' . htmlspecialchars($graded['course_code'] ?? '') . '</td>';
+                $html .= '<td>' . htmlspecialchars($graded['course_title'] ?? '') . '</td>';
+                $html .= '<td style="text-align: center;">' . htmlspecialchars($graded['grade'] ?? '') . '</td>';
+                $html .= '<td>' . htmlspecialchars($graded['prerequisite_code'] ?? '') . '</td>';
+                // Advised side (right)
+                $advisedDisplay = $advised ? (($advised['course_code'] ?? '') . ' - ' . ($advised['course_title'] ?? '')) : '';
+                $html .= '<td>' . htmlspecialchars($advisedDisplay) . '</td>';
+                $html .= '<td style="text-align: center;">' . htmlspecialchars($advised['units'] ?? '') . '</td>';
+                $html .= '<td></td>';
+                $html .= '</tr>';
             }
 
             // Failed Courses Section
-            $failedCourses = array_filter($studentData['advised_courses'], function($c) { return ($c['remarks'] ?? '') === 'Failed'; });
+            $failedCourses = array_filter($studentData['graded_courses'], function($c) { return ($c['remarks'] ?? '') === 'Failed'; });
             if (!empty($failedCourses)) {
                 $html .= '<tr><td colspan="7"><strong>Failed course/s</strong></td></tr>';
                 $html .= '<tr>';
@@ -476,24 +467,19 @@ try {
                     $html .= '<td>' . htmlspecialchars($failedCourse['course_code'] ?? '') . '</td>';
                     $html .= '<td>' . htmlspecialchars($failedCourse['course_title'] ?? '') . '</td>';
                     $html .= '<td style="text-align: center;">' . htmlspecialchars($failedCourse['grade'] ?? 'N/A') . '</td>';
-                    $html .= '<td>' . htmlspecialchars($studentData['semester_name'] ?? '') . '</td>'; // Assuming semester name for term
-                    $html .= '<td>' . htmlspecialchars($studentData['academic_year_name'] ?? '') . '</td>'; // Assuming academic year for AY
+                    $html .= '<td>' . htmlspecialchars($failedCourse['semester_name'] ?? '') . '</td>';
+                    $html .= '<td>' . htmlspecialchars($failedCourse['academic_year_name'] ?? '') . '</td>';
                     $html .= '<td></td>';
                     $html .= '<td></td>';
                     $html .= '</tr>';
-                }
-            } else {
-                // Placeholder rows for Failed courses if none exist (mimicking JSX)
-                for ($i = 0; $i < 3; $i++) {
-                    $html .= '<tr><td colspan="7">&nbsp;</td></tr>';
                 }
             }
 
             $html .= '</tbody>';
             $html .= '<tfoot>';
             $html .= '<tr>';
-            $html .= '<td colspan="3"><strong>Total number of units enrolled:</strong> ' . array_reduce($studentData['advised_courses'], function($sum, $item) { return $sum + (($item['units'] ?? 0) ?: 0); }, 0) . ' Units</td>';
-            $html .= '<td colspan="4"><strong>Total number of units to be enrolled:</strong> 16 Units</td>'; // Hardcoded as in JSX
+            $html .= '<td colspan="3"><strong>Total number of units enrolled:</strong> ' . array_reduce($studentData['graded_courses'], function($sum, $item) { return $sum + (($item['units'] ?? 0) ?: 0); }, 0) . ' Units</td>';
+            $html .= '<td colspan="4"><strong>Total number of units to be enrolled:</strong> ' . array_reduce($studentData['advised_courses'], function($sum, $item) { return $sum + (($item['units'] ?? 0) ?: 0); }, 0) . ' Units</td>';
             $html .= '</tr>';
             $html .= '<tr>';
             $html .= '<td colspan="3"><strong>Student\'s Signature:</strong> </td>';

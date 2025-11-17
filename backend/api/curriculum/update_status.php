@@ -53,7 +53,7 @@ try {
                 "program_id" => $curriculum['program_id'],
                 "program" => $curriculum['program'],
                 "academic_year_id" => $curriculum['academic_year_id'],
-                "academicYear" => $curriculum['academicYear'],
+                "academicYear" => $curriculum['academicYear'] ?? '', // Use null-coalescing operator
                 "status" => $curriculum['status']
             );
             
