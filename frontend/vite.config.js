@@ -8,9 +8,6 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  build:{
-    sourcemap: true,
-  }  
   },
   server: {
     host: "0.0.0.0",
