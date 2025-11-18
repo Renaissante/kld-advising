@@ -2,7 +2,7 @@
 // Define your list of allowed origins
 $allowed_origins = [
     "http://localhost:5173", // For local development on the server machine
-    "http://192.168.18.6", // For accessing from other devices on the local network
+    "http://172.20.10.7", // For accessing from other devices on the local network
     "https://kld-advising.vercel.app",
     "https://kld-advising-git-main-ranielespiritu4-gmailcoms-projects.vercel.app",
     "https://kld-advising-pl5nrg3y3-ranielespiritu4-gmailcoms-projects.vercel.app"

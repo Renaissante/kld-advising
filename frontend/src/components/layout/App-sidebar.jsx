@@ -86,7 +86,7 @@ export function AppSidebar() {
   const memoizedDashboardUrl = useMemo(() => getRoleSpecificHomeUrl(activeRole), [activeRole]);
 
   const items = [
-    { title: "Dashboard", url: memoizedDashboardUrl, icon: LayoutDashboard, roles: ["admin", "dean", "programchair",] },
+    { title: "Dashboard", url: memoizedDashboardUrl, icon: LayoutDashboard, roles: ["admin", "dean", "programchair", "faculty"] },
     { title: "Users", icon: Users, roles: ["admin"], subItems: [
       { title: "Active Users", url: "/admin/users/active-users", icon: Users },
       { title: "Archived Users", url: "/admin/users/archived-users", icon: Archive }
@@ -102,7 +102,7 @@ export function AppSidebar() {
     { title: "Audit Logs", url: "/admin/audit-logs", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
-    { title: "Generate Reports", url: "/dean/generate-reports", icon: ClipboardList, roles: ["dean"] }, // New item for Dean Reports
+    { title: "Generates Reports", url: "/dean/generate-reports", icon: ClipboardList, roles: ["dean"] }, // New item for Dean Reports
     // { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin", "faculty", "student", "programchair", "dean"] }, // New item for all roles
   ];
 
