@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import Header from "@/components/layout/header"
+import Header from "@/components/layout/Header"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/App-sidebar"
 import { UserCheck, Users, BookOpen, BarChart as BarChartIcon, Loader2 } from "lucide-react"
