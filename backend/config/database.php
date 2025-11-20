@@ -12,12 +12,12 @@ if (file_exists($envPath . '/.env')) {
 }
 
 // Now getenv() will work, or use $_ENV
-$host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST')     ?: 'aws-1-ap-southeast-1.pooler.supabase.com';
-$db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME')     ?: 'postgres';
-$username = $_ENV['DB_USER']     ?? getenv('DB_USER')     ?: 'postgres.irnudqxgicdruxdjcbzj';
-$password = $_ENV['DB_PASS']     ?? getenv('DB_PASS')     ?: '09772634543raniel';
-$port     = $_ENV['DB_PORT']     ?? getenv('DB_PORT')     ?: '5432';
-$driver   = $_ENV['DB_DRIVER']   ?? getenv('DB_DRIVER')   ?: 'pgsql';
+$host     = $_ENV['DB_HOST']     ?? getenv('DB_HOST');
+$db_name  = $_ENV['DB_NAME']     ?? getenv('DB_NAME');
+$username = $_ENV['DB_USER']     ?? getenv('DB_USER');
+$password = $_ENV['DB_PASS']     ?? getenv('DB_PASS');
+$port     = $_ENV['DB_PORT']     ?? getenv('DB_PORT');
+$driver   = $_ENV['DB_DRIVER']   ?? getenv('DB_DRIVER');
 
 error_log("Attempting database connection...");
 error_log("Host: $host | Port: $port | User: $username | DB: $db_name");

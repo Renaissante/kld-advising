@@ -1,4 +1,5 @@
 <?php
+session_start();
 // Include CORS headers
 include_once '../../config/cors.php';
 
@@ -10,6 +11,9 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 include_once '../../config/database.php';
 include_once '../audit/log_activity.php';
 
+// Start session to check for logged in user
+
+
 $data = json_decode(file_get_contents("php://input"));
 
 if (!isset($data->section_id) || !isset($data->status) ||
@@ -18,6 +22,13 @@ if (!isset($data->section_id) || !isset($data->status) ||
     echo json_encode(array("message" => "Incomplete data. Provide section_id, status, and user_id."));
     exit();
 }
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] != $data->user_id || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to update section status."));
+//     exit();
+// }
 
 $section_id = $data->section_id;
 $status = $data->status;

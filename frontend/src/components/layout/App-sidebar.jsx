@@ -97,8 +97,8 @@ export function AppSidebar() {
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
     { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
-    { title: "Manage Faculty", url: "/program-chair/manage-faculty", basePath: "/program-chair/faculty-assignment", icon: ListPlus, roles: ["programchair"] },
-    { title: "Manage Sections", url: "/program-chair/manage-sections", icon: Users, roles: ["programchair"] },
+    { title: "Manage Faculty", url: "/admin/manage-faculty", basePath: "/admin/faculty-assignment", icon: ListPlus, roles: ["admin"] },
+    { title: "Manage Sections", url: "/admin/manage-sections", icon: Users, roles: ["admin"] },
     { title: "Audit Logs", url: "/admin/audit-logs", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean
     { title: "Advising Forms", url: "/dean/advising-forms", icon: ClipboardList, roles: ["dean"] }, // New item for Dean
@@ -284,13 +284,13 @@ export function AppSidebar() {
               <div
                 className="flex flex-col items-start text-sm group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:hidden"
               >
-                <span className="font-medium whitespace-nowrap capitalize">{activeRole || 'No Role'}</span>
+                <span className="font-medium whitespace-nowrap capitalize">{activeRole === 'admin' ? 'Associate Dean' : activeRole || 'No Role'}</span>
                 <span className="text-xs text-gray-400 whitespace-nowrap">{user?.email}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Active Role: {activeRole ? activeRole.charAt(0).toUpperCase() + activeRole.slice(1) : 'N/A'}</DropdownMenuLabel>
+            <DropdownMenuLabel>Active Role: {activeRole === 'admin' ? 'Associate Dean' : activeRole ? activeRole.charAt(0).toUpperCase() + activeRole.slice(1) : 'N/A'}</DropdownMenuLabel>
             {user?.roles.length > 1 && (
                 <DropdownMenuSeparator />
             )}

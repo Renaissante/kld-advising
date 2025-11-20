@@ -8,17 +8,14 @@ header("Content-Type: application/json; charset=UTF-8");
 // Removed: header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once '../../config/database.php';
-// Removed: include_once '../../middleware/auth.php';
 
-// Removed: if ($_SERVER['REQUEST_METHOD'] !== 'POST') { ... } block
+// Start session
+// session_start();
 
-// Authenticate and get user ID (if auth.php was included, otherwise this part is removed/handled elsewhere)
-// For consistency with curriculum/delete.php, we'll assume authentication is not handled here.
-// $user = authenticate(['program_chair']); // Only program chairs can archive assignments
-
-// if (!isset($user['id'])) {
-//     http_response_code(401);
-//     echo json_encode(["message" => "Unauthorized: Invalid or missing token.", "success" => false]);
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to delete assignments."));
 //     exit();
 // }
 

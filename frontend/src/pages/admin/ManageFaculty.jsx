@@ -62,7 +62,7 @@ export default function ManageFaculty() {
       setError(null)
       try {
         // Adjust the URL to your actual backend endpoint
-        const response = await fetch(`${API_BASE_URL}/program_chair/read_assignment.php`)
+        const response = await fetch(`${API_BASE_URL}/admin/read_assignment.php`)
         if (!response.ok) {
           // Try to get error message from response body
           let errorMsg = `HTTP error! status: ${response.status}`;
@@ -135,7 +135,7 @@ export default function ManageFaculty() {
         description: "Processing your request."
       });
       
-      const response = await fetch(`${API_BASE_URL}/faculty/update_advisor_status.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/update_advisor_status.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -367,7 +367,7 @@ export default function ManageFaculty() {
                                 align="end"
                                 onInteractOutside={(e) => e.preventDefault()}
                               >
-                                      <DropdownMenuItem onClick={() => navigate(`/program-chair/faculty-assignment/${faculty.faculty_id}`)}>
+                                      <DropdownMenuItem onClick={() => navigate(`/admin/faculty-assignment/${faculty.faculty_id}`)}>
                                         <Calendar className="mr-2 h-4 w-4" />
                                         View Assignments
                                       </DropdownMenuItem>

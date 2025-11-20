@@ -16,9 +16,9 @@ import ProtectedRoute from "@/routes/ProtectedRoute";
 import ManageGrades from "@/pages/faculty/ManageGrades";
 import ManageCurriculum from "@/pages/admin/ManageCurriculum";
 import StudentCurriculum from "@/pages/student/StudentCurriculum";
-import ManageFaculty from "@/pages/program-chair/ManageFaculty";
-import FacultyAssignment from "@/pages/program-chair/FacultyAssignment";
-import ManageSections from "@/pages/program-chair/ManageSections";
+import ManageFaculty from "@/pages/admin/ManageFaculty";
+import FacultyAssignment from "@/pages/admin/FacultyAssignment";
+import ManageSections from "@/pages/admin/ManageSections";
 import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
 import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
 import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
@@ -187,27 +187,27 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/program-chair/manage-faculty"
+        path="/admin/manage-faculty"
         element={
-          <ProtectedRoute requiredRoles="programchair">
+          <ProtectedRoute requiredRoles="admin">
             <ManageFaculty />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/program-chair/faculty-assignment/:facultyId"
+        path="/admin/faculty-assignment/:facultyId"
         element={
-          <ProtectedRoute requiredRoles="programchair">
+          <ProtectedRoute requiredRoles="admin">
             <FacultyAssignment />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/program-chair/manage-sections"
+        path="/admin/manage-sections"
         element={
-          <ProtectedRoute requiredRoles="programchair">
+          <ProtectedRoute requiredRoles="admin">
             <ManageSections />
           </ProtectedRoute>
         }

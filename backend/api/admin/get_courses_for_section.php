@@ -6,6 +6,16 @@ header("Content-Type: application/json; charset=UTF-8");
 
 include_once '../../config/database.php';
 
+// Start session
+// session_start();
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to get courses for this section."));
+//     exit();
+// }
+
 // Check if section_id is provided
 if (!isset($_GET['section_id']) || empty($_GET['section_id'])) {
     http_response_code(400);

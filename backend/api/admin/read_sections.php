@@ -11,6 +11,26 @@ $academic_year_id = isset($_GET['academic_year_id']) ? $_GET['academic_year_id']
 $semester_id = isset($_GET['semester_id']) ? $_GET['semester_id'] : null;
 $ignore_academic_filters = isset($_GET['ignore_academic_filters']) ? filter_var($_GET['ignore_academic_filters'], FILTER_VALIDATE_BOOLEAN) : false;
 
+// // Get admin ID from query parameter (for testing) or session
+// $adminId = isset($_GET['admin_id']) ? $_GET['admin_id'] : null;
+// 
+// // Start session to check for logged in user
+// session_start();
+// 
+// if (!$adminId && isset($_SESSION['user_id'])) {
+//     $adminId = $_SESSION['user_id'];
+//     // Ensure the logged-in user is an admin
+//     if (isset($_SESSION['user_roles']) && !in_array('admin', $_SESSION['user_roles'])) {
+//         http_response_code(403);
+//         echo json_encode(array("message" => "Forbidden: User is not an admin"));
+//         exit();
+//     }
+// } else if (!$adminId) {
+//     http_response_code(401);
+//     echo json_encode(array("message" => "Unauthorized: You must be logged in as an admin"));
+//     exit();
+// }
+
 // If not ignoring academic filters and academic year/semester are missing, then it's an error
 if (!$ignore_academic_filters && (empty($academic_year_id) || empty($semester_id))) {
     die(json_encode(array("message" => "Missing academic_year_id or semester_id parameter, or ignore_academic_filters is false")));
@@ -19,7 +39,7 @@ if (!$ignore_academic_filters && (empty($academic_year_id) || empty($semester_id
 // Check if we want sections with advisors or without advisors
 $filter_type = isset($_GET['filter_type']) ? $_GET['filter_type'] : 'all';
 $status_filter = isset($_GET['status']) ? $_GET['status'] : null; // Get status filter
-$program_ids_filter = isset($_GET['program_ids']) ? $_GET['program_ids'] : null; // Get program_ids filter
+// $program_ids_filter = isset($_GET['program_ids']) ? $_GET['program_ids'] : null; // Remove program_ids filter
 
 try {
     // Base query to get sections
@@ -61,15 +81,15 @@ try {
         $query .= " AND s.status = :status";
     }
 
-    // Add program_ids filter if provided
-    if ($program_ids_filter) {
-        $program_ids_array = explode(',', $program_ids_filter);
-        $placeholders = [];
-        foreach ($program_ids_array as $key => $program_id) {
-            $placeholders[] = ':program_id_' . $key;
-        }
-        $query .= " AND s.program_id IN (" . implode(',', $placeholders) . ")";
-    }
+    // Remove program_ids filter logic
+    // if ($program_ids_filter) {
+    //     $program_ids_array = explode(',', $program_ids_filter);
+    //     $placeholders = [];
+    //     foreach ($program_ids_array as $key => $program_id) {
+    //         $placeholders[] = ':program_id_' . $key;
+    //     }
+    //     $query .= " AND s.program_id IN (" . implode(',', $placeholders) . ")";
+    // }
 
     // Filter sections based on whether they have advisors or not
     if ($filter_type === 'no_advisor') {
@@ -91,14 +111,14 @@ try {
     if ($status_filter) {
         $stmt->bindParam(':status', $status_filter);
     }
-    // Bind program_ids parameters
-    if ($program_ids_filter) {
-        $program_ids_array = explode(',', $program_ids_filter);
-        foreach ($program_ids_array as $key => $program_id) {
-            $param_name = ':program_id_' . $key;
-            $stmt->bindValue($param_name, $program_id, PDO::PARAM_INT);
-        }
-    }
+    // Remove program_ids binding logic
+    // if ($program_ids_filter) {
+    //     $program_ids_array = explode(',', $program_ids_filter);
+    //     foreach ($program_ids_array as $key => $program_id) {
+    //         $param_name = ':program_id_' . $key;
+    //         $stmt->bindValue($param_name, $program_id, PDO::PARAM_INT);
+    //     }
+    // }
 
     // Execute query
     $stmt->execute();

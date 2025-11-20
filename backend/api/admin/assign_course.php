@@ -7,6 +7,16 @@ header("Access-Control-Allow-Methods: POST");
 
 include_once '../../config/database.php';
 
+// Start session
+// session_start();
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to assign courses."));
+//     exit();
+// }
+
 // Check if the request is a POST request
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405); // Method Not Allowed

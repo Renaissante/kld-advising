@@ -26,12 +26,30 @@ if (!isset($conn) || $conn === null) {
     exit();
 }
 
-// Get required section_id
+// Get required section_id and student_id
 $sectionId = isset($_GET['section_id']) ? intval($_GET['section_id']) : null;
+$studentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : null;
 
-if (!$sectionId) {
+// Get admin ID from query parameter (for testing) or session
+$adminId = isset($_GET['admin_id']) ? $_GET['admin_id'] : null;
+
+if (!$adminId && isset($_SESSION['user_id'])) {
+    $adminId = $_SESSION['user_id'];
+    // Ensure the logged-in user is an admin
+    if (isset($_SESSION['user_roles']) && !in_array('admin', $_SESSION['user_roles'])) {
+        http_response_code(403);
+        echo json_encode(array("success" => false, "message" => "Forbidden: User is not an admin"));
+        exit();
+    }
+} else if (!$adminId) {
+    http_response_code(401);
+    echo json_encode(array("success" => false, "message" => "Unauthorized: You must be logged in as an admin"));
+    exit();
+}
+
+if (!$sectionId || !$studentId) {
     http_response_code(400);
-    echo json_encode(array("success" => false, "message" => "Missing required parameter: section_id"));
+    echo json_encode(array("success" => false, "message" => "Missing required parameters: section_id and student_id"));
     exit();
 }
 

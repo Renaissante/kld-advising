@@ -10,6 +10,9 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 include_once '../../config/database.php';
 include_once '../audit/log_activity.php';
 
+// Start session to check for logged in user
+session_start();
+
 $data = json_decode(file_get_contents("php://input"));
 
 // Validate input
@@ -19,6 +22,13 @@ if (!isset($data->section_id) || empty($data->section_id) ||
     echo json_encode(array("message" => "Section ID and User ID are required."));
     exit();
 }
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] != $data->user_id || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to delete sections."));
+//     exit();
+// }
 
 $section_id = $data->section_id;
 $user_id = $data->user_id;

@@ -9,6 +9,9 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 
 include_once '../../config/database.php';
 
+// Start session to check for logged in user
+session_start();
+
 $data = json_decode(file_get_contents("php://input"));
 
 if (!isset($data->student_id) || !isset($data->section_id)) {
@@ -16,6 +19,13 @@ if (!isset($data->student_id) || !isset($data->section_id)) {
     echo json_encode(array("message" => "Incomplete data. Provide student_id and section_id."));
     exit();
 }
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to unassign students from sections."));
+//     exit();
+// }
 
 $student_id_raw = $data->student_id;
 $section_id = (int)$data->section_id; // Ensure section_id is an integer
@@ -36,9 +46,22 @@ if (strpos($student_id_raw, 'irregular-') === 0) {
         echo json_encode(array("message" => "Invalid irregular student ID format."));
         exit();
     }
+} else if (strpos($student_id_raw, 'regular-') === 0) { // Handle regular students
+    $is_irregular_student = false;
+    $parts = explode('-', $student_id_raw);
+    if (count($parts) >= 3 && is_numeric($parts[1]) && is_numeric($parts[2])) {
+        $student_db_id = (int)$parts[1];
+        // $sse_id = (int)$parts[2]; // Not needed for deletion here
+    } else {
+        http_response_code(400);
+        echo json_encode(array("message" => "Invalid regular student ID format."));
+        exit();
+    }
 } else {
-    // For regular students
-    $student_db_id = (int)$student_id_raw;
+    // Fallback or error if format is unknown (e.g., direct student_db_id without prefix)
+    http_response_code(400);
+    echo json_encode(array("message" => "Unknown student ID format."));
+    exit();
 }
 
 $conn->beginTransaction();

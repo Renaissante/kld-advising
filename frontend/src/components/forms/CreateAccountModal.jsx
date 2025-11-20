@@ -397,7 +397,7 @@ export function CreateAccountModal({onAccountCreated}) {
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">System Admin</SelectItem>
+                <SelectItem value="admin">Associate Dean</SelectItem>
                 <SelectItem value="dean">Dean</SelectItem>
                 <SelectItem value="programchair">Program Chair</SelectItem>
                 <SelectItem value="faculty">Faculty</SelectItem>

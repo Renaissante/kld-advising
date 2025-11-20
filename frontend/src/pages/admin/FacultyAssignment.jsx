@@ -109,46 +109,47 @@ export default function FacultyAssignment() {
   const [loadingEditDialogCourses, setLoadingEditDialogCourses] = useState(false);
 
   // --- State for Program Chair's Programs (copied from ManageFaculty) ---
-  const [programs, setPrograms] = useState([]);
-  const [assignedProgramIds, setAssignedProgramIds] = useState([]);
-  const [loadingProgramData, setLoadingProgramData] = useState(true);
+  // Removed program chair specific states
+  // const [programs, setPrograms] = useState([]);
+  // const [assignedProgramIds, setAssignedProgramIds] = useState([]);
+  // const [loadingProgramData, setLoadingProgramData] = useState(true);
 
-  // --- Fetch Program Chair's Assigned Programs ---
-  useEffect(() => {
-    const fetchProgramChairData = async () => {
-      if (!user || !user.id) {
-        console.log("User data not available yet for fetching programs.");
-        setLoadingProgramData(false);
-        return;
-      }
-      setLoadingProgramData(true);
-      console.log("Fetching programs for Program Chair ID:", user.id);
-      try {
-        const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
-        const programData = await programResponse.json();
-        if (!programResponse.ok) {
-          console.error("Failed to fetch programs:", programData.message);
-          setError(prev => prev || `Failed to load assigned programs: ${programData.message}`);
-          setPrograms([]);
-          setAssignedProgramIds([]);
-          return;
-        }
-        setPrograms(programData);
-        const programIds = programData.map(program => program.id);
-        setAssignedProgramIds(programIds);
-        console.log("Program Chair's Assigned Programs:", programData);
-        console.log("Program IDs for filtering:", programIds);
-      } catch (error) {
-        console.error("Error fetching program chair data:", error);
-        setError(prev => prev || "Error loading assigned programs.");
-        setPrograms([]);
-        setAssignedProgramIds([]);
-      } finally {
-        setLoadingProgramData(false);
-      }
-    };
-    fetchProgramChairData();
-  }, [user]);
+  // --- Fetch Program Chair's Assigned Programs --- (Removed this useEffect)
+  // useEffect(() => {
+  //   const fetchProgramChairData = async () => {
+  //     if (!user || !user.id) {
+  //       console.log("User data not available yet for fetching programs.");
+  //       setLoadingProgramData(false);
+  //       return;
+  //     }
+  //     setLoadingProgramData(true);
+  //     console.log("Fetching programs for Program Chair ID:", user.id);
+  //     try {
+  //       const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
+  //       const programData = await programResponse.json();
+  //       if (!programResponse.ok) {
+  //         console.error("Failed to fetch programs:", programData.message);
+  //         setError(prev => prev || `Failed to load assigned programs: ${programData.message}`);
+  //         setPrograms([]);
+  //         setAssignedProgramIds([]);
+  //         return;
+  //       }
+  //       setPrograms(programData);
+  //       const programIds = programData.map(program => program.id);
+  //       setAssignedProgramIds(programIds);
+  //       console.log("Program Chair's Assigned Programs:", programData);
+  //       console.log("Program IDs for filtering:", programIds);
+  //     } catch (error) {
+  //       console.error("Error fetching program chair data:", error);
+  //       setError(prev => prev || "Error loading assigned programs.");
+  //       setPrograms([]);
+  //       setAssignedProgramIds([]);
+  //     } finally {
+  //       setLoadingProgramData(false);
+  //     }
+  //   };
+  //   fetchProgramChairData();
+  // }, [user]);
 
   // Refetch function (extracted for reuse)
   const fetchFacultyData = async () => {
@@ -161,7 +162,7 @@ export default function FacultyAssignment() {
     setError(null)
     try {
       const response = await fetch(
-        `${API_BASE_URL}/program_chair/read_single_faculty_assignment.php?faculty_id=${facultyId}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`,
+        `${API_BASE_URL}/admin/read_single_faculty_assignment.php?faculty_id=${facultyId}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`,
       )
       if (!response.ok) {
         let errorMsg = `HTTP error! status: ${response.status}`
@@ -209,37 +210,24 @@ export default function FacultyAssignment() {
   // --- Fetch Sections (Updated with Program Filtering) ---
   useEffect(() => {
     const fetchSections = async () => {
-      if (!activeAcademicYear?.id || !activeSemester?.id || loadingProgramData) {
-        console.log("Waiting for AY/Sem or Program Chair data to fetch sections.");
-        if (loadingProgramData) console.log("Program data is still loading.");
-        else if (!activeAcademicYear?.id || !activeSemester?.id) console.log("Active AY/Sem not set.");
+      if (!activeAcademicYear?.id || !activeSemester?.id) { // Removed loadingProgramData and assignedProgramIds.length === 0 check
+        console.log("Waiting for AY/Sem to fetch sections.");
+        if (!activeAcademicYear?.id || !activeSemester?.id) console.log("Active AY/Sem not set.");
         setSectionsDataState([]); // Use renamed state setter
         return;
       }
-      if (!loadingProgramData && assignedProgramIds.length === 0) {
-          console.log("Program Chair has no assigned programs. Cannot fetch sections.");
-          setSectionsDataState([]); // Use renamed state setter
-          setLoadingSections(false);
-          return;
-      }
-      console.log("Fetching sections for AY:", activeAcademicYear.id, "Sem:", activeSemester.id, "Programs:", assignedProgramIds);
+      // Removed the entire block for program chair filtering (lines 219-224)
+      
+      console.log("Fetching sections for AY:", activeAcademicYear.id, "Sem:", activeSemester.id);
       setLoadingSections(true);
       try {
-        const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&status=active`;
+        const url = `${API_BASE_URL}/admin/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&status=active`;
         const response = await fetch(url);
         if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
         const data = await response.json();
         console.log("All sections data received:", data);
-        const assignedProgramNames = programs.map(program => program.name);
-        console.log("Filtering sections based on assigned program names:", assignedProgramNames);
-        const filteredSections = data.filter(section => {
-          if (section.program_name) { return assignedProgramNames.some(programName => section.program_name.includes(programName)); }
-          if (section.program_id) { return assignedProgramIds.includes(parseInt(section.program_id)); }
-          console.warn(`Section ${section.name} (ID: ${section.id}) has neither program_name nor program_id. Excluding.`);
-          return false;
-        });
-        console.log("Filtered sections for program chair's programs:", filteredSections);
-        setSectionsDataState(filteredSections); // Use renamed state setter
+        // Removed program filtering logic (lines 233-240)
+        setSectionsDataState(data); // Replaced with direct assignment
       } catch (error) {
         console.error("Error fetching sections:", error);
         setSectionsDataState([]); // Use renamed state setter
@@ -249,7 +237,7 @@ export default function FacultyAssignment() {
       }
     };
     fetchSections();
-  }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds, programs]);
+  }, [activeAcademicYear, activeSemester]); // Removed loadingProgramData, assignedProgramIds, programs from dependency array
 
   // Reset dialogs when component unmounts
   useEffect(() => {
@@ -284,7 +272,7 @@ export default function FacultyAssignment() {
       }
       setLoadingEditDialogCourses(true);
       try {
-        const url = new URL(`${API_BASE_URL}/program_chair/get_courses_for_section.php`);
+        const url = new URL(`${API_BASE_URL}/admin/get_courses_for_section.php`);
         url.searchParams.append('section_id', newAssignment.sectionId);
         url.searchParams.append('academic_year_id', activeAcademicYear.id);
         url.searchParams.append('semester_id', activeSemester.id);
@@ -316,7 +304,7 @@ export default function FacultyAssignment() {
     const toastId = toast.loading("Deleting assignment...");
     try {
       // --- API Call for Deleting ---
-      const response = await fetch(`${API_BASE_URL}/program_chair/delete_assignment.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/delete_assignment.php`, {
         method: 'POST', // Changed to POST
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignment_id: assignmentToDelete.assignment_id })
@@ -360,7 +348,7 @@ export default function FacultyAssignment() {
       if (!adviseeSectionToUnassign || !facultyInfo) return;
       const toastId = toast.loading("Unassigning advisee...");
       try {
-          const response = await fetch(`${API_BASE_URL}/program_chair/unassign_advisor.php`, {
+          const response = await fetch(`${API_BASE_URL}/admin/unassign_advisor.php`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -401,7 +389,7 @@ export default function FacultyAssignment() {
         course_id: assignmentData.courseId
       };
       console.log("Saving course assignment:", completeAssignmentData);
-      const response = await fetch(`${API_BASE_URL}/program_chair/assign_course.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/assign_course.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(completeAssignmentData)
@@ -479,7 +467,7 @@ export default function FacultyAssignment() {
           // semester_id: newAssignment.semesterId
       };
       console.log("Updating assignment:", updateData);
-      const response = await fetch(`${API_BASE_URL}/program_chair/update_assignment.php`, { // Replace with your actual update endpoint
+      const response = await fetch(`${API_BASE_URL}/admin/update_assignment.php`, { // Replace with your actual update endpoint
         method: 'PUT', // Or POST
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
@@ -627,7 +615,7 @@ export default function FacultyAssignment() {
       const fetchCoursesForSection = async () => {
         setLoadingCoursesForSection(true);
         try {
-          const url = new URL(`${API_BASE_URL}/program_chair/get_courses_for_section.php`);
+          const url = new URL(`${API_BASE_URL}/admin/get_courses_for_section.php`);
           url.searchParams.append('section_id', assignment.sectionId);
           if (activeAcademicYear?.id) url.searchParams.append('academic_year_id', activeAcademicYear.id);
           if (activeSemester?.id) url.searchParams.append('semester_id', activeSemester.id);
@@ -777,7 +765,7 @@ export default function FacultyAssignment() {
     useEffect(() => {
       const fetchSectionsWithoutAdvisors = async () => {
         // Ensure all required data is available
-        if (!open || !activeAcademicYear?.id || !activeSemester?.id || assignedProgramIds.length === 0) {
+        if (!open || !activeAcademicYear?.id || !activeSemester?.id) { // Removed assignedProgramIds.length === 0 check
           setSectionsWithoutAdvisors([]); // Clear if conditions aren't met
           return;
         }
@@ -785,7 +773,7 @@ export default function FacultyAssignment() {
         setLoadingUnassignedSections(true);
         try {
           // URL for sections without advisors, filtered by AY and Sem
-          const url = `${API_BASE_URL}/program_chair/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor&status=active`;
+          const url = `${API_BASE_URL}/admin/read_sections.php?academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&filter_type=no_advisor&status=active`;
 
           console.log("Fetching sections without advisors for dialog:", url);
 
@@ -797,25 +785,8 @@ export default function FacultyAssignment() {
 
           const data = await response.json();
 
-          // Get program names from the parent scope's 'programs' state
-          const assignedProgramNames = programs.map(program => program.name);
-
-          // Filter the fetched unassigned sections by the program chair's assigned programs
-          const filteredSections = data.filter(section => {
-            if (section.program_name) {
-              return assignedProgramNames.some(programName =>
-                section.program_name.includes(programName)
-              );
-            }
-            if (section.program_id) {
-              return assignedProgramIds.includes(parseInt(section.program_id));
-            }
-            console.warn(`Unassigned Section ${section.name} (ID: ${section.id}) has neither program_name nor program_id. Excluding.`);
-            return false;
-          });
-
-          console.log("Filtered sections without advisors for dialog:", filteredSections);
-          setSectionsWithoutAdvisors(filteredSections);
+          // Removed program filtering logic (lines 800-815)
+          setSectionsWithoutAdvisors(data); // Replaced with direct assignment
         } catch (error) {
           console.error("Error fetching sections without advisors:", error);
           setSectionsWithoutAdvisors([]); // Clear on error
@@ -827,7 +798,7 @@ export default function FacultyAssignment() {
 
       fetchSectionsWithoutAdvisors();
       // Dependencies: dialog open state, AY, Sem, and the program chair's program data
-    }, [open, activeAcademicYear, activeSemester, programs, assignedProgramIds]);
+    }, [open, activeAcademicYear, activeSemester]);
 
 
     const handleSaveClick = () => {
@@ -958,7 +929,7 @@ export default function FacultyAssignment() {
       console.log("Assigning advisor:", payload);
       // Endpoint should handle assigning faculty_id to section's advisor field,
       // potentially overwriting an existing one.
-      const response = await fetch(`${API_BASE_URL}/program_chair/assign_advisor.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/assign_advisor.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -998,7 +969,7 @@ export default function FacultyAssignment() {
   };
 
   // --- Render Logic ---
-  if (isLoading || loadingProgramData) {
+  if (isLoading) { // Removed loadingProgramData
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -1020,7 +991,7 @@ export default function FacultyAssignment() {
         <main className="w-full">
           <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
           <div className="p-4 md:p-6">
-             <Button variant="ghost" className="mb-4" onClick={() => navigate("/program-chair/manage-faculty")}>
+             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-faculty")}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Faculty
               </Button>
             <Alert variant="destructive">
@@ -1041,7 +1012,7 @@ export default function FacultyAssignment() {
         <main className="w-full">
           <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
           <div className="p-4 md:p-6">
-             <Button variant="ghost" className="mb-4" onClick={() => navigate("/program-chair/manage-faculty")}>
+             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-faculty")}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Faculty
               </Button>
             <Alert variant="destructive">
@@ -1139,7 +1110,7 @@ export default function FacultyAssignment() {
 
           <div className="p-4 md:p-6">
             <div className="flex items-center mb-6">
-              <Button variant="ghost" className="mr-2" onClick={() => navigate("/program-chair/manage-faculty")}> <ArrowLeft className="h-4 w-4 mr-2" /> Back </Button>
+              <Button variant="ghost" className="mr-2" onClick={() => navigate("/admin/manage-faculty")}> <ArrowLeft className="h-4 w-4 mr-2" /> Back </Button>
               <div>
                 <h1 className="text-2xl font-semibold text-[#1b4b2a]">{facultyInfo.faculty_name}</h1>
                 <p className="text-muted-foreground">{facultyInfo.role} • {facultyInfo.department_name} • A.Y. {activeAcademicYear?.year || 'N/A'} {activeSemester?.name || 'N/A'}</p>
@@ -1321,3 +1292,4 @@ export default function FacultyAssignment() {
     </SidebarProvider>
   )
 }
+

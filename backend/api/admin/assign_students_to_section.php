@@ -7,6 +7,9 @@ header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// Start session to check for logged in user
+session_start();
+
 $data = json_decode(file_get_contents("php://input"));
 
 if (!isset($data->section_id) || !isset($data->student_ids) || !is_array($data->student_ids)) {
@@ -14,6 +17,13 @@ if (!isset($data->section_id) || !isset($data->student_ids) || !is_array($data->
     echo json_encode(["message" => "Incomplete data. Provide section_id and an array of student_ids."]);
     exit();
 }
+
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("message" => "Forbidden: You do not have permission to assign students to sections."));
+//     exit();
+// }
 
 $section_id = $data->section_id;
 $student_ids = $data->student_ids;

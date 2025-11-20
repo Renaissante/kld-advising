@@ -26,19 +26,20 @@ if (!isset($conn) || $conn === null) {
     exit();
 }
 
-// Get program chair ID from session or query parameter (for testing)
-$programChairId = isset($_GET['program_chair_id']) ? $_GET['program_chair_id'] : null;
+// Get admin ID from session or query parameter (for testing)
+$adminId = isset($_GET['admin_id']) ? $_GET['admin_id'] : null;
 
-if (!$programChairId && isset($_SESSION['user_id'])) {
-    $programChairId = $_SESSION['user_id'];
-    if (isset($_SESSION['user_roles']) && !in_array('program_chair', $_SESSION['user_roles'])) {
+if (!$adminId && isset($_SESSION['user_id'])) {
+    $adminId = $_SESSION['user_id'];
+    // Ensure the logged-in user is an admin
+    if (isset($_SESSION['user_roles']) && !in_array('admin', $_SESSION['user_roles'])) {
         http_response_code(403);
-        echo json_encode(array("success" => false, "message" => "Forbidden: User is not a program chair"));
+        echo json_encode(array("success" => false, "message" => "Forbidden: User is not an admin"));
         exit();
     }
-} else if (!$programChairId) {
+} else if (!$adminId) {
     http_response_code(401);
-    echo json_encode(array("success" => false, "message" => "Unauthorized: You must be logged in as a program chair"));
+    echo json_encode(array("success" => false, "message" => "Unauthorized: You must be logged in as an admin"));
     exit();
 }
 
@@ -53,58 +54,57 @@ if (!$academicYearId || !$semesterId) {
 }
 
 try {
-    // First, get the programs associated with this program chair
-    $programQuery = "SELECT pc.program FROM program_chairs pc WHERE pc.employee_id = :program_chair_id";
+    // Admin can see students from all programs, no need to filter by program chair assigned programs
+    $programQuery = "SELECT id FROM programs"; // Fetch all program IDs
     $programStmt = $conn->prepare($programQuery);
-    $programStmt->bindParam(':program_chair_id', $programChairId);
     $programStmt->execute();
-    $assignedPrograms = $programStmt->fetchAll(PDO::FETCH_COLUMN);
+    $allPrograms = $programStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    if (empty($assignedPrograms)) {
+    if (empty($allPrograms)) {
         http_response_code(200);
-        echo json_encode(array("success" => true, "count" => 0, "data" => [], "message" => "Program chair not assigned to any programs."));
+        echo json_encode(array("success" => true, "count" => 0, "data" => [], "message" => "No programs found in the system."));
         exit();
     }
 
-    $programIdsString = implode(',', $assignedPrograms);
+    $programIdsString = implode(',', $allPrograms);
 
     // Query to fetch irregular students with failed courses, not currently retaking that course
     $query = "
-        SELECT 
-            s.id AS student_db_id,
-            s.student_id,
-            s.name AS student_name,
-            u.email, -- Changed from s.email to u.email
-            yl.level AS year_level, -- Reverted to yl.level
-            COALESCE(home_sec.name, 'N/A') AS home_section_name,
-            c.id AS failed_course_id,
-            c.course_code AS failed_course_code,
-            c.course_title AS failed_course_title
-        FROM 
-            students s
-        JOIN 
-            course_grades cg ON s.student_id = cg.student_id
-        JOIN 
-            courses c ON cg.course_id = c.id
-        JOIN
-            users u ON s.student_id = u.id -- Added join with users table
-        JOIN
-            year_levels yl ON s.year_level_id = yl.id
-        LEFT JOIN
-            sections home_sec ON s.section_id = home_sec.id
-        WHERE 
-            cg.remarks = 'Failed'
-            AND s.program_id IN ($programIdsString) -- Filter by programs managed by this chair
-            AND NOT EXISTS (
-                SELECT 1
-                FROM irregular_course_enrollments ice
-                JOIN courses ice_c ON ice.course_id = ice_c.id -- Join to get course code of retake
-                WHERE ice.student_id = s.id
-                  AND ice_c.course_code = c.course_code -- Compare by course_code
-                  AND ice.enrollment_type = 'Retake'
-            )
-        ORDER BY 
-            s.name, c.course_code;
+    SELECT 
+        s.id AS student_db_id,
+        s.student_id,
+        s.name AS student_name,
+        u.email, -- Changed from s.email to u.email
+        yl.level AS year_level, -- Reverted to yl.level
+        COALESCE(home_sec.name, 'N/A') AS home_section_name,
+        c.id AS failed_course_id,
+        c.course_code AS failed_course_code,
+        c.course_title AS failed_course_title
+    FROM 
+        students s
+    JOIN 
+        course_grades cg ON s.student_id = cg.student_id
+    JOIN 
+        courses c ON cg.course_id = c.id
+    JOIN
+        users u ON s.student_id = u.id -- Added join with users table
+    JOIN
+        year_levels yl ON s.year_level_id = yl.id
+    LEFT JOIN
+        sections home_sec ON s.section_id = home_sec.id
+    WHERE 
+        cg.remarks = 'Failed'
+        AND s.program_id IN ($programIdsString) -- Now filters by ALL programs
+        AND NOT EXISTS (
+            SELECT 1
+            FROM irregular_course_enrollments ice
+            JOIN courses ice_c ON ice.course_id = ice_c.id -- Join to get course code of retake
+            WHERE ice.student_id = s.id
+              AND ice_c.course_code = c.course_code -- Compare by course_code
+              AND ice.enrollment_type = 'Retake'
+        )
+    ORDER BY 
+        s.name, c.course_code;
     ";
 
     $stmt = $conn->prepare($query);
@@ -112,11 +112,7 @@ try {
         throw new PDOException("Failed to prepare query: " . implode(" - ", $conn->errorInfo()));
     }
 
-    // Assuming irregular_course_enrollments doesn't have AY/Sem, bind only program_chair_id
-    // If it does, uncomment and bind :academic_year_id and :semester_id
-    // $stmt->bindParam(':academic_year_id', $academicYearId, PDO::PARAM_INT);
-    // $stmt->bindParam(':semester_id', $semesterId, PDO::PARAM_INT);
-    
+    // No longer binding program_chair_id
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

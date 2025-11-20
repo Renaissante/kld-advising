@@ -139,7 +139,7 @@ const AdminDashboard = () => {
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div>
-              <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Admin Dashboard</h1>
+              <h1 className="text-2xl font-semibold text-[#1b4b2a] dark:text-emerald-300">Associate Dean Dashboard</h1>
               <p className="text-muted-foreground mt-1">Overview of the system</p>
             </div>
 

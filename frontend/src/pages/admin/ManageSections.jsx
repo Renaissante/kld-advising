@@ -97,10 +97,8 @@ export default function ManageSections() {
 
   // --- State for Program Chair's Programs ---
   const { user } = useAuth(); // Get user from auth context
-  const [programs, setPrograms] = useState([]);
-  const [assignedProgramIds, setAssignedProgramIds] = useState([]);
-  const [loadingProgramData, setLoadingProgramData] = useState(true);
   const [yearLevels, setYearLevels] = useState([]); // State for year levels
+  const [allPrograms, setAllPrograms] = useState([]); // New state for all programs
 
   // Fetch year levels
   useEffect(() => {
@@ -122,26 +120,19 @@ export default function ManageSections() {
 
   // Refactored fetch functions using useCallback
   const fetchSections = useCallback(async (shouldIgnoreAcademicFilters = false, statusFilter = null) => {
-    if (!shouldIgnoreAcademicFilters && (!activeAcademicYear?.id || !activeSemester?.id || loadingProgramData)) {
+    if (!shouldIgnoreAcademicFilters && (!activeAcademicYear?.id || !activeSemester?.id)) {
         setIsLoadingSections(false);
-      console.log("Waiting for AY/Sem or Program Chair data to fetch sections.");
-      if (loadingProgramData) console.log("Program data is still loading.");
-      else if (!activeAcademicYear?.id || !activeSemester?.id) console.log("Active AY/Sem not set.");
+      console.log("Waiting for AY/Sem to fetch sections.");
+      if (!activeAcademicYear?.id || !activeSemester?.id) console.log("Active AY/Sem not set.");
       setSections([]); // Clear sections if conditions aren't met
         return;
       }
-    if (!loadingProgramData && assignedProgramIds.length === 0) {
-      console.log("Program Chair has no assigned programs. Cannot fetch sections.");
-      setSections([]);
-      setIsLoadingSections(false);
-      return;
-    }
-      setSectionsError(null);
+    setSectionsError(null);
       try {
-      const programIdsParam = assignedProgramIds.length > 0 ? `&program_ids=${assignedProgramIds.join(',')}` : '';
+      const adminIdParam = user?.id ? `&admin_id=${user.id}` : '';
       const academicFilters = shouldIgnoreAcademicFilters ? `&ignore_academic_filters=true` : `&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
       const statusParam = statusFilter ? `&status=${statusFilter}` : '';
-      const apiUrl = `${API_BASE_URL}/program_chair/read_sections.php?${academicFilters}${statusParam}${programIdsParam}`;
+      const apiUrl = `${API_BASE_URL}/admin/read_sections.php?${academicFilters}${statusParam}${adminIdParam}`;
       const response = await fetch(apiUrl);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -167,7 +158,7 @@ export default function ManageSections() {
       } finally {
         setIsLoadingSections(false);
       }
-  }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds]); // Add activeTab to dependencies
+  }, [activeAcademicYear, activeSemester, user]); // Add activeTab to dependencies
 
   const fetchUnassignedStudents = useCallback(async () => {
       setIsLoadingStudents(true);
@@ -193,7 +184,7 @@ export default function ManageSections() {
     setIsLoadingIrregularStudents(true);
     setIrregularStudentsError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/student/read_irregular_students_with_failed_courses.php?program_chair_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`);
+      const response = await fetch(`${API_BASE_URL}/student/read_irregular_students_with_failed_courses.php?admin_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -217,7 +208,7 @@ export default function ManageSections() {
     setCoursesForSectionError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/course/read_courses_by_section_curriculum.php?section_id=${sectionId}&student_id=${studentId}&program_chair_id=${user.id}`);
+      const response = await fetch(`${API_BASE_URL}/course/read_courses_by_section_curriculum.php?section_id=${sectionId}&student_id=${studentId}&admin_id=${user.id}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -235,70 +226,49 @@ export default function ManageSections() {
   }, [user]);
 
   useEffect(() => {
-    const fetchProgramChairData = async () => {
-      if (!user || !user.id) {
-        console.log("User data not available yet for fetching programs.");
-        setLoadingProgramData(false);
-        return;
+    if (user?.id) {
+      // Fetch active sections (filtered by active AY/Sem)
+      if (activeAcademicYear?.id && activeSemester?.id) {
+        fetchSections(false, "active");
+      } else {
+        setActiveSectionsState([]); // Clear active sections if AY/Sem not set
+        setIsLoadingSections(false);
       }
-      setLoadingProgramData(true);
-      console.log("Fetching programs for Program Chair ID:", user.id);
+      // Fetch archived and completed sections (ignore AY/Sem filters)
+      fetchSections(true, "archived");
+      fetchSections(true, "completed");
+      fetchUnassignedStudents(); // Unassigned students are always based on active AY/Sem
+      fetchIrregularStudentsForAssignment();
+    } else {
+      console.log("User data not available yet for fetching sections.");
+      setActiveSectionsState([]);
+      setArchivedSectionsState([]);
+      setCompletedSectionsState([]);
+      setIsLoadingSections(false);
+      setAvailableStudents([]);
+      setIsLoadingStudents(false);
+      setIrregularStudentsToAssign([]);
+      setIsLoadingIrregularStudents(false);
+    }
+  }, [activeAcademicYear, activeSemester, user, fetchSections, fetchUnassignedStudents, fetchIrregularStudentsForAssignment]);
+
+  // New useEffect to fetch all programs
+  useEffect(() => {
+    const fetchAllPrograms = async () => {
       try {
-        const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
-        const programData = await programResponse.json();
-        if (!programResponse.ok) {
-          console.error("Failed to fetch programs:", programData.message);
-          setSectionsError(prev => prev || `Failed to load assigned programs: ${programData.message}`);
-          setPrograms([]);
-          setAssignedProgramIds([]);
-          return;
+        const response = await fetch(`${API_BASE_URL}/program/read.php`); // Fetch all programs
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        setPrograms(programData);
-        const programIds = programData.map(program => program.id);
-        setAssignedProgramIds(programIds);
-        console.log("Program Chair's Assigned Programs:", programData);
-        console.log("Program IDs for filtering:", programIds);
+        const data = await response.json();
+        setAllPrograms(data || []);
       } catch (error) {
-        console.error("Error fetching program chair data:", error);
-        setSectionsError(prev => prev || "Error loading assigned programs.");
-        setPrograms([]);
-        setAssignedProgramIds([]);
-      } finally {
-        setLoadingProgramData(false);
+        console.error("Error fetching all programs:", error);
+        toast.error("Failed to load programs for selection.");
       }
     };
-    fetchProgramChairData();
-  }, [user]);
-
-  // Main data fetching effect
-  useEffect(() => {
-    if (!loadingProgramData) {
-      if (assignedProgramIds.length > 0) {
-        // Fetch active sections (filtered by active AY/Sem)
-        if (activeAcademicYear?.id && activeSemester?.id) {
-          fetchSections(false, "active");
-        } else {
-          setActiveSectionsState([]); // Clear active sections if AY/Sem not set
-          setIsLoadingSections(false);
-        }
-        // Fetch archived and completed sections (ignore AY/Sem filters)
-        fetchSections(true, "archived");
-        fetchSections(true, "completed");
-        fetchUnassignedStudents(); // Unassigned students are always based on active AY/Sem
-        fetchIrregularStudentsForAssignment();
-      } else {
-        console.log("No assigned programs for program chair, clearing sections.");
-        setActiveSectionsState([]);
-        setArchivedSectionsState([]);
-        setCompletedSectionsState([]);
-        setIsLoadingSections(false);
-        setAvailableStudents([]);
-        setIsLoadingStudents(false);
-        setIrregularStudentsToAssign([]);
-        setIsLoadingIrregularStudents(false);
-      }
-    }
-  }, [activeAcademicYear, activeSemester, loadingProgramData, assignedProgramIds, fetchSections, fetchUnassignedStudents, fetchIrregularStudentsForAssignment]);
+    fetchAllPrograms();
+  }, []); // Empty dependency array means this runs once on mount
 
   const getUnassignedStudents = () => {
     // This function will now filter from the `availableStudents` fetched from API
@@ -339,7 +309,7 @@ export default function ManageSections() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/create_section.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/create_section.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -383,7 +353,7 @@ export default function ManageSections() {
   const confirmRemoveStudent = async (studentDbId, sectionId, studentName, sectionName) => {
     setIsRemoveStudentConfirmDialogOpen(false);
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/unassign_student_from_section.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/unassign_student_from_section.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -416,7 +386,7 @@ export default function ManageSections() {
   const confirmDeleteSection = async (sectionId, sectionName) => {
     setIsDeleteSectionConfirmDialogOpen(false);
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/delete_section.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/delete_section.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -453,7 +423,7 @@ export default function ManageSections() {
 
   const updateSectionStatus = async (sectionId, newStatus) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/update_section_status.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/update_section_status.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -495,7 +465,7 @@ export default function ManageSections() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/update_section.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/update_section.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -550,7 +520,7 @@ export default function ManageSections() {
     if (!selectedSection) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/program_chair/assign_students_to_section.php`, {
+      const response = await fetch(`${API_BASE_URL}/admin/assign_students_to_section.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -598,15 +568,16 @@ export default function ManageSections() {
     }));
 
     try {
-      const responses = await Promise.all(assignments.map(assignment =>
-        fetch(`${API_BASE_URL}/program_chair/assign_irregular_student_to_section.php?program_chair_id=${user.id}`, {
+      const responses = await Promise.all(assignments.map(assignment => {
+        const adminIdParam = user?.id ? `admin_id=${user.id}` : '';
+        return fetch(`${API_BASE_URL}/admin/assign_irregular_student_to_section.php?${adminIdParam}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(assignment),
         })
-      ));
+      }));
 
       let allSuccess = true;
       for (const response of responses) {
@@ -772,7 +743,7 @@ export default function ManageSections() {
                           <SelectValue placeholder="Select a program" />
                         </SelectTrigger>
                         <SelectContent>
-                          {programs.map((program) => (
+                          {allPrograms.map((program) => (
                             <SelectItem key={program.id} value={program.id}>
                               {program.name}
                             </SelectItem>
@@ -852,7 +823,7 @@ export default function ManageSections() {
                           <SelectValue placeholder="Select a program" />
                         </SelectTrigger>
                         <SelectContent>
-                          {programs.map((program) => (
+                          {allPrograms.map((program) => (
                             <SelectItem key={program.id} value={program.id}>
                               {program.name}
                             </SelectItem>

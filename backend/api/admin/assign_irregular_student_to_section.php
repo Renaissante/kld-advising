@@ -36,6 +36,13 @@ if (!$data) {
     exit();
 }
 
+// // Check if user is logged in and is an admin
+// if (!isset($_SESSION['user_id']) || !in_array('admin', $_SESSION['user_roles'])) {
+//     http_response_code(403);
+//     echo json_encode(array("success" => false, "message" => "Forbidden: You do not have permission to assign irregular students."));
+//     exit();
+// }
+
 // Extract required information
 $studentDbId = isset($data['student_id']) ? intval($data['student_id']) : null; // This is students.id
 $sectionId = isset($data['section_id']) ? intval($data['section_id']) : null;
