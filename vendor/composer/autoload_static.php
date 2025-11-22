@@ -200,6 +200,16 @@ class ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1
         ),
     );
 
+    public static $prefixesPsr0 = array (
+        'C' => 
+        array (
+            'ConvertApi\\' => 
+            array (
+                0 => __DIR__ . '/..' . '/convertapi/convertapi-php/lib',
+            ),
+        ),
+    );
+
     public static $classMap = array (
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
@@ -226,6 +236,7 @@ class ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1
         return \Closure::bind(function () use ($loader) {
             $loader->prefixLengthsPsr4 = ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1::$prefixLengthsPsr4;
             $loader->prefixDirsPsr4 = ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1::$prefixesPsr0;
             $loader->classMap = ComposerStaticInitce559b9fbd0e097bccee77e6c3cc8be1::$classMap;
 
         }, null, ClassLoader::class);

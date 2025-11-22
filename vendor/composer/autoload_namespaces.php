@@ -6,4 +6,5 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'ConvertApi\\' => array($vendorDir . '/convertapi/convertapi-php/lib'),
 );

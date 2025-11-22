@@ -9,16 +9,39 @@ include_once '../../config/cors.php';
 require_once '../../config/database.php';
 require_once __DIR__ . '/../../../vendor/autoload.php'; // Composer autoload
 
+// Load environment variables from .env file if it exists (local development)
+// Current file: backend/api/students/export_advising_form.php
+// Need to go up to project root: ../../../
+$envPath = __DIR__ . '/../../..';
+error_log("Looking for .env at: " . realpath($envPath) . '/.env');
+if (file_exists($envPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($envPath);
+    $dotenv->safeLoad();
+    error_log("✓ Loaded environment from .env file at: " . realpath($envPath . '/.env'));
+} else {
+    error_log("✗ No .env file found at: " . realpath($envPath) . ' - using system environment variables (Railway)');
+}
+
 // Get filter parameters from GET request
 $student_id = isset($_GET['student_id']) ? trim($_GET['student_id'], '\" ') : die("Missing student_id parameter.");
 $academic_year = isset($_GET['academic_year']) ? trim($_GET['academic_year'], '\" ') : die("Missing academic_year parameter.");
 $semester = isset($_GET['semester']) ? trim($_GET['semester'], '\" ') : die("Missing semester parameter.");
 $format = 'pdf'; // Force format to PDF for student export
 
+// Template file path - adjust this to your template location
+$templatePath = __DIR__ . '/../../templates/KLD_Advising_Form.docx';
+
 // Log received parameters for debugging
 error_log("Export request received: Student ID = " . $student_id . ", Academic Year = " . $academic_year . ", Semester = " . $semester . ", Format = " . $format);
 
 try {
+    // Check if template exists
+    if (!file_exists($templatePath)) {
+        http_response_code(500);
+        echo json_encode(array("message" => "Template file not found at: " . $templatePath));
+        exit();
+    }
+
     // Lookup the real integer PK for this student_id
     $get_student_id_sql = "SELECT id FROM students WHERE student_id = :student_id_str";
     $stmt_lookup = $conn->prepare($get_student_id_sql);
@@ -31,28 +54,6 @@ try {
         exit;
     }
     $student_id_int = $student_row['id'];
-
-    // Fetch the active academic year and semester - NOT NEEDED AS PARAMS ARE PASSED
-    // $activeAcademicYearQuery = "SELECT academic_year_id, academic_year_name FROM academic_years WHERE is_current = TRUE LIMIT 1";
-    // $activeAcademicYearStmt = $conn->prepare($activeAcademicYearQuery);
-    // $activeAcademicYearStmt->execute();
-    // $activeAcademicYear = $activeAcademicYearStmt->fetch(PDO::FETCH_ASSOC);
-
-    // $activeSemesterQuery = "SELECT semester_id, semester_name FROM semesters WHERE is_current = TRUE LIMIT 1";
-    // $activeSemesterStmt = $conn->prepare($activeSemesterQuery);
-    // $activeSemesterStmt->execute();
-    // $activeSemester = $activeSemesterStmt->fetch(PDO::FETCH_ASSOC);
-
-    // if (!$activeAcademicYear || !$activeSemester) {
-    //     http_response_code(404);
-    //     echo json_encode(array("message" => "Active academic year or semester not found."));
-    //     exit();
-    // }
-
-    // $academicYearId = $activeAcademicYear['academic_year_id'];
-    // $academicYearName = $activeAcademicYear['academic_year_name'];
-    // $semesterId = $activeSemester['semester_id'];
-    // $semesterName = $activeSemester['semester_name'];
     
     // Fetch academic_year_id and semester_id based on names provided
     $get_ay_id_sql = "SELECT academic_year_id FROM academic_years WHERE academic_year_name = :academic_year_name";
@@ -150,9 +151,9 @@ try {
 
     // Build period strings
     $last_enrollment_period_str = $last_enrollment_semester 
-        ? $last_enrollment_academic_year . ' ' . $last_enrollment_semester 
+        ? $last_enrollment_semester . ' ' . $last_enrollment_academic_year
         : 'N/A';
-    $current_enrollment_period_str = $academic_year . ' ' . $semester;
+    $current_enrollment_period_str = $semester . ' ' . $academic_year;
 
     // Bind parameters
     $stmt->bindParam(':student_id', $student_id);
@@ -160,16 +161,13 @@ try {
     $stmt->bindParam(':current_enrollment_period', $current_enrollment_period_str);
     $stmt->bindParam(':academic_year', $academic_year);
     $stmt->bindParam(':semester', $semester);
-
-    // Bind new parameters for total_units_earned subquery
     $stmt->bindParam(':last_enrollment_academic_year', $last_enrollment_academic_year);
     $stmt->bindParam(':last_enrollment_semester', $last_enrollment_semester);
 
     // Execute query
     if ($stmt->execute()) {
         $num = $stmt->rowCount();
-        // error_log("Profile query executed successfully. Rows found: " . $num);
-        $studentData = []; // Renamed from $groupedAdvisingData for single student
+        $studentData = [];
 
         if ($num > 0) {
             $studentData = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -185,29 +183,46 @@ try {
         exit();
     }
 
-    // Fetch advised courses for the current student and active academic year/semester
-    $advisedCoursesQuery = "SELECT ac.advised_course_id, c.course_code, c.course_title, (c.unit_lec + c.unit_lab) AS units FROM advised_courses ac LEFT JOIN courses c ON ac.course_id = c.id LEFT JOIN academic_years ay ON ac.academic_year_id = ay.academic_year_id LEFT JOIN semesters sem ON ac.semester_id = sem.semester_id WHERE ac.student_id = :student_id AND ay.academic_year_name = :academic_year AND sem.semester_name = :semester ORDER BY c.year_level_id ASC, c.semester_id ASC, c.id ASC";
+    // Fetch advised courses - using same query structure as working file
+    $advisedCoursesQuery = "SELECT 
+        ac.advised_course_id, 
+        c.course_code, 
+        c.course_title, 
+        (c.unit_lec + c.unit_lab) AS units 
+    FROM advised_courses ac 
+    LEFT JOIN courses c ON ac.course_id = c.id 
+    LEFT JOIN academic_years ay ON ac.academic_year_id = ay.academic_year_id 
+    LEFT JOIN semesters sem ON ac.semester_id = sem.semester_id 
+    WHERE ac.student_id = :student_id 
+        AND ay.academic_year_name = :academic_year 
+        AND sem.semester_name = :semester 
+    ORDER BY c.year_level_id ASC, c.semester_id ASC, c.id ASC";
+    
     $advisedCoursesStmt = $conn->prepare($advisedCoursesQuery);
     $advisedCoursesStmt->bindParam(':student_id', $student_id);
     $advisedCoursesStmt->bindParam(':academic_year', $academic_year);
     $advisedCoursesStmt->bindParam(':semester', $semester);
     $advisedCoursesStmt->execute();
     $studentData['advised_courses'] = $advisedCoursesStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Debug: Check raw advised courses data
+    error_log("Raw advised courses data: " . json_encode($studentData['advised_courses']));
 
-    // Fetch graded courses (all past terms, with units earned logic)
+    // Fetch graded courses - using same query structure as working file
     $gradedCoursesQuery = "SELECT
         cg.id as course_grade_id,
         c.course_code,
         c.course_title,
+        (c.unit_lec + c.unit_lab) AS total_units,
         CASE
-            WHEN cg.remarks IN ('Failed', 'Incomplete', 'Unofficially Dropped', 'Officially Dropped') THEN 0
+            WHEN cg.remarks IN ('Failed', 'Incomplete', 'Unofficially Dropped', 'Officially Dropped') OR cg.remarks IS NULL THEN 0
             ELSE (c.unit_lec + c.unit_lab)
         END AS units_earned,
         cg.transmutation AS grade,
         cg.remarks,
         ay_cg.academic_year_name AS academic_year_name,
         sem_cg.semester_name AS semester_name,
-        STRING_AGG(DISTINCT pr.course_code, ', ' ORDER BY pr.course_code) AS prerequisite_code
+        COALESCE(STRING_AGG(DISTINCT pr.course_code, ', ' ORDER BY pr.course_code), '') AS prerequisite_code
     FROM students s
     LEFT JOIN courses c ON c.curriculum_id = s.curriculum_id
     INNER JOIN course_grades cg ON cg.student_id = s.student_id AND cg.course_id = c.id
@@ -215,7 +230,7 @@ try {
     INNER JOIN semesters sem_cg ON cg.semester_id = sem_cg.semester_id
     LEFT JOIN course_prerequisites cp ON c.id = cp.course_id
     LEFT JOIN courses pr ON cp.prerequisite_course_id = pr.id
-    WHERE s.student_id = :student_id
+    WHERE s.id = :student_id_int
     AND ay_cg.academic_year_name = :last_enrollment_academic_year
     AND sem_cg.semester_name = :last_enrollment_semester
     GROUP BY
@@ -223,114 +238,292 @@ try {
     ORDER BY c.year_level_id ASC, c.semester_id ASC, c.id ASC";
 
     $gradedCoursesStmt = $conn->prepare($gradedCoursesQuery);
-    $gradedCoursesStmt->bindParam(':student_id', $student_id);
+    $gradedCoursesStmt->bindParam(':student_id_int', $student_id_int, PDO::PARAM_INT);
     $gradedCoursesStmt->bindParam(':last_enrollment_academic_year', $last_enrollment_academic_year);
     $gradedCoursesStmt->bindParam(':last_enrollment_semester', $last_enrollment_semester);
     $gradedCoursesStmt->execute();
     $studentData['graded_courses'] = $gradedCoursesStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // PDF generation starts here
-    $dompdf = new Dompdf\Dompdf();
+    // Debug: Check raw graded courses data
+    error_log("Raw graded courses data: " . json_encode($studentData['graded_courses']));
+    
+    // Clean output buffer
+    if (ob_get_length()) ob_end_clean();
 
-    $html = '';
-    $html .= '<style>';
-    $html .= 'body { font-family: Arial, sans-serif; }';
-    $html .= '.advising-form { margin-bottom: 30px; }';
-    $html .= 'table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }';
-    $html .= 'th, td { border: 1px solid #000; padding: 4px; text-align: left; font-size: 10px; }';
-    $html .= 'th { background-color: #f2f2f2; }';
-    $html .= 'h1, h3 { text-align: center; }';
-    $html .= '.student-info p { margin: 2px 0; }';
-    $html .= '.new-page { page-break-before: always; }';
-    $html .= '</style>';
+    // Load the template
+    $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
+    
+    // Debug: Log what variables are in the template
+    error_log("Template variables available: " . json_encode($templateProcessor->getVariables()));
+    
+    // Set simple variables
+    $templateProcessor->setValue('student_name', $studentData['student_name'] ?? '');
+    $templateProcessor->setValue('student_number', $studentData['student_number'] ?? '');
 
-    $html .= '<div class="advising-form">';
-    $html .= '<table>';
-    $html .= '<thead>';
-    
-    $html .= '<tr>';
-    $html .= '<th colspan="4" style="width:60%; text-align:left; font-weight:normal;"><strong>Name :</strong> ' . htmlspecialchars($studentData['student_name'] ?? '') . '</th>';
-    $html .= '<th colspan="3" style="width:40%; text-align:left; font-weight:normal;"><strong>Student No :</strong> ' . htmlspecialchars($studentData['student_number'] ?? '') . '</th>';
-    $html .= '</tr>';
-    
-    $html .= '<tr>';
-    $html .= '<th colspan="2" style="width:30%; text-align:left; font-weight:normal;"><strong>Institute :</strong> ' . htmlspecialchars($studentData['institute_name'] ?? '') . '</th>';
-    $html .= '<th colspan="2" style="width:30%; text-align:left; font-weight:normal;"><strong>Program/Year/Section :</strong> ' . htmlspecialchars($studentData['program_year_section'] ?? '') . '</th>';
-    $html .= '<th colspan="3" style="width:40%; text-align:left; font-weight:normal;"><strong>Status :</strong> ' . htmlspecialchars($studentData['student_status'] ?? '') . '</th>';
-    $html .= '</tr>';
-    
-    $html .= '<tr>';
-    $html .= '<th colspan="4" style="width:60%; text-align:left; font-weight:normal;"><strong>LAST ENROLLMENT :</strong> ' . htmlspecialchars($studentData['last_enrollment_period'] ?? '') . '</th>';
-    $html .= '<th colspan="3" style="width:40%; text-align:left; font-weight:normal;"><strong>CURRENT ENROLLMENT :</strong> ' . htmlspecialchars($studentData['current_enrollment_period'] ?? '') . '</th>';
-    $html .= '</tr>';
-    
-    $html .= '<tr>';
-    $html .= '<th class="header-label" style="width:12.5%; text-align:center;">Course Code</th>';
-    $html .= '<th class="header-label" style="width:25%; text-align:center;">Course Title</th>';
-    $html .= '<th class="header-label" style="width:10%; text-align:center;">Units Earned</th>';
-    $html .= '<th class="header-label" style="width:12.5%; text-align:center;">Pre-requisite</th>';
-    $html .= '<th class="header-label" style="width:15%; text-align:center;">Course Code</th>';
-    $html .= '<th class="header-label" style="width:15%; text-align:center;">Course Title</th>';
-    $html .= '<th class="header-label" style="width:10%; text-align:center;">Units</th>';
-    $html .= '</tr>';
-    $html .= '</thead>';
-    $html .= '<tbody>';
+    // Abbreviate institute name
+    $instituteName = $studentData['institute_name'] ?? '';
+    $abbreviatedInstituteName = '';
+    if (!empty($instituteName)) {
+        $words = explode(' ', $instituteName);
+        foreach ($words as $word) {
+            if (!in_array(strtolower($word), ['of', 'and', 'the'])) { // Exclude common small words
+                $abbreviatedInstituteName .= strtoupper(substr($word, 0, 1));
+            }
+        }
+        if (empty($abbreviatedInstituteName)) { // Fallback if all words were excluded
+            $abbreviatedInstituteName = $instituteName;
+        }
+    }
+    $templateProcessor->setValue('institute_name', $abbreviatedInstituteName);
 
-    $maxRows = max(count($studentData['graded_courses']), count($studentData['advised_courses']));
-    for ($i = 0; $i < $maxRows; $i++) {
-        $graded = $studentData['graded_courses'][$i] ?? null;
-        $advised = $studentData['advised_courses'][$i] ?? null;
-        $html .= '<tr>';
-        // Graded columns (left)
-        $html .= '<td>' . htmlspecialchars($graded['course_code'] ?? '') . '</td>';
-        $html .= '<td>' . htmlspecialchars($graded['course_title'] ?? '') . '</td>';
-        $html .= '<td style="text-align: center;">' . htmlspecialchars($graded['units_earned'] ?? '0') . '</td>';
-        $html .= '<td>' . htmlspecialchars($graded['prerequisite_code'] ?? '') . '</td>';
-        // Advised side (right)
-        $html .= '<td>' . htmlspecialchars($advised['course_code'] ?? '') . '</td>';
-        $html .= '<td>' . htmlspecialchars($advised['course_title'] ?? '') . '</td>';
-        $html .= '<td style="text-align: center;">' . htmlspecialchars($advised['units'] ?? '') . '</td>';
-        $html .= '</tr>';
+    $templateProcessor->setValue('program_year_section', $studentData['program_year_section'] ?? '');
+    $templateProcessor->setValue('section_name', $studentData['section_name'] ?? '');
+    $templateProcessor->setValue('student_status', $studentData['student_status'] ?? '');
+    $templateProcessor->setValue('last_enrollment_period', $studentData['last_enrollment_period'] ?? '');
+    $templateProcessor->setValue('current_enrollment_period', $studentData['current_enrollment_period'] ?? '');
+    $templateProcessor->setValue('advisor_name', strtoupper($studentData['advisor_name'] ?? 'N/A'));
+    $templateProcessor->setValue('student_name_upper', strtoupper($studentData['student_name'] ?? 'N/A'));
+    
+    // Define a threshold for smaller font size
+    define('TITLE_LENGTH_THRESHOLD', 25);
+
+    // Debug: Log student data
+    error_log("Student data being populated: " . json_encode([
+        'student_name' => $studentData['student_name'] ?? '',
+        'student_number' => $studentData['student_number'] ?? '',
+        'graded_courses_count' => count($studentData['graded_courses']),
+        'advised_courses_count' => count($studentData['advised_courses'])
+    ]));
+    
+    // Debug: Log sample course data to check units
+    if (!empty($studentData['graded_courses'])) {
+        error_log("Sample graded course units: " . json_encode([
+            'first_course_units' => $studentData['graded_courses'][0]['units_earned'] ?? 'NULL',
+            'first_course_code' => $studentData['graded_courses'][0]['course_code'] ?? 'NULL'
+        ]));
+    }
+    if (!empty($studentData['advised_courses'])) {
+        error_log("Sample advised course units: " . json_encode([
+            'first_course_units' => $studentData['advised_courses'][0]['units'] ?? 'NULL',
+            'first_course_code' => $studentData['advised_courses'][0]['course_code'] ?? 'NULL'
+        ]));
+    }
+    
+    // Calculate totals
+    $totalUnitsEarned = $studentData['total_units_earned'] ?? 0;
+    $totalUnitsToBeEnrolled = array_reduce($studentData['advised_courses'], function($sum, $item) { 
+        return $sum + (int)($item['units'] ?? 0); 
+    }, 0);
+    
+    $templateProcessor->setValue('total_units_earned', $totalUnitsEarned);
+    $templateProcessor->setValue('total_units_to_enroll', $totalUnitsToBeEnrolled);
+    
+    // Set fixed number of rows (change this number as needed)
+    $fixedRows = 12;
+    
+    // Get actual data count
+    $gradedCount = count($studentData['graded_courses']);
+    $advisedCount = count($studentData['advised_courses']);
+    
+    // Use the larger of fixed rows or actual data (in case data exceeds fixed rows)
+    $maxGradedRows = max($fixedRows, $gradedCount);
+    $maxAdvisedRows = max($fixedRows, $advisedCount);
+    
+    // Debug: Log row counts
+    error_log("Graded courses: $gradedCount, Advised courses: $advisedCount");
+    error_log("Max rows - Graded: $maxGradedRows, Advised: $maxAdvisedRows");
+    
+    // Get all template variables to understand the structure
+    $allVars = $templateProcessor->getVariables();
+    error_log("All template variables: " . json_encode($allVars));
+
+    // Count how many times each variable appears (to detect if we have 2 tables)
+    $varCounts = array_count_values($allVars);
+    error_log("Variable counts: " . json_encode($varCounts));
+
+    // Check if we have duplicate tables (gc_code appears more than once in base form)
+    $hasDuplicateTables = (isset($varCounts['gc_code']) && $varCounts['gc_code'] > 1);
+    error_log("Has duplicate tables: " . ($hasDuplicateTables ? 'YES' : 'NO'));
+
+    // Clone rows - this works for BOTH tables simultaneously
+    if ($maxGradedRows > 0) {
+        error_log("Cloning gc_code rows: $maxGradedRows");
+        $templateProcessor->cloneRow('gc_code', $maxGradedRows);
     }
 
-    $html .= '</tbody>';
-    $html .= '<tfoot>';
-    $html .= '<tr>';
-    $html .= '<td colspan="3"><strong>Total number of units enrolled:</strong> ' . ($studentData['total_units_earned'] ?? 0) . ' Units</td>';
-    $html .= '<td colspan="4"><strong>Total number of units to be enrolled:</strong> ' . array_reduce($studentData['advised_courses'], function($sum, $item) { return $sum + (($item['units'] ?? 0) ?: 0); }, 0) . ' Units</td>';
-    $html .= '</tr>';
-    $html .= '<tr>';
-    $html .= '<td colspan="3"><strong>Student\'s Signature:</strong> </td>';
-    $html .= '<td colspan="4"><strong>Adviser\'s Printed Name:</strong> ' . htmlspecialchars(mb_strtoupper($studentData['advisor_name'] ?? 'N/A')) . '</td>';
-    $html .= '</tr>';
-    $html .= '<tr>';
-    $html .= '<td colspan="3"></td>';
-    $html .= '<td colspan="4"><strong>Student\'s Printed Name:</strong> ' . htmlspecialchars(mb_strtoupper($studentData['student_name'] ?? 'N/A')) . '</td>';
-    $html .= '</tr>';
-    $html .= '</tfoot>';
-    $html .= '</table>';
-    $html .= '</div>'; // End of advising-form
+    if ($maxAdvisedRows > 0) {
+        error_log("Cloning ac_code rows: $maxAdvisedRows");
+        $templateProcessor->cloneRow('ac_code', $maxAdvisedRows);
+    }
 
-    $dompdf->loadHtml($html);
-    $dompdf->setPaper('A4', 'portrait');
-    $dompdf->render();
+    // Check what variables exist after cloning
+    error_log("Variables after cloning: " . json_encode($templateProcessor->getVariables()));
 
-    ob_clean(); // Clean the output buffer before sending the file
-    $filename = "Advising_Form_" . htmlspecialchars($student_id) . "_" . htmlspecialchars($academic_year) . "_" . htmlspecialchars($semester) . ".pdf";
-    header("Content-Type: application/pdf");
-    header("Content-Disposition: attachment;filename=\"" . $filename . "\"");
-    header('Cache-Control: max-age=0');
-    echo $dompdf->output();
+    // Now populate the data - setValue replaces ALL occurrences
+    for ($i = 0; $i < $maxGradedRows; $i++) {
+        $rowNum = $i + 1;
+        $graded = $studentData['graded_courses'][$i] ?? null;
+        
+        // Use the units_earned from the query which already handles the CASE logic
+        $units = ($graded !== null && $graded['units_earned'] === 0) ? ' 0' : ($graded ? strval($graded['units_earned']) : '');
+        
+        error_log("Populating row $rowNum - Code: " . ($graded['course_code'] ?? 'EMPTY') . ", Units: '$units'");
+
+        $gcTitle = $graded['course_title'] ?? '';
+        if (strlen($gcTitle) <= TITLE_LENGTH_THRESHOLD) {
+            $templateProcessor->setValue("gc_title_normal#$rowNum", $gcTitle);
+            $templateProcessor->setValue("gc_title_small#$rowNum", ''); // Ensure the other placeholder is empty
+        } else {
+            $templateProcessor->setValue("gc_title_small#$rowNum", $gcTitle);
+            $templateProcessor->setValue("gc_title_normal#$rowNum", ''); // Ensure the other placeholder is empty
+        }
+
+        // This should populate ALL instances of these variables across both tables
+        $templateProcessor->setValue("gc_code#$rowNum", $graded['course_code'] ?? '');
+        $templateProcessor->setValue("gc_units#$rowNum", $units);
+        $templateProcessor->setValue("gc_prereq#$rowNum", $graded['prerequisite_code'] ?? '');
+    }
+
+    for ($i = 0; $i < $maxAdvisedRows; $i++) {
+        $rowNum = $i + 1;
+        $advised = $studentData['advised_courses'][$i] ?? null;
+        
+        // Use units directly from the query
+        $units = ($advised !== null && $advised['units'] === 0) ? ' 0' : ($advised ? strval($advised['units']) : '');
+        
+        error_log("Populating advised row $rowNum - Code: " . ($advised['course_code'] ?? 'EMPTY') . ", Units: '$units'");
+        
+        $acTitle = $advised['course_title'] ?? '';
+        if (strlen($acTitle) <= TITLE_LENGTH_THRESHOLD) {
+            $templateProcessor->setValue("ac_title_normal#$rowNum", $acTitle);
+            $templateProcessor->setValue("ac_title_small#$rowNum", '');
+        } else {
+            $templateProcessor->setValue("ac_title_small#$rowNum", $acTitle);
+            $templateProcessor->setValue("ac_title_normal#$rowNum", '');
+        }
+
+        // This should populate ALL instances of these variables across both tables
+        $templateProcessor->setValue("ac_code#$rowNum", $advised['course_code'] ?? '');
+        $templateProcessor->setValue("ac_units#$rowNum", $units);
+    }
+
+    // Check what variables are still unresolved
+    error_log("Unresolved variables after population: " . json_encode($templateProcessor->getVariables()));
+    
+    // Save to temporary file
+    $tempFile = tempnam(sys_get_temp_dir(), 'advising_') . '.docx';
+    $templateProcessor->saveAs($tempFile);
+    
+    // Debug: Check if temp file was created and has content
+    error_log("Temp DOCX file created: " . $tempFile);
+    error_log("Temp DOCX file size: " . filesize($tempFile) . " bytes");
+    
+    if ($format === 'pdf') {
+        // Clean output buffer completely
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        // Get ConvertAPI secret
+        $convertApiSecret = $_ENV['CONVERTAPI_SECRET'] ?? getenv('CONVERTAPI_SECRET');
+        
+        // Debug: Log if secret exists (without exposing the actual value)
+        error_log("ConvertAPI Secret exists: " . (!empty($convertApiSecret) ? "YES" : "NO"));
+        if (!empty($convertApiSecret)) {
+            error_log("ConvertAPI Secret length: " . strlen($convertApiSecret));
+            error_log("ConvertAPI Secret first 4 chars: " . substr($convertApiSecret, 0, 4) . "...");
+        }
+        
+        if (!$convertApiSecret || empty($convertApiSecret)) {
+            http_response_code(500);
+            header("Content-Type: application/json; charset=UTF-8");
+            echo json_encode(array("message" => "CONVERTAPI_SECRET not configured. Please set it in your .env file."));
+            unlink($tempFile);
+            exit();
+        }
+        
+        // Trim any whitespace from the secret
+        $convertApiSecret = trim($convertApiSecret);
+        
+        try {
+            error_log("Using ConvertAPI for PDF conversion with secret: " . substr($convertApiSecret, 0, 4) . "...");
+            
+            // Set API credentials (this is the correct way for ConvertAPI PHP library)
+            \ConvertApi\ConvertApi::setApiCredentials($convertApiSecret);
+            
+            error_log("Converting DOCX to PDF via ConvertAPI...");
+            
+            // Convert DOCX to PDF
+            $result = \ConvertApi\ConvertApi::convert('pdf', [
+                'File' => $tempFile,
+            ], 'docx');
+            
+            error_log("ConvertAPI conversion completed");
+            
+            // Save the result to a temporary file
+            $pdfFile = sys_get_temp_dir() . '/converted_' . uniqid() . '.pdf';
+            $result->getFile()->save($pdfFile);
+            
+            error_log("PDF file saved to: " . $pdfFile);
+            error_log("PDF file size: " . filesize($pdfFile) . " bytes");
+            
+            if (!file_exists($pdfFile)) {
+                throw new Exception("PDF file was not created");
+            }
+            
+            if (filesize($pdfFile) <= 100) {
+                throw new Exception("PDF file is too small (" . filesize($pdfFile) . " bytes), likely empty or corrupted");
+            }
+            
+            $filename = "Advising_Form_" . $student_id . "_" . $academic_year . "_" . $semester . ".pdf";
+            
+            header("Content-Type: application/pdf");
+            header("Content-Disposition: attachment; filename=\"" . $filename . "\"");
+            header("Content-Length: " . filesize($pdfFile));
+            header('Cache-Control: max-age=0');
+            header('Pragma: public');
+            
+            readfile($pdfFile);
+            
+            // Cleanup
+            unlink($pdfFile);
+            unlink($tempFile);
+            
+            error_log("PDF successfully generated with ConvertAPI");
+            exit;
+            
+        } catch (Exception $e) {
+            error_log("ConvertAPI error: " . $e->getMessage());
+            http_response_code(500);
+            header("Content-Type: application/json; charset=UTF-8");
+            echo json_encode(array("message" => "PDF conversion failed: " . $e->getMessage()));
+            unlink($tempFile);
+            exit();
+        }
+    } else {
+        // Return as DOCX
+        $filename = "Advising_Form_" . $student_id . "_" . $academic_year . "_" . $semester . ".docx";
+        
+        header("Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        header("Content-Disposition: attachment; filename=\"" . $filename . "\"");
+        header("Content-Length: " . filesize($tempFile));
+        header('Cache-Control: max-age=0');
+        header('Pragma: public');
+        
+        readfile($tempFile);
+        unlink($tempFile);
+    }
+    
     exit;
 
 } catch (PDOException $e) {
     http_response_code(500);
-    header("Content-Type: application/json; charset=UTF-8"); // Ensure JSON header for errors
+    header("Content-Type: application/json; charset=UTF-8");
     echo json_encode(array("message" => "Database error: " . $e->getMessage()));
     exit();
-} catch (Exception $e) { // Catch any other exceptions
+} catch (Exception $e) {
     http_response_code(500);
-    header("Content-Type: application/json; charset=UTF-8"); // Ensure JSON header for errors
+    header("Content-Type: application/json; charset=UTF-8");
     echo json_encode(array("message" => "Server error: " . $e->getMessage()));
     exit();
 }
