@@ -12,6 +12,7 @@ import { API_BASE_URL } from '@/config/api';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useParams } from 'react-router-dom'; // Import useParams
 import { toast } from "sonner"; // Import toast for notifications
+import { useActive } from "@/contexts/ActiveContext"; // Import useActive hook
 import {
   Dialog,
   DialogContent,
@@ -55,17 +56,34 @@ const CreditCourses = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const navigate = useNavigate();
+  const { activeAcademicYear, activeSemester, loading: activeLoading } = useActive(); // Use useActive hook
 
   // --- Get student_id from localStorage (temporary for now) ---
   const studentId = useParams().studentId; // Get studentId from URL parameters
 
+  // Combine local loading with active context loading
+  const isOverallLoading = isLoading || activeLoading;
+
   // --- Fetch Data using fetch API ---
   useEffect(() => {
     const fetchCurriculumData = async () => {
+      // Only proceed with fetching student data if necessary IDs are available and active context is NOT loading
+      if (!studentId || !activeAcademicYear?.id || !activeSemester?.id || activeLoading) {
+        // If activeLoading is true, we simply return. The component remains in a loading state
+        // due to isOverallLoading (which includes activeLoading).
+        // No need to set setIsLoading(false) here, as it would cause an unnecessary state update/re-render.
+        if (!activeLoading) {
+            // Only set error if not actively loading from context, to avoid premature error messages
+            setError("Missing student ID or active academic period information.");
+            setIsLoading(false);
+        }
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_BASE_URL}/student/get_curriculum.php?student_id=${studentId}`, {
+        const response = await fetch(`${API_BASE_URL}/student/get_curriculum.php?student_id=${studentId}&active_academic_year_id=${activeAcademicYear.id}&active_semester_id=${activeSemester.id}`, {
              credentials: 'include'
         });
 
@@ -86,7 +104,8 @@ const CreditCourses = () => {
         // Initialize grades from fetched data
         const initialGrades = {};
         data.courses.forEach(course => {
-            if (course.grade) {
+            // Only initialize grade if it's verified
+            if (course.grade && course.is_verified) {
                 initialGrades[course.id] = course.grade;
             }
         });
@@ -101,13 +120,13 @@ const CreditCourses = () => {
       }
     };
 
-    if (studentId) {
+    if (studentId && activeAcademicYear?.id && activeSemester?.id && !activeLoading) {
       fetchCurriculumData();
-    } else {
-      setError('Student ID not found. Please log in.');
+    } else if (!activeLoading) { // Only set error if not actively loading from context
+      setError('Missing student ID or active academic period information.');
       setIsLoading(false);
     }
-  }, [studentId]);
+  }, [studentId, activeAcademicYear?.id, activeSemester?.id, activeLoading]);
 
   // --- Destructure fetched data ---
   const { curriculumName, yearLevels, semesters, courses } = curriculumData;
@@ -231,7 +250,7 @@ const CreditCourses = () => {
   const fullYearSpan = startYear && endYear ? `${startYear}-${endYear}` : academicYear;
 
   // --- Render Loading State ---
-  if (isLoading) {
+  if (isOverallLoading) {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -251,7 +270,7 @@ const CreditCourses = () => {
   }
 
   // --- Render Error State ---
-  if (error) {
+  if (error || (isOverallLoading && !studentId)) {
      return (
       <SidebarProvider>
         <AppSidebar />
@@ -342,20 +361,14 @@ const CreditCourses = () => {
                               {group.courses.map((course) => (
                                 <TableRow key={course.id}>
                                   <TableCell className="border-r text-center p-2">
-                                    {course.grade ? (
-                                          <span className="font-medium">
-                                            {course.grade}
-                                          </span>
-                                        ) : (
-                                          <Input
-                                            type="text"
-                                            value={grades[course.id] || ""}
-                                            onChange={(e) => handleGradeChange(course.id, e.target.value)}
-                                            placeholder="—"
-                                            className="text-center text-sm h-8"
-                                            maxLength={4}
-                                          />
-                                        )}
+                                    <Input
+                                      type="text"
+                                      value={grades[course.id] !== undefined ? grades[course.id] : (course.is_verified ? (course.grade || "") : "")}
+                                      onChange={(e) => handleGradeChange(course.id, e.target.value)}
+                                      placeholder="—"
+                                      className="text-center text-sm h-8"
+                                      maxLength={4}
+                                    />
                                   </TableCell>
                                   <TableCell className="border-r">{course.course_code}</TableCell>
                                   <TableCell className="border-r">{course.course_title}</TableCell>

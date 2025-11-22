@@ -7,6 +7,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/App-sidebar';
 import Header from '@/components/layout/Header';
 import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { useActive } from "@/contexts/ActiveContext"; // Import useActive hook
 
 // --- Helper function (copied from Curriculum.jsx) ---
 const formatPrerequisites = (prerequisites = []) => {
@@ -70,17 +71,31 @@ const StudentCurriculum = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const { activeAcademicYear, activeSemester, loading: activeLoading } = useActive(); // Use useActive hook
+
+  // Combine local loading with active context loading
+  const isOverallLoading = isLoading || activeLoading;
+
   // --- Get student_id from localStorage ---
   const studentId = localStorage.getItem('studentId');
 
   // --- Fetch Data using fetch API ---
   useEffect(() => {
     const fetchCurriculumData = async () => {
+      // Only proceed with fetching student data if necessary IDs are available and active context is NOT loading
+      if (!studentId || !activeAcademicYear?.id || !activeSemester?.id || activeLoading) {
+        if (!activeLoading) {
+            setError("Missing student ID or active academic period information.");
+            setIsLoading(false);
+        }
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
         // Use fetch API with student_id as query parameter
-        const response = await fetch(`${API_BASE_URL}/student/get_curriculum.php?student_id=${studentId}`, {
+        const response = await fetch(`${API_BASE_URL}/student/get_curriculum.php?student_id=${studentId}&active_academic_year_id=${activeAcademicYear.id}&active_semester_id=${activeSemester.id}`, {
              credentials: 'include' // Send cookies for session-based auth
         });
 
@@ -116,13 +131,13 @@ const StudentCurriculum = () => {
       }
     };
 
-    if (studentId) {
+    if (studentId && activeAcademicYear?.id && activeSemester?.id && !activeLoading) {
       fetchCurriculumData();
-    } else {
-      setError('Student ID not found. Please log in.');
+    } else if (!activeLoading) {
+      setError('Missing student ID or active academic period information.');
       setIsLoading(false);
     }
-  }, [studentId]); // Dependency array includes studentId
+  }, [studentId, activeAcademicYear?.id, activeSemester?.id, activeLoading]); // Dependency array includes studentId, activeAcademicYear?.id, activeSemester?.id, activeLoading
 
   // --- Destructure fetched data ---
   const { curriculumName, yearLevels, semesters, courses } = curriculumData;
@@ -150,7 +165,7 @@ const StudentCurriculum = () => {
 
 
   // --- Render Loading State ---
-  if (isLoading) {
+  if (isOverallLoading) {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -170,7 +185,7 @@ const StudentCurriculum = () => {
   }
 
   // --- Render Error State ---
-  if (error) {
+  if (error || (isOverallLoading && !studentId)) {
      return (
       <SidebarProvider>
         <AppSidebar />
@@ -206,7 +221,7 @@ const StudentCurriculum = () => {
 
               {/* Semester Cards Section - Use fetched data */}
               <div>
-                {yearLevels?.length === 0 && semesters?.length === 0 && courses?.length === 0 && !isLoading && !error && (
+                {yearLevels?.length === 0 && semesters?.length === 0 && courses?.length === 0 && !isOverallLoading && !error && (
                    <Card className="p-4 text-center text-muted-foreground border">
                     No curriculum data available for this student.
                   </Card>
@@ -257,8 +272,10 @@ const StudentCurriculum = () => {
 
                                   return (
                                     <TableRow key={`${course.id}-${course.course_code}`}>
-                                      {/* Display fetched grade or '-' */}
-                                      <TableCell className="border-r text-center font-medium">{course.grade ?? ''}</TableCell>
+                                      {/* Display fetched grade or '-' only if is_verified is true */}
+                                      <TableCell className="border-r text-center font-medium">
+                                        {course.is_verified ? (course.grade ?? '') : '-'}
+                                      </TableCell>
                                       <TableCell className="border-r">{course.course_code}</TableCell>
                                       <TableCell className="border-r">{course.course_title}</TableCell>
                                       <TableCell className="text-center border-r">{course.unit_lec}</TableCell>

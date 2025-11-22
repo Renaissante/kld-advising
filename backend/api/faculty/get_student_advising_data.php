@@ -59,6 +59,18 @@ $studentId = isset($_GET['student_id']) ? $_GET['student_id'] : null;
 $activeAcademicYearId = isset($_GET['active_academic_year_id']) ? (int)$_GET['active_academic_year_id'] : null;
 $activeSemesterId = isset($_GET['active_semester_id']) ? (int)$_GET['active_semester_id'] : null;
 
+$overriddenGradesJson = isset($_GET['overridden_grades_json']) ? $_GET['overridden_grades_json'] : null;
+$overriddenGrades = [];
+if ($overriddenGradesJson) {
+    $decodedGrades = json_decode($overriddenGradesJson, true);
+    if (json_last_error() === JSON_ERROR_NONE) {
+        // Ensure keys are integers for direct course_id mapping
+        foreach ($decodedGrades as $courseId => $grade) {
+            $overriddenGrades[(int)$courseId] = $grade;
+        }
+    }
+}
+
 // Validate required parameters
 if (!$studentId || !$activeAcademicYearId || !$activeSemesterId) {
     http_response_code(400);
@@ -108,37 +120,108 @@ try {
     $currentSemesterId = $studentSectionInfo['current_semester_id'];
     $curriculumId = $studentSectionInfo['curriculum_id'];
 
-    // --- 2. Check if Advising is Already Completed for this AY/Semester ---
-    $advisedCoursesQuery = "SELECT
-                                ac.advised_course_id,
-                                ac.course_id,
-                                c.course_code,
-                                c.course_title,
-                                (c.unit_lec + c.unit_lab) AS units
-                            FROM advised_courses ac
-                            JOIN courses c ON ac.course_id = c.id
-                            WHERE ac.student_id = :student_id
-                              AND ac.academic_year_id = :academic_year_id
-                              AND ac.semester_id = :semester_id";
+    // Function to get remarks based on transmutation (5-point grading scale)
+    function getRemarksFromTransmutation($transmutation) {
+        if ($transmutation === null || $transmutation === "") return null;
 
-    $stmtAdvisedCourses = $conn->prepare($advisedCoursesQuery);
-    if ($stmtAdvisedCourses === false) {
-         throw new PDOException("Failed to prepare advised courses query: " . implode(" - ", $conn->errorInfo()));
+        // Check for non-numeric special grades first
+        $lowerTransmutation = strtolower($transmutation);
+        if ($lowerTransmutation === 'inc') return 'Incomplete';
+        if ($lowerTransmutation === 'ud') return 'Unofficially Dropped';
+        if ($lowerTransmutation === 'od') return 'Officially Dropped';
+
+        $numTransmutation = floatval($transmutation);
+
+        if (is_nan($numTransmutation)) {
+            return null; // It's not a known text grade or a valid number
+        }
+
+        // 5-point grading scale: 1.00-3.00 is Passed, 3.25-5.00 is Failed
+        if ($numTransmutation >= 1.00 && $numTransmutation <= 3.00) return "Passed";
+        if ($numTransmutation >= 3.25 && $numTransmutation <= 5.00) return "Failed";
+        return null; // Should not happen with valid input range
     }
-    $stmtAdvisedCourses->bindParam(':student_id', $studentId);
-    $stmtAdvisedCourses->bindParam(':academic_year_id', $activeAcademicYearId);
-    $stmtAdvisedCourses->bindParam(':semester_id', $activeSemesterId);
-    $stmtAdvisedCourses->execute();
-    $advisedCoursesList = $stmtAdvisedCourses->fetchAll(PDO::FETCH_ASSOC);
-
-    $advisingCompleted = count($advisedCoursesList) > 0;
 
     $fullGradeHistory = [];
     $eligibleCourses = [];
     $gradeHistoryMap = [];
+    $studentSubmittedAdvisedCourses = [];
+    $facultyApprovedAdvisedCourses = [];
+    $advisingCompleted = false;
+    $allCurriculumCoursesMap = []; // Initialize here
+    $prerequisitesMap = []; // Initialize here
+
+    // --- Determine Next Semester/Year Level in Curriculum ---
+    $nextYearLevelId = $currentYearLevelId;
+    $nextSemesterId = null;
+
+    $semestersQuery = "SELECT semester_id FROM semesters ORDER BY semester_id ASC";
+    $stmtSemesters = $conn->query($semestersQuery);
+    $allSemesters = $stmtSemesters->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    $currentSemIndex = array_search($currentSemesterId, $allSemesters);
+
+    if ($currentSemIndex !== false && $currentSemIndex < count($allSemesters) - 1) {
+        $nextSemesterId = $allSemesters[$currentSemIndex + 1];
+        $nextYearLevelId = $currentYearLevelId; // Stays the same year level
+    } else {
+        // Move to next year level, 1st semester
+        $nextSemesterId = $allSemesters[0];
+
+        $yearLevelsQuery = "SELECT id FROM year_levels ORDER BY id ASC";
+        $stmtYearLevels = $conn->query($yearLevelsQuery);
+        $allYearLevels = $stmtYearLevels->fetchAll(PDO::FETCH_COLUMN, 0);
+
+        $currentYearIndex = array_search($currentYearLevelId, $allYearLevels);
+
+        if ($currentYearIndex !== false && $currentYearIndex < count($allYearLevels) - 1) {
+            $nextYearLevelId = $allYearLevels[$currentYearIndex + 1];
+        } else {
+            // End of curriculum
+            $nextYearLevelId = null;
+            $nextSemesterId = null;
+        }
+    }
+
+    // Only proceed if next academic period is valid
+    if ($nextYearLevelId !== null && $nextSemesterId !== null) {
+        // --- 2. Check if Advising is Already Completed for the NEXT AY/Semester ---
+        $advisedCoursesQuery = "SELECT
+                                    ac.advised_course_id,
+                                    ac.course_id,
+                                    c.course_code,
+                                    c.course_title,
+                                    (c.unit_lec + c.unit_lab) AS units,
+                                    ac.status,
+                                    ac.advisor_id
+                                FROM advised_courses ac
+                                JOIN courses c ON ac.course_id = c.id
+                                WHERE ac.student_id = :student_id
+                                  AND ac.academic_year_id = :next_academic_year_id
+                                  AND ac.semester_id = :next_semester_id";
+
+        $stmtAdvisedCourses = $conn->prepare($advisedCoursesQuery);
+        if ($stmtAdvisedCourses === false) {
+             throw new PDOException("Failed to prepare advised courses query for next period: " . implode(" - ", $conn->errorInfo()));
+        }
+        $stmtAdvisedCourses->bindParam(':student_id', $studentId);
+        $stmtAdvisedCourses->bindParam(':next_academic_year_id', $nextYearLevelId);
+        $stmtAdvisedCourses->bindParam(':next_semester_id', $nextSemesterId);
+        $stmtAdvisedCourses->execute();
+        $allAdvisedCoursesForNextPeriod = $stmtAdvisedCourses->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($allAdvisedCoursesForNextPeriod as $advisedCourse) {
+            if ($advisedCourse['status'] === 'approved' && $advisedCourse['advisor_id'] !== null) {
+                $facultyApprovedAdvisedCourses[] = $advisedCourse;
+                $advisingCompleted = true; // Advising is completed if any course is approved by faculty for the NEXT period
+            } else if ($advisedCourse['status'] === 'pending') {
+                $studentSubmittedAdvisedCourses[] = $advisedCourse;
+            }
+        }
+    }
 
     if (!$advisingCompleted) {
-        // --- 3. Fetch Student's Complete Grade History ---
+        // --- 3. Fetch Student's Complete Grade History (including current active semester) ---
         $fullGradeHistoryQuery = "SELECT
                                        cg.id,
                                        cg.transmutation,
@@ -148,7 +231,8 @@ try {
                                        c.course_title,
                                        (c.unit_lec + c.unit_lab) AS units,
                                        c.year_level_id,
-                                       c.semester_id
+                                       c.semester_id,
+                                       cg.is_verified
                                    FROM course_grades cg
                                    JOIN courses c ON cg.course_id = c.id
                                    WHERE cg.student_id = :student_id";
@@ -161,41 +245,45 @@ try {
         $stmtFullGradeHistory->execute();
         $fullGradeHistory = $stmtFullGradeHistory->fetchAll(PDO::FETCH_ASSOC);
 
+        $currentSemesterGradeMap = []; // Map for grades in the current active semester
         foreach ($fullGradeHistory as $grade) {
             $gradeHistoryMap[$grade['course_id']] = $grade;
-        }
-
-        // --- 4. Determine Next Semester/Year Level in Curriculum ---
-        $nextYearLevelId = $currentYearLevelId;
-        $nextSemesterId = null;
-
-        $semestersQuery = "SELECT semester_id FROM semesters ORDER BY semester_id ASC";
-        $stmtSemesters = $conn->query($semestersQuery);
-        $allSemesters = $stmtSemesters->fetchAll(PDO::FETCH_COLUMN, 0);
-
-        $currentSemIndex = array_search($currentSemesterId, $allSemesters);
-
-        if ($currentSemIndex !== false && $currentSemIndex < count($allSemesters) - 1) {
-            $nextSemesterId = $allSemesters[$currentSemIndex + 1];
-            $nextYearLevelId = $currentYearLevelId;
-        } else {
-            $nextSemesterId = $allSemesters[0];
-
-            $yearLevelsQuery = "SELECT id FROM year_levels ORDER BY id ASC";
-            $stmtYearLevels = $conn->query($yearLevelsQuery);
-            $allYearLevels = $stmtYearLevels->fetchAll(PDO::FETCH_COLUMN, 0);
-
-            $currentYearIndex = array_search($currentYearLevelId, $allYearLevels);
-
-            if ($currentYearIndex !== false && $currentYearIndex < count($allYearLevels) - 1) {
-                $nextYearLevelId = $allYearLevels[$currentYearIndex + 1];
-            } else {
-                $nextYearLevelId = null;
-                $nextSemesterId = null;
+            // Identify grades belonging to the current active semester
+            if ((int)$grade['year_level_id'] === (int)$currentYearLevelId && (int)$grade['semester_id'] === (int)$currentSemesterId) {
+                $currentSemesterGradeMap[$grade['course_id']] = $grade;
             }
         }
 
-        // --- 5. Fetch Eligible Courses ---
+        // Apply overridden grades to the grade history map for reactive prerequisite checks
+        foreach ($overriddenGrades as $courseId => $newGrade) {
+            if (isset($gradeHistoryMap[$courseId])) {
+                $gradeHistoryMap[$courseId]['transmutation'] = $newGrade;
+                $gradeHistoryMap[$courseId]['remarks'] = getRemarksFromTransmutation($newGrade);
+                // For overridden grades, we can treat them as if they are 'verified' for the purpose of checking prerequisites reactively
+                // This allows the faculty to see immediate effects of grade changes on eligibility.
+                $gradeHistoryMap[$courseId]['is_verified'] = 1;
+            } else {
+                // If a grade is overridden for a course not in history, add it (e.g., for new courses)
+                $gradeHistoryMap[$courseId] = [
+                    'course_id' => $courseId,
+                    'transmutation' => $newGrade,
+                    'remarks' => getRemarksFromTransmutation($newGrade),
+                    'is_verified' => 1, // Treat as verified for reactive checks
+                    'year_level_id' => $currentYearLevelId, // Assume current semester if not found
+                    'semester_id' => $currentSemesterId,
+                ];
+            }
+            // Also update currentSemesterGradeMap if the course belongs to the current semester
+            if ((int)($gradeHistoryMap[$courseId]['year_level_id'] ?? 0) === (int)$currentYearLevelId &&
+                (int)($gradeHistoryMap[$courseId]['semester_id'] ?? 0) === (int)$currentSemesterId) {
+                $currentSemesterGradeMap[$courseId] = $gradeHistoryMap[$courseId];
+            }
+        }
+
+        // --- 4. Determine Next Semester/Year Level in Curriculum ---
+        // This logic is now moved above to be used for advised courses query as well
+
+        // --- 5. Fetch Eligible Courses for the NEXT AY/Semester ---
         if ($curriculumId && $nextYearLevelId !== null && $nextSemesterId !== null) {
             $eligibleCoursesQuery = "SELECT
                                     c.id,
@@ -211,7 +299,7 @@ try {
                                         FROM course_grades cg
                                         WHERE cg.course_id = c.id
                                           AND cg.student_id = :student_id
-                                          AND cg.remarks = 'Passed'
+                                          AND cg.remarks = 'Passed' AND cg.is_verified = 1
                                       )";
 
             $stmtEligibleCourses = $conn->prepare($eligibleCoursesQuery);
@@ -269,11 +357,28 @@ try {
                     $failedPrereqCodes = [];
                     foreach ($prereqIds as $prereqId) {
                         $gradeEntry = $gradeHistoryMap[$prereqId] ?? null;
+                        $isCurrentSemesterPrereq = isset($currentSemesterGradeMap[$prereqId]);
 
-                        if (!$gradeEntry || $gradeEntry['remarks'] !== 'Passed') {
+                        if (!$gradeEntry) {
                             $course['can_select'] = false;
                             $prereqCourse = $allCurriculumCoursesMap[$prereqId] ?? ['course_code' => 'Unknown Course'];
                             $failedPrereqCodes[] = $prereqCourse['course_code'];
+                        } else {
+                            // For current semester grades, only check if remarks is 'Passed'
+                            if ($isCurrentSemesterPrereq) {
+                                if ($gradeEntry['remarks'] !== 'Passed') {
+                                    $course['can_select'] = false;
+                                    $prereqCourse = $allCurriculumCoursesMap[$prereqId] ?? ['course_code' => 'Unknown Course'];
+                                    $failedPrereqCodes[] = $prereqCourse['course_code'];
+                                }
+                            } else {
+                                // For past semester grades, strictly check 'Passed' AND 'is_verified' = 1
+                                if (!($gradeEntry['remarks'] === 'Passed' && (int)$gradeEntry['is_verified'] === 1)) {
+                                    $course['can_select'] = false;
+                                    $prereqCourse = $allCurriculumCoursesMap[$prereqId] ?? ['course_code' => 'Unknown Course'];
+                                    $failedPrereqCodes[] = $prereqCourse['course_code'];
+                                }
+                            }
                         }
                     }
 
@@ -293,10 +398,15 @@ try {
         "data" => array(
             "full_grade_history" => $fullGradeHistory,
             "advising_completed" => $advisingCompleted,
-            "advised_courses" => $advisedCoursesList,
+            "faculty_approved_advised_courses" => $facultyApprovedAdvisedCourses,
+            "student_submitted_advised_courses" => $studentSubmittedAdvisedCourses,
             "eligible_courses" => $eligibleCourses,
             "current_year_level_id" => $currentYearLevelId,
-            "current_semester_id" => $currentSemesterId
+            "current_semester_id" => $currentSemesterId,
+            "next_year_level_id" => $nextYearLevelId,
+            "next_semester_id" => $nextSemesterId,
+            "all_curriculum_courses_map" => $allCurriculumCoursesMap, // Add this
+            "prerequisites_map" => $prerequisitesMap, // Add this
         )
     ));
 

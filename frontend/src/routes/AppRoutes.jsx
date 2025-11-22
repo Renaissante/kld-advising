@@ -20,6 +20,7 @@ import ManageFaculty from "@/pages/admin/ManageFaculty";
 import FacultyAssignment from "@/pages/admin/FacultyAssignment";
 import ManageSections from "@/pages/admin/ManageSections";
 import StudentAdvisingRecords from "@/pages/student/StudentAdvisingRecords";
+import AdvisingStatus from "@/pages/student/AdvisingStatus"; // Import new component
 import RoleSelectionPage from "@/pages/auth/RoleSelectionPage"; // Import new RoleSelectionPage
 import AdvisingPeriodManager from "@/pages/dean/AdvisingPeriodManager"; // Import the new component
 import ExportAdvisingForms from "@/pages/dean/ExportAdvisingForms"; // Import the new component
@@ -28,6 +29,7 @@ import NotificationsManagement from "@/pages/NotificationsManagement"; // Import
 import SetPasswordForm from "@/components/SetPasswordForm"; // Import SetPasswordForm
 import { useContext } from "react"; // Import useContext
 import { AuthContext } from "@/contexts/AuthContext"; // Import AuthContext
+import SubmitForAdvising from "@/pages/student/SubmitForAdvising"; // Import new component
 
 
 export default function AppRoutes() {
@@ -268,6 +270,24 @@ export default function AppRoutes() {
           <ErrorBoundary>
             <SetPasswordForm />
           </ErrorBoundary>
+        }
+      />
+     
+      <Route
+        path="/student/advising-status"
+        element={
+          <ProtectedRoute requiredRoles="student">
+            <AdvisingStatus />
+          </ProtectedRoute>
+        }
+      />
+     
+      <Route
+        path="/student/advising"
+        element={
+          <ProtectedRoute requiredRoles="student">
+            <SubmitForAdvising />
+          </ProtectedRoute>
         }
       />
      

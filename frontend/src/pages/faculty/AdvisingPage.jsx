@@ -226,10 +226,10 @@ const AdvisingPage = () => {
   }, [selectedSection, user, activeAcademicYear, activeSemester, activeLoading]);
 
   // Modified function to update student status AND units after advising
-  const handleAdvisingComplete = (studentId, advisedUnits) => {
+  const handleAdvisingComplete = (studentId, advisedUnits, advisingCompletedStatus) => {
     setStudents(prevStudents =>
       prevStudents.map(student =>
-        student.id === studentId ? { ...student, advising_status: "Done", units: advisedUnits } : student
+        student.id === studentId ? { ...student, advising_status: advisingCompletedStatus ? "Approved" : "Pending Approval", units: advisedUnits } : student
       )
     );
   };

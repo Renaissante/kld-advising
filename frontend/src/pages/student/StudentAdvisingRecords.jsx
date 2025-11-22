@@ -70,7 +70,7 @@ export default function StudentAdvisingRecords() {
       semester: record.semester_name,
       format: 'pdf',
     });
-    const url = `${API_BASE_URL}/dean/export_advising_forms.php?${params.toString()}`;
+    const url = `${API_BASE_URL}/student/export_advising_form.php?${params.toString()}`;
 
     try {
       const response = await fetch(url);
@@ -104,7 +104,7 @@ export default function StudentAdvisingRecords() {
         <AppSidebar />
         <main className="w-full">
           <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
-          <div className="container mx-auto p-6 max-w-6xl">
+          <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-6 w-1/2 mb-4" />
             <Skeleton className="h-4 w-1/3 mb-8" />
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -129,55 +129,61 @@ export default function StudentAdvisingRecords() {
       <main className="w-full">
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
 
-        <div className="container mx-auto p-6 max-w-6xl">
+        <div className="container mx-auto p-4 md:p-6 mt-4">
           <div className="mb-8">
             <h1 className="text-2xl font-semibold text-[#1b4b2a]">Academic Advising Records</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground ">
               Browse and access your advising forms.
             </p>
           </div>
 
           {/* Records Grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {advisingPeriods.map((record) => (
-              <Card key={`${record.academic_year_id}-${record.semester_id}`} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-1">Advising Form</CardTitle>
-                      <CardDescription className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4" />
-                        {record.academic_year_name} • {record.semester_name}
-                      </CardDescription>
+          {advisingPeriods.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {advisingPeriods.map((record) => (
+                <Card key={`${record.academic_year_id}-${record.semester_id}`} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-1">Advising Form</CardTitle>
+                        <CardDescription className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4" />
+                          {record.academic_year_name} • {record.semester_name}
+                        </CardDescription>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    <div className="text-sm">
-                      <p className="text-muted-foreground mb-1">Advisor</p>
-                      <p className="font-medium">{record.advisor_name || "N/A"}</p>
-                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      <div className="text-sm">
+                        <p className="text-muted-foreground mb-1">Advisor</p>
+                        <p className="font-medium">{record.advisor_name || "N/A"}</p>
+                      </div>
 
-                    <div className="text-sm">
-                      <p className="text-muted-foreground mb-1">Submission</p>
-                      <p className="font-medium">{record.latest_advising_date ? new Date(record.latest_advising_date).toLocaleDateString() : "N/A"}</p>
-                    </div>
+                      <div className="text-sm">
+                        <p className="text-muted-foreground mb-1">Submission</p>
+                        <p className="font-medium">{record.latest_advising_date ? new Date(record.latest_advising_date).toLocaleDateString() : "N/A"}</p>
+                      </div>
 
-                    <div className="flex gap-2 pt-2">
-                      <Button size="sm" variant="outline" className="flex-1 bg-transparent" onClick={() => handleViewRecord(record.academic_year_name, record.semester_name)}>
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDownload(record)}>
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" variant="outline" className="flex-1 bg-transparent" onClick={() => handleViewRecord(record.academic_year_name, record.semester_name)}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDownload(record)}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                </div>
               </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          ) : (
+            <div className="flex justify-center items-center p-8 border rounded-lg text-muted-foreground mt-6">
+              <p>No advising records found.</p>
+            </div>
+          )}
         </div>
 
         <Dialog open={showForm} onOpenChange={setShowForm}>

@@ -146,7 +146,7 @@ export default function StudentTable({ students = [], onAdviseStudent, sectionNa
                     <TableCell className="px-3 py-2">
                       <Badge
                          variant={
-                           student.advising_status === "Done"
+                           student.advising_status === "Approved"
                              ? "default" // Or a specific color for Done
                              : "secondary" // Or a specific color for Pending
                          }

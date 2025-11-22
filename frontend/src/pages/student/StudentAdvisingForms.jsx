@@ -50,11 +50,11 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
 
   useEffect(() => {
     const fetchStudentProfile = async () => {
-      if (!user || !user.student_id) {
+      if (!user || !user.student_id || !academicYear || !semester) {
         return;
       }
       try {
-        const response = await fetch(`${API_BASE_URL}/student/read_student_advising_profile.php?student_id=${user.student_id}`);
+        const response = await fetch(`${API_BASE_URL}/student/read_student_advising_profile.php?student_id=${user.student_id}&academic_year=${academicYear}&semester=${semester}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -65,7 +65,7 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
       }
     };
     fetchStudentProfile();
-  }, [user]);
+  }, [user, academicYear, semester]);
 
   if (loading || !studentProfile) {
     return (
@@ -91,27 +91,23 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
     institute_name, 
     program_year_section, 
     student_status, 
-    current_enrollment_period, 
-    next_enrollment_period
+    last_enrollment_period, 
+    current_enrollment_period
   } = studentProfile;
 
   // Get failed courses from graded courses
-  const failedCourses = gradedCourses.filter(course => course.remarks === "Failed");
+  // const failedCourses = gradedCourses.filter(course => course.remarks === "Failed");
 
   // Exclude failed courses from main graded courses
-  const nonFailedGradedCourses = gradedCourses.filter(course => course.remarks !== "Failed");
+  // const nonFailedGradedCourses = gradedCourses.filter(course => course.remarks !== "Failed");
 
   // Calculate total units for advised courses
   const totalAdvisedUnits = advisedCourses.reduce((sum, record) => sum + (record.units || 0), 0);
 
   // Calculate total units earned from graded courses (passed courses only)
-  const totalUnitsEarned = gradedCourses
-    .filter(course => course.remarks === "Passed" || course.grade) // Only count courses with grades/passed
-    .reduce((sum, course) => {
-      // Parse units from course data - you may need to adjust this based on your data structure
-      const units = parseFloat(course.units) || 0;
-      return sum + units;
-    }, 0);
+  const totalUnitsEarned = gradedCourses.reduce((sum, course) => {
+    return sum + (course.units_earned || 0);
+  }, 0);
 
   return (
     <div>
@@ -132,24 +128,24 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
                 </TableRow>
                 
                 <TableRow>
-                  <TableHead colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">LAST ENROLLMENT : {current_enrollment_period}</TableHead>
-                  <TableHead colSpan={3} className="w-[40%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">CURRENT ENROLLMENT : {next_enrollment_period}</TableHead>
+                  <TableHead colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">LAST ENROLLMENT : {last_enrollment_period}</TableHead>
+                  <TableHead colSpan={3} className="w-[40%] text-left border-b border-r px-2 py-1 text-xs font-normal h-6">CURRENT ENROLLMENT : {current_enrollment_period}</TableHead>
                 </TableRow>
               
                 <TableRow>
                   <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Course Code</TableHead>
                   <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Title</TableHead>
-                  <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Grade</TableHead>
+                  <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Units Earned</TableHead>
                   <TableHead className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs">Pre-requisite</TableHead>
-                  <TableHead className="w-[25%] text-center border-b border-r px-2 py-1 text-xs">Course Code and Title</TableHead>
+                  <TableHead className="w-[15%] text-center border-b border-r px-2 py-1 text-xs">Course Code</TableHead>
+                  <TableHead className="w-[15%] text-center border-b border-r px-2 py-1 text-xs">Course Title</TableHead>
                   <TableHead className="w-[5%] text-center border-b border-r px-2 py-1 text-xs">Units</TableHead>
-                  <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs">Adviser's Signature</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {/* Display rows with graded courses (left) and advised courses (right) */}
-                {Array.from({ length: Math.max(nonFailedGradedCourses.length, advisedCourses.length) }).map((_, index) => {
-                  const gradedCourse = nonFailedGradedCourses[index];
+                {Array.from({ length: Math.max(gradedCourses.length, advisedCourses.length) }).map((_, index) => {
+                  const gradedCourse = gradedCourses[index];
                   const advisedCourse = advisedCourses[index];
 
                   return (
@@ -162,7 +158,7 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
                         {gradedCourse?.course_title || ''}
                       </TableCell>
                       <TableCell className="w-[10%] text-center border-r px-2 py-1 text-xs">
-                        {gradedCourse?.grade || ''}
+                        {gradedCourse?.units_earned || '0'}
                       </TableCell>
                       {/* Show prerequisites from graded courses */}
                       <TableCell className="w-[12.5%] text-left border-r px-2 py-1 text-xs">
@@ -170,13 +166,15 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
                       </TableCell>
 
                       {/* Right side - Advised courses for current enrollment */}
-                      <TableCell className="w-[25%] text-left border-r px-2 py-1 text-xs">
-                        {advisedCourse ? `${advisedCourse.course_code} - ${advisedCourse.course_title}` : ''}
+                      <TableCell className="w-[15%] text-left border-r px-2 py-1 text-xs">
+                        {advisedCourse?.course_code || ''}
+                      </TableCell>
+                      <TableCell className="w-[15%] text-left border-r px-2 py-1 text-xs">
+                        {advisedCourse?.course_title || ''}
                       </TableCell>
                       <TableCell className="w-[5%] text-center border-r px-2 py-1 text-xs">
                         {advisedCourse?.units || ''}
                       </TableCell>
-                      <TableCell className="w-[10%] text-center px-2 py-1 text-xs"></TableCell>
                     </TableRow>
                   );
                 })}
@@ -184,44 +182,10 @@ const StudentAdvisingForms = ({ academicYear, semester }) => {
                 {/* Show message if no data */}
                 {gradedCourses.length === 0 && advisedCourses.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-4 text-sm text-muted-foreground">
                       No records found.
                     </TableCell>
                   </TableRow>
-                )}
-
-                {/* Failed courses section */}
-                {failedCourses.length > 0 && (
-                  <>
-                    <TableRow>
-                      <TableCell colSpan={4} className="w-[60%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Failed course/s</TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
-                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs"></TableCell> 
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs"></TableCell>
-                    </TableRow>
-
-                    <TableRow>
-                      <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Code</TableCell>
-                      <TableCell className="w-[25%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Course Title</TableCell>
-                      <TableHead className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Grade</TableHead>
-                      <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">Term</TableCell>
-                      <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">AY</TableCell>
-                      <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                    </TableRow>
-
-                    {failedCourses.map((failedRecord, idx) => (
-                      <TableRow key={`failed-${idx}`}>
-                        <TableCell className="w-[12.5%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500 h-6">{failedRecord.course_code}</TableCell>
-                        <TableCell className="w-[25%] text-left border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.course_title}</TableCell>
-                        <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.grade || "N/A"}</TableCell>
-                        <TableCell className="w-[12.5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.semester_name}</TableCell>
-                        <TableCell className="w-[25%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500">{failedRecord.academic_year_name}</TableCell>
-                        <TableCell className="w-[5%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                        <TableCell className="w-[10%] text-center border-b border-r px-2 py-1 text-xs font-medium text-gray-500"></TableCell>
-                      </TableRow>
-                    ))}
-                  </>
                 )}
 
               </TableBody>

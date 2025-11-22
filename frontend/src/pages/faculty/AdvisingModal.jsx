@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth"
 // Import Tooltip components
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { API_BASE_URL } from '@/config/api';
+import { Input } from "@/components/ui/input"; // Import Input component
 
 export default function AdvisingModal({
   isOpen,
@@ -31,14 +32,41 @@ export default function AdvisingModal({
   const [selectedTab, setSelectedTab] = useState("eligible")
   const [selectedCourses, setSelectedCourses] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editableGrades, setEditableGrades] = useState({}); // New state for editable grades
 
   // State for fetched data
   const [previousGrades, setPreviousGrades] = useState([]) // Grades for the *current* active semester
   const [eligibleCourses, setEligibleCourses] = useState([]) // Eligible courses for the *next* period (if advising not completed)
-  const [advisedCourses, setAdvisedCourses] = useState([]) // Advised courses for the *current* active period (if advising completed)
+  const [studentSubmittedCourses, setStudentSubmittedCourses] = useState([]) // Student-submitted courses
+  const [facultyApprovedCourses, setFacultyApprovedCourses] = useState([]) // Faculty-approved advised courses
   const [advisingCompleted, setAdvisingCompleted] = useState(false) // Flag from backend
   const [isLoadingAdvisingData, setIsLoadingAdvisingData] = useState(false)
   const [advisingDataError, setAdvisingDataError] = useState(null)
+  const [nextAcademicYearId, setNextAcademicYearId] = useState(null); // New state for next academic year ID
+  const [nextSemesterId, setNextSemesterId] = useState(null); // New state for next semester ID
+  const [allCurriculumCoursesMap, setAllCurriculumCoursesMap] = useState({}); // New state for all curriculum courses map
+  const [prerequisitesMap, setPrerequisitesMap] = useState({}); // New state for prerequisites map
+
+  // Helper function to determine remarks based on grade (replicating backend logic)
+  const getRemarksFromGrade = (grade) => {
+    if (grade === null || grade === "") return null;
+
+    const lowerGrade = String(grade).toLowerCase();
+    if (lowerGrade === 'inc') return 'Incomplete';
+    if (lowerGrade === 'ud') return 'Unofficially Dropped';
+    if (lowerGrade === 'od') return 'Officially Dropped';
+
+    const numGrade = parseFloat(grade);
+
+    if (isNaN(numGrade)) {
+      return null; // Not a known text grade or a valid number
+    }
+
+    // 5-point grading scale: 1.00-3.00 is Passed, 3.25-5.00 is Failed
+    if (numGrade >= 1.00 && numGrade <= 3.00) return "Passed";
+    if (numGrade >= 3.25 && numGrade <= 5.00) return "Failed";
+    return null; // Should not happen with valid input range
+  };
 
   // Effect to fetch data when modal opens and student is selected
   useEffect(() => {
@@ -47,10 +75,12 @@ export default function AdvisingModal({
         // Don't fetch if required data is missing
         setPreviousGrades([]);
         setEligibleCourses([]);
-        setAdvisedCourses([]); // Reset advised courses
-        setAdvisingCompleted(false); // Reset advising completed flag
+        setStudentSubmittedCourses([]);
+        setFacultyApprovedCourses([]);
+        setAdvisingCompleted(false);
         setIsLoadingAdvisingData(false);
         setAdvisingDataError(null);
+        setEditableGrades({}); // Also clear when modal closes or student data is missing
         return;
       }
 
@@ -58,8 +88,9 @@ export default function AdvisingModal({
       setAdvisingDataError(null);
       setPreviousGrades([]);
       setEligibleCourses([]);
-      setAdvisedCourses([]); // Reset advised courses
-      setAdvisingCompleted(false); // Reset advising completed flag
+      setStudentSubmittedCourses([]);
+      setFacultyApprovedCourses([]);
+      setAdvisingCompleted(false);
       setSelectedCourses([]); // Clear selected courses on new student/fetch
 
       try {
@@ -85,17 +116,20 @@ export default function AdvisingModal({
         console.log("Advising data API response:", data);
 
         if (data.success && data.data) {
-           setAdvisingCompleted(data.data.advising_completed); // Set the advising completed flag
+           setAdvisingCompleted(data.data.advising_completed);
 
            if (data.data.advising_completed) {
-               // If advising is completed, set advised courses
-               setAdvisedCourses(data.data.advised_courses || []);
-               // No need to set eligibleCourses or fullGradeHistory if advising is completed
-               setPreviousGrades([]); // Ensure previous grades are cleared if not sent
-               setEligibleCourses([]); // Ensure eligible courses are cleared if not sent
+               setFacultyApprovedCourses(data.data.faculty_approved_advised_courses || []);
+               setPreviousGrades([]);
+               setEligibleCourses([]);
+               setStudentSubmittedCourses([]);
+               setSelectedCourses(data.data.faculty_approved_advised_courses.map(course => course.course_id));
+               setNextAcademicYearId(parseInt(data.data.next_year_level_id) || null); // Corrected to use next_year_level_id
+               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Ensure it's an integer
+               setEditableGrades({}); // Clear editable grades when advising is completed
+               setAllCurriculumCoursesMap(data.data.all_curriculum_courses_map || {}); // Set all curriculum courses map
+               setPrerequisitesMap(data.data.prerequisites_map || {}); // Set prerequisites map
            } else {
-               // If advising is NOT completed, set eligible courses and previous grades
-               // Filter full_grade_history to get only current semester grades for display
                const currentYearLevelId = data.data.current_year_level_id;
                const currentSemesterId = data.data.current_semester_id;
 
@@ -103,16 +137,38 @@ export default function AdvisingModal({
                    grade.year_level_id === currentYearLevelId &&
                    grade.semester_id === currentSemesterId
                );
-               setPreviousGrades(currentSemGrades); // Use filtered grades for display
+               setPreviousGrades(currentSemGrades);
 
-               // eligible_courses now includes can_select and prerequisite_reason
+               // Initialize editableGrades from currentSemGrades
+               const initialEditableGrades = currentSemGrades.reduce((acc, grade) => {
+                   acc[grade.course_id] = grade.transmutation ? grade.transmutation.toString() : "";
+                   return acc;
+               }, {});
+               setEditableGrades(initialEditableGrades);
+
                setEligibleCourses(data.data.eligible_courses || []);
-               setAdvisedCourses([]); // Ensure advised courses are cleared if not sent
+               setStudentSubmittedCourses(data.data.student_submitted_advised_courses || []);
+
+               // Pre-select student-submitted courses if advising is not completed yet
+               if (data.data.student_submitted_advised_courses && data.data.student_submitted_advised_courses.length > 0) {
+                   setSelectedCourses(data.data.student_submitted_advised_courses.map(course => course.course_id));
+               } else {
+                   setSelectedCourses([]);
+               }
+               setFacultyApprovedCourses([]);
+               setNextAcademicYearId(parseInt(data.data.next_year_level_id) || null); // Corrected to use next_year_level_id
+               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Ensure it's an integer
+               setAllCurriculumCoursesMap(data.data.all_curriculum_courses_map || {}); // Set all curriculum courses map
+               setPrerequisitesMap(data.data.prerequisites_map || {}); // Set prerequisites map
            }
 
            console.log("Advising data state set:", data.data);
+           console.log("Frontend advisingCompleted:", data.data.advising_completed);
+           console.log("Frontend nextAcademicYearId:", data.data.next_year_level_id); // Log the raw value from backend
+           console.log("Frontend nextSemesterId:", data.data.next_semester_id); // Log the raw value from backend
+           console.log("Frontend studentSubmittedCourses (initial):", data.data.student_submitted_advised_courses);
+           console.log("Frontend selectedCourses (initial):", (data.data.student_submitted_advised_courses || []).map(course => course.course_id));
         } else {
-           // API returned success:false or missing data field
            throw new Error(data.message || "API returned success:false or missing data field.");
         }
       } catch (error) {
@@ -120,8 +176,10 @@ export default function AdvisingModal({
         setAdvisingDataError(error.message || "Failed to load advising data. Please try again later.");
         setPreviousGrades([]);
         setEligibleCourses([]);
-        setAdvisedCourses([]);
+        setStudentSubmittedCourses([]);
+        setFacultyApprovedCourses([]);
         setAdvisingCompleted(false);
+        setEditableGrades({}); // Also clear on error
       } finally {
         setIsLoadingAdvisingData(false);
       }
@@ -130,28 +188,39 @@ export default function AdvisingModal({
     if (isOpen && student && user?.id) {
       fetchAdvisingData();
     } else {
-        // Reset data when modal is closed or student is cleared
         setPreviousGrades([]);
         setEligibleCourses([]);
-        setAdvisedCourses([]);
+        setStudentSubmittedCourses([]);
+        setFacultyApprovedCourses([]);
         setAdvisingCompleted(false);
         setSelectedCourses([]);
         setIsLoadingAdvisingData(false);
         setAdvisingDataError(null);
+        setEditableGrades({}); // Also clear when modal closes or student data is missing
     }
 
-  }, [isOpen, student, activeAcademicYear, activeSemester, user]); // Dependencies include props and user
+  }, [isOpen, student, activeAcademicYear, activeSemester, user]);
 
-  // Reset selected courses and tab when modal opens with a new student
   useEffect(() => {
-    if (isOpen) {
-      setSelectedCourses([]) // Clear selections when modal opens
-      setSelectedTab("eligible") // Reset to eligible tab
+    if (isOpen && !advisingCompleted) {
+      // Only reset selected courses if there are no student-submitted courses initially
+      // This effect should run after studentSubmittedCourses has been updated from the fetch.
+      // If studentSubmittedCourses are available, they should override the blank state.
+      if (!studentSubmittedCourses || studentSubmittedCourses.length === 0) {
+        setSelectedCourses([])
+      }
+      setSelectedTab("eligible")
     }
-  }, [isOpen, student]) // Dependency array includes student to reset if student changes while modal is open (less common)
+  }, [isOpen, student, advisingCompleted, studentSubmittedCourses]) // Added advisingCompleted and studentSubmittedCourses to dependencies
 
   // Return null if modal is not open or no student data is available yet
   if (!isOpen || !student) return null
+
+  // Handler for grade input changes
+  const handleGradeChange = (courseId, newGrade) => {
+    // Always update the state to allow free typing
+    setEditableGrades(prev => ({ ...prev, [courseId]: newGrade }));
+  };
 
   // Handler to add/remove a course from the selection
   const handleSelectCourse = (courseId) => {
@@ -176,12 +245,53 @@ export default function AdvisingModal({
     setIsSubmitting(true)
     console.log("Submitting advising for:", student.id, "Courses:", selectedCourses)
 
+    // Validate editable grades before submission
+    const gradesToSubmit = [];
+    let hasInvalidGrades = false;
+    for (const courseId in editableGrades) {
+      const grade = editableGrades[courseId].trim();
+
+      if (grade === "") {
+        // Empty grades are allowed (not yet submitted)
+        continue;
+      }
+
+      const lowerGrade = grade.toLowerCase();
+      if (lowerGrade === "inc" || lowerGrade === "ud" || lowerGrade === "od") {
+        gradesToSubmit.push({
+          course_id: parseInt(courseId),
+          grade: grade.toUpperCase(), // Store as uppercase
+        });
+        continue;
+      }
+
+      const parsedValue = parseFloat(grade);
+      const decimalPart = grade.includes('.') ? grade.split('.')[1] : '';
+
+      if (isNaN(parsedValue) || parsedValue < 1.00 || parsedValue > 5.00 || decimalPart.length > 2) {
+        toast.error(`Invalid grade '${grade}' for course ID ${courseId}. Grades must be between 1.00 and 5.00 (max 2 decimal places), or 'INC', 'UD', 'OD'.`);
+        hasInvalidGrades = true;
+        break; // Stop validation on first error
+      }
+
+      gradesToSubmit.push({
+        course_id: parseInt(courseId),
+        grade: parsedValue.toFixed(2), // Format to 2 decimal places
+      });
+    }
+
+    if (hasInvalidGrades) {
+      setIsSubmitting(false);
+      return;
+    }
+
     const advisingData = {
         student_id: student.id,
         advisor_id: user.id, // Get advisor ID from the logged-in user
-        active_academic_year_id: activeAcademicYear.id,
-        active_semester_id: activeSemester.id,
+        academic_year_id: nextAcademicYearId, // Use next academic year ID
+        semester_id: nextSemesterId, // Use next semester ID
         selected_course_ids: selectedCourses,
+        grades: gradesToSubmit,
     };
 
     try {
@@ -224,7 +334,12 @@ export default function AdvisingModal({
             setAdvisingCompleted(true);
             // Call the callback to update the parent state, passing the total selected units
             if (onAdvisingComplete && student?.id) {
-                onAdvisingComplete(student.id, totalSelectedUnits); // Pass totalSelectedUnits
+                // The totalSelectedUnits calculation might need to reflect the newly advised courses
+                // For now, let's recalculate it based on the current selectedCourses which will be the approved ones
+                const newlyAdvisedUnits = eligibleCourses
+                    .filter((c) => selectedCourses.includes(c.id))
+                    .reduce((acc, curr) => acc + curr.units, 0);
+                onAdvisingComplete(student.id, newlyAdvisedUnits, true); // Pass true for advisingCompleted
             }
             // Send advising form PDF to student via email
             try {
@@ -263,8 +378,8 @@ export default function AdvisingModal({
     .filter((c) => selectedCourses.includes(c.id))
     .reduce((acc, curr) => acc + curr.units, 0)
 
-  // Calculate total units for advised courses (only relevant if advising is completed)
-  const totalAdvisedUnits = advisedCourses.reduce((acc, curr) => acc + curr.units, 0);
+  // Calculate total units for faculty-approved advised courses
+  const totalAdvisedUnits = facultyApprovedCourses.reduce((acc, curr) => acc + curr.units, 0);
 
   // Determine if all eligible courses that can be selected are currently selected
   const allSelectableEligibleCoursesIds = eligibleCourses.filter(course => course.can_select).map(course => course.id);
@@ -326,15 +441,15 @@ export default function AdvisingModal({
                               <TableCell className="font-medium">{grade.course_code}</TableCell>
                               <TableCell>{grade.course_title}</TableCell>
                               <TableCell className="text-center">
-                                <Badge
-                                  variant={
-                                    parseFloat(grade.transmutation) === 5.00 || parseFloat(grade.transmutation) === 0.00
-                                      ? "destructive"
-                                      : "default"
-                                  }
-                                >
-                                  {grade.transmutation}
-                                </Badge>
+                                <Input
+                                  type="text"
+                                  value={editableGrades[grade.course_id] || ""}
+                                  onChange={(e) => handleGradeChange(grade.course_id, e.target.value)}
+                                  className="text-center h-8 w-20 p-1 border rounded"
+                                  placeholder="Grade"
+                                  maxLength={4} // e.g., "5.00", "INC"
+                                  disabled={advisingCompleted} // Disable input if advising is completed
+                                />
                               </TableCell>
                               <TableCell className="text-center">{grade.units}</TableCell>
                             </TableRow>
@@ -362,7 +477,7 @@ export default function AdvisingModal({
                  {advisingCompleted ? (
                     <>
                        <BookOpenCheck className="h-4 w-4 mr-2 text-muted-foreground" /> {/* Icon for completed advising */}
-                       Advised Courses for Current Semester
+                       Faculty Approved Courses for Current Semester
                     </>
                  ) : (
                     <>
@@ -373,7 +488,7 @@ export default function AdvisingModal({
               </CardTitle>
               <CardDescription>
                  {advisingCompleted ? (
-                    "Courses recommended and submitted for this advising period."
+                    "Courses approved by faculty for this advising period."
                  ) : (
                     "Select courses to recommend for enrollment"
                  )}
@@ -391,7 +506,7 @@ export default function AdvisingModal({
                       <p>Error loading courses: {advisingDataError}</p>
                  </div>
               ) : advisingCompleted ? (
-                 // Display Advised Courses if advising is completed
+                 // Display Faculty Approved Courses if advising is completed
                  <div className="rounded-md border">
                    <Table>
                      <TableHeader>
@@ -399,21 +514,25 @@ export default function AdvisingModal({
                          <TableHead>Code</TableHead>
                          <TableHead>Title</TableHead>
                          <TableHead className="text-center">Units</TableHead>
+                         <TableHead className="text-center">Status</TableHead>
                        </TableRow>
                      </TableHeader>
                      <TableBody>
-                       {advisedCourses.length > 0 ? (
-                         advisedCourses.map((course) => (
+                       {facultyApprovedCourses.length > 0 ? (
+                         facultyApprovedCourses.map((course) => (
                            <TableRow key={course.course_id}>
                              <TableCell className="font-medium">{course.course_code}</TableCell>
                              <TableCell>{course.course_title}</TableCell>
                              <TableCell className="text-center">{course.units}</TableCell>
+                             <TableCell className="text-center">
+                               <Badge variant="default">{course.status}</Badge>
+                             </TableCell>
                            </TableRow>
                          ))
                        ) : (
                          <TableRow>
-                           <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                             No advised courses found for this period.
+                           <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                             No faculty-approved courses found for this period.
                            </TableCell>
                          </TableRow>
                        )}
@@ -485,7 +604,9 @@ export default function AdvisingModal({
                                            variant={isSelected ? "secondary" : "outline"}
                                            size="sm"
                                            onClick={() => handleSelectCourse(course.id)}
-                                           disabled={isSelected} // Disable if already selected
+                                           // A course is only disabled if it's already selected AND it wasn't originally student-submitted
+                                           // This allows faculty to deselect student-submitted courses
+                                           disabled={isSelected && !studentSubmittedCourses.some(ssc => ssc.course_id === course.id)}
                                          >
                                            {isSelected ? (
                                              <>
@@ -547,8 +668,8 @@ export default function AdvisingModal({
                          <TableBody>
                            {selectedCourses.length > 0 ? (
                              selectedCourses.map((courseId) => {
-                               // Find the full course details from the eligible list
-                               const course = eligibleCourses.find((c) => c.id === courseId)
+                               // Find the full course details from the eligible list (or studentSubmittedCourses if it was pre-selected)
+                               const course = eligibleCourses.find((c) => c.id === courseId) || studentSubmittedCourses.find((c) => c.course_id === courseId);
                                if (!course) return null
                                return (
                                  <TableRow key={course.id}>
@@ -586,6 +707,10 @@ export default function AdvisingModal({
           </Card>
         </div> {/* End grid */}
 
+        {console.log("Render Check - advisingCompleted:", advisingCompleted)}
+        {console.log("Render Check - selectedCourses:", selectedCourses)}
+        {console.log("Render Check - nextAcademicYearId:", nextAcademicYearId)}
+        {console.log("Render Check - nextSemesterId:", nextSemesterId)}
         {/* Dialog Footer */}
         <DialogFooter className="mt-6 pt-4 border-t">
           {/* Info section on the left */}
@@ -593,7 +718,7 @@ export default function AdvisingModal({
             <Info className="h-4 w-4 mr-2 flex-shrink-0" />
             {advisingCompleted ? (
                 <span>
-                   Total advised: {advisedCourses.length} course{advisedCourses.length !== 1 ? 's' : ''} ({totalAdvisedUnits} units)
+                   Total approved: {facultyApprovedCourses.length} course{facultyApprovedCourses.length !== 1 ? 's' : ''} ({totalAdvisedUnits} units)
                 </span>
             ) : (
                 <span>
@@ -609,17 +734,17 @@ export default function AdvisingModal({
               <Button
                 variant="green"
                 onClick={handleSubmitAdvising}
-                disabled={selectedCourses.length === 0 || isSubmitting || isLoadingAdvisingData || advisingDataError}
+                disabled={selectedCourses.length === 0 || isSubmitting || isLoadingAdvisingData || advisingDataError || !nextAcademicYearId || !nextSemesterId}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Submitting...
+                    Approving...
                   </>
                 ) : (
                   <>
                     <FileCheck className="h-4 w-4 mr-2" />
-                    Complete Advising
+                    Approve Advising
                   </>
                 )}
               </Button>

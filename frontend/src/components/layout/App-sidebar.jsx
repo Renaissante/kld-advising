@@ -95,7 +95,18 @@ export function AppSidebar() {
     { title: "Grades", url: "/faculty/grades", icon: BookA, roles: ["faculty"] },
     { title: "Advise", url: "/faculty/advise", basePath: "/faculty/credit-courses", icon: NotebookPen, roles: ["faculty"] },
     { title: "Manage Curriculum", url: "/program-chair/curriculum", icon: Inbox, roles: ["programchair"] },
-    { title: "Advising Records", url: "/student/advising-records", icon: Archive, roles: ["student"] },
+    // Existing "Curriculum" item for student, moved to top-level
+    
+    {
+      title: "Advising",
+      icon: BookOpen,
+      roles: ["student"],
+      subItems: [
+        { title: "Submit for Advising", url: "/student/advising", icon: NotebookPen },
+        { title: "Advising Status", url: "/student/advising-status", icon: ClipboardList },
+        { title: "Advising Records", url: "/student/advising-records", icon: Archive },
+      ]
+    },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
     { title: "Manage Faculty", url: "/admin/manage-faculty", basePath: "/admin/faculty-assignment", icon: ListPlus, roles: ["admin"] },
     { title: "Manage Sections", url: "/admin/manage-sections", icon: Users, roles: ["admin"] },
@@ -165,12 +176,14 @@ export function AppSidebar() {
                                 </TooltipContent>
                               </Tooltip>
                               <DropdownMenuContent side="right" align="start" className="w-48">
-                                <ul>
+                                <ul className="space-y-1 py-1">
                                 {item.subItems.map((subItem) => (
                                   <DropdownMenuItem 
                                     key={subItem.title} 
                                     onClick={() => navigate(subItem.url)}
+                                    className="flex items-center gap-2"
                                   >
+                                    {subItem.icon && <subItem.icon className="h-4 w-4" />}
                                     <span>{subItem.title}</span>
                                   </DropdownMenuItem>
                                 ))}
@@ -190,19 +203,20 @@ export function AppSidebar() {
                                 </SidebarMenuButton>
                               </CollapsibleTrigger>
                               <CollapsibleContent className="ml-4 border-l border-[#1a4027]">
-                                <ul>
+                                <ul className="space-y-1 py-1">
                                 {item.subItems.map((subItem) => {
                                   const isSubItemActive = location.pathname === subItem.url;
                                   return (
                                     <SidebarMenuItem key={subItem.title}>
-                                      <SidebarMenuButton asChild isActive={isSubItemActive} className="h-auto py-1 pl-4">
+                                      <SidebarMenuButton asChild isActive={isSubItemActive} className="h-auto py-1 pl-4 flex items-center gap-2">
                                         <button
                                           onClick={(e) => {
                                             e.preventDefault();
                                             navigate(subItem.url);
                                           }}
-                                          className="w-full text-left"
+                                          className="w-full text-left flex items-center gap-2"
                                         >
+                                          {subItem.icon && <subItem.icon className="h-4 w-4" />}
                                           <span>{subItem.title}</span>
                                         </button>
                                       </SidebarMenuButton>

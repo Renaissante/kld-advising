@@ -24,7 +24,7 @@ $query = "SELECT DISTINCT
           JOIN academic_years ay ON ac.academic_year_id = ay.academic_year_id
           JOIN semesters sem ON ac.semester_id = sem.semester_id
           LEFT JOIN employees e ON ac.advisor_id = e.employee_id
-          WHERE ac.student_id = :student_id
+          WHERE ac.student_id = :student_id AND ac.status = 'approved'
           GROUP BY ay.academic_year_id, sem.semester_id, COALESCE(e.name, 'N/A')
           ORDER BY ay.academic_year_name DESC, sem.semester_name DESC";
 

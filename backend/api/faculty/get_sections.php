@@ -65,6 +65,26 @@ if (!$advisorId) {
 }
 
 try {
+    // Fetch the active academic year and semester
+    $activeAcademicYearQuery = "SELECT academic_year_id FROM academic_years WHERE is_current = TRUE LIMIT 1";
+    $activeAcademicYearStmt = $conn->prepare($activeAcademicYearQuery);
+    $activeAcademicYearStmt->execute();
+    $activeAcademicYear = $activeAcademicYearStmt->fetch(PDO::FETCH_ASSOC);
+
+    $activeSemesterQuery = "SELECT semester_id FROM semesters WHERE is_current = TRUE LIMIT 1";
+    $activeSemesterStmt = $conn->prepare($activeSemesterQuery);
+    $activeSemesterStmt->execute();
+    $activeSemester = $activeSemesterStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$activeAcademicYear || !$activeSemester) {
+        http_response_code(404);
+        echo json_encode(array("message" => "Active academic year or semester not found."));
+        exit();
+    }
+
+    $currentAcademicYearId = $activeAcademicYear['academic_year_id'];
+    $currentSemesterId = $activeSemester['semester_id'];
+
     // Modified query: Use student_section_enrollments to count students correctly for both active and completed sections
     $query = "SELECT
                 s.id AS section_id,
@@ -91,14 +111,14 @@ try {
             LEFT JOIN year_levels yl ON s.year_level_id = yl.id
             -- Changed: Use student_section_enrollments to count all students who were/are enrolled
             LEFT JOIN student_section_enrollments sse ON s.id = sse.section_id
-            WHERE sa.advisor_id = :advisor_id";
-    
-    // Add status filter only if specified
-    if ($statusFilter !== null) {
-        $query .= " AND sa.status::TEXT = :status_filter";
-    }
-    
-    $query .= " GROUP BY
+            WHERE sa.advisor_id = :advisor_id
+            AND s.status != 'archived'
+            AND (
+                (s.academic_year_id = :current_academic_year_id AND s.semester_id = :current_semester_id AND s.status = 'active')
+                OR
+                (s.academic_year_id < :current_academic_year_id OR (s.academic_year_id = :current_academic_year_id AND s.semester_id < :current_semester_id)) AND s.status = 'completed'
+            )
+            GROUP BY
                 s.id,
                 s.name,
                 s.status,
@@ -120,10 +140,9 @@ try {
     // Bind advisor ID
     $stmt->bindParam(':advisor_id', $advisorId);
     
-    // Bind status filter only if specified
-    if ($statusFilter !== null) {
-        $stmt->bindParam(':status_filter', $statusFilter);
-    }
+    // Bind academic year and semester IDs
+    $stmt->bindParam(':current_academic_year_id', $currentAcademicYearId, PDO::PARAM_INT);
+    $stmt->bindParam(':current_semester_id', $currentSemesterId, PDO::PARAM_INT);
 
     // Execute query
     $stmt->execute();
