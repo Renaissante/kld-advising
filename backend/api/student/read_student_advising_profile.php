@@ -47,6 +47,16 @@ try {
         $last_enrollment_semester = $previous_period['semester_name'];
     }
 
+    // Determine next enrollment period
+    $next_enrollment_academic_year = 'N/A';
+    $next_enrollment_semester = '';
+
+    if ($current_period_index < count($all_periods) - 1) {
+        $next_period = $all_periods[$current_period_index + 1];
+        $next_enrollment_academic_year = $next_period['academic_year_name'];
+        $next_enrollment_semester = $next_period['semester_name'];
+    }
+
     // Prepare a SQL query to select comprehensive student advising profile details
     $query = "SELECT
                 COALESCE(s.name, 'N/A') AS student_name,
@@ -69,7 +79,8 @@ try {
                  WHERE cg_sum.student_id = s.student_id 
                  AND cg_sum.remarks = 'Passed') AS total_units_earned,
                 :last_enrollment_period AS last_enrollment_period,
-                :current_enrollment_period AS current_enrollment_period
+                :current_enrollment_period AS current_enrollment_period,
+                :next_enrollment_period AS next_enrollment_period
               FROM students s
               LEFT JOIN programs p ON s.program_id = p.id
               LEFT JOIN departments d ON s.department_id = d.id
@@ -83,11 +94,15 @@ try {
         ? $last_enrollment_academic_year . ' ' . $last_enrollment_semester 
         : 'N/A';
     $current_enrollment_period_str = $academic_year . ' ' . $semester;
+    $next_enrollment_period_str = $next_enrollment_semester 
+        ? $next_enrollment_academic_year . ' ' . $next_enrollment_semester 
+        : 'N/A';
 
     // Bind parameters
     $stmt->bindParam(':student_id', $student_id);
     $stmt->bindParam(':last_enrollment_period', $last_enrollment_period_str);
     $stmt->bindParam(':current_enrollment_period', $current_enrollment_period_str);
+    $stmt->bindParam(':next_enrollment_period', $next_enrollment_period_str);
     $stmt->bindParam(':academic_year', $academic_year);
     $stmt->bindParam(':semester', $semester);
 

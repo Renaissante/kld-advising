@@ -189,7 +189,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/admin/manage-faculty"
+        path="/admin/manage-advisors"
         element={
           <ProtectedRoute requiredRoles="admin">
             <ManageFaculty />
@@ -198,7 +198,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/admin/faculty-assignment/:facultyId"
+        path="/admin/advisor-assignment/:facultyId"
         element={
           <ProtectedRoute requiredRoles="admin">
             <FacultyAssignment />

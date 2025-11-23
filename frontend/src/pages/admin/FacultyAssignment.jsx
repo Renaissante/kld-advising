@@ -38,22 +38,22 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/useAuth"
 
 // Sample data for subjects
-const subjectsData = [
-  { id: "s1", code: "GEC4000", title: "Purposive Communications" },
-  { id: "s2", code: "GEC8000", title: "Science, Technology, and Society" },
-  { id: "s3", code: "GEE1000", title: "Living in the IT Era" },
-  { id: "s4", code: "NSTP1101", title: "National Service Training Program" },
-  { id: "s5", code: "PE1101", title: "PATHFIT 1" },
-  { id: "s6", code: "CCIS1101", title: "Introduction to Computing Lec" },
-]
+// Removed: const subjectsData = [
+// Removed:   { id: "s1", code: "GEC4000", title: "Purposive Communications" },
+// Removed:   { id: "s2", code: "GEC8000", title: "Science, Technology, and Society" },
+// Removed:   { id: "s3", code: "GEE1000", title: "Living in the IT Era" },
+// Removed:   { id: "s4", code: "NSTP1101", title: "National Service Training Program" },
+// Removed:   { id: "s5", code: "PE1101", title: "PATHFIT 1" },
+// Removed:   { id: "s6", code: "CCIS1101", title: "Introduction to Computing Lec" },
+// Removed: ]
 
 // Sample data for sections
-const sectionsData = [
-  { id: "sec1", name: "BSIS 2022-A", year: "1st Year", semester: "1st Semester" },
-  { id: "sec2", name: "BSIS 2022-B", year: "1st Year", semester: "1st Semester" },
-  { id: "sec3", name: "BSIS 2023-A", year: "1st Year", semester: "1st Semester" },
-  { id: "sec4", name: "BSIS 2023-B", year: "1st Year", semester: "1st Semester" },
-]
+// Removed: const sectionsData = [
+// Removed:   { id: "sec1", name: "BSIS 2022-A", year: "1st Year", semester: "1st Semester" },
+// Removed:   { id: "sec2", name: "BSIS 2022-B", year: "1st Year", semester: "1st Semester" },
+// Removed:   { id: "sec3", name: "BSIS 2023-A", year: "1st Year", semester: "1st Semester" },
+// Removed:   { id: "sec4", name: "BSIS 2023-B", year: "1st Year", semester: "1st Semester" },
+// Removed: ]
 
 // Sample data for semesters
 const semesterData = [
@@ -70,86 +70,24 @@ export default function FacultyAssignment() {
 
   // State for fetched data
   const [facultyInfo, setFacultyInfo] = useState(null)
-  const [assignedCourses, setAssignedCourses] = useState([])
   const [advisees, setAdvisees] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
 
   // Existing state
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("teaching load")
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
-  const [isEditAssignmentDialogOpen, setIsEditAssignmentDialogOpen] = useState(false)
-  const [selectedAssignment, setSelectedAssignment] = useState(null)
+  const [activeTab, setActiveTab] = useState("advisees") // Changed default tab
   const [showValidationDialog, setShowValidationDialog] = useState(false)
   const [validationMessage, setValidationMessage] = useState("")
-  const [showDeleteAssignmentDialog, setShowDeleteAssignmentDialog] = useState(false) // Renamed for clarity
-  const [assignmentToDelete, setAssignmentToDelete] = useState(null) // Kept for consistency, refers to assignment being deleted
   const [isAssignAdviseeDialogOpen, setIsAssignAdviseeDialogOpen] = useState(false)
   const [showUnassignAdviseeDialog, setShowUnassignAdviseeDialog] = useState(false);
   const [adviseeSectionToUnassign, setAdviseeSectionToUnassign] = useState(null);
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
-  // State for Edit Dialog (keep if edit functionality is separate)
-  const [newAssignment, setNewAssignment] = useState({
-    courseId: "",
-    sectionId: "",
-    semesterId: "",
-  })
-
   // State for dynamic data fetching (Sections for Dialogs)
   const [sectionsData, setSectionsDataState] = useState([]);
-  const [coursesData, setCoursesData] = useState([]); // General courses list if needed for Edit Dialog
   const [loadingSections, setLoadingSections] = useState(false);
-  const [loadingCourses, setLoadingCourses] = useState(false); // General course loading if needed
-
-  // --- State for Edit Dialog Courses ---
-  const [editDialogCourses, setEditDialogCourses] = useState([]);
-  const [loadingEditDialogCourses, setLoadingEditDialogCourses] = useState(false);
-
-  // --- State for Program Chair's Programs (copied from ManageFaculty) ---
-  // Removed program chair specific states
-  // const [programs, setPrograms] = useState([]);
-  // const [assignedProgramIds, setAssignedProgramIds] = useState([]);
-  // const [loadingProgramData, setLoadingProgramData] = useState(true);
-
-  // --- Fetch Program Chair's Assigned Programs --- (Removed this useEffect)
-  // useEffect(() => {
-  //   const fetchProgramChairData = async () => {
-  //     if (!user || !user.id) {
-  //       console.log("User data not available yet for fetching programs.");
-  //       setLoadingProgramData(false);
-  //       return;
-  //     }
-  //     setLoadingProgramData(true);
-  //     console.log("Fetching programs for Program Chair ID:", user.id);
-  //     try {
-  //       const programResponse = await fetch(`${API_BASE_URL}/program/read_by_program_chair.php?id=${user.id}`);
-  //       const programData = await programResponse.json();
-  //       if (!programResponse.ok) {
-  //         console.error("Failed to fetch programs:", programData.message);
-  //         setError(prev => prev || `Failed to load assigned programs: ${programData.message}`);
-  //         setPrograms([]);
-  //         setAssignedProgramIds([]);
-  //         return;
-  //       }
-  //       setPrograms(programData);
-  //       const programIds = programData.map(program => program.id);
-  //       setAssignedProgramIds(programIds);
-  //       console.log("Program Chair's Assigned Programs:", programData);
-  //       console.log("Program IDs for filtering:", programIds);
-  //     } catch (error) {
-  //       console.error("Error fetching program chair data:", error);
-  //       setError(prev => prev || "Error loading assigned programs.");
-  //       setPrograms([]);
-  //       setAssignedProgramIds([]);
-  //     } finally {
-  //       setLoadingProgramData(false);
-  //     }
-  //   };
-  //   fetchProgramChairData();
-  // }, [user]);
 
   // Refetch function (extracted for reuse)
   const fetchFacultyData = async () => {
@@ -162,7 +100,7 @@ export default function FacultyAssignment() {
     setError(null)
     try {
       const response = await fetch(
-        `${API_BASE_URL}/admin/read_single_faculty_assignment.php?faculty_id=${facultyId}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`,
+        `${API_BASE_URL}/admin/read_single_faculty_assignment.php?faculty_id=${facultyId}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}&status=active`,
       )
       if (!response.ok) {
         let errorMsg = `HTTP error! status: ${response.status}`
@@ -172,19 +110,17 @@ export default function FacultyAssignment() {
       const data = await response.json()
       if (!data.facultyInfo) { throw new Error("Faculty not found after update."); }
       setFacultyInfo(data.facultyInfo)
-      setAssignedCourses(data.assignedCourses || [])
       setAdvisees(data.advisees || [])
       // Calculate total advisees by summing student_count from each advised section
       const totalAdviseesCount = (data.advisees || []).reduce((sum, section) => sum + (section.student_count || 0), 0);
       setFacultyInfo(prevInfo => ({
         ...prevInfo,
-        adviseesAssigned: totalAdviseesCount
+        adviseesAssigned: totalAdviseesCount,
+        advisedSectionsCount: (data.advisees || []).length // Ensure this is updated as well
       }));
     } catch (error) {
       console.error("Refetching faculty assignment data failed:", error)
       toast.error("Failed to refresh data", { description: error.message || "Could not update faculty details." });
-      // Keep existing data or clear it? Decide based on desired UX
-      // setFacultyInfo(null); setAssignedCourses([]); setAdvisees([]);
     } finally {
       setIsLoading(false); // Turn off loading indicator
     }
@@ -237,106 +173,15 @@ export default function FacultyAssignment() {
       }
     };
     fetchSections();
-  }, [activeAcademicYear, activeSemester]); // Removed loadingProgramData, assignedProgramIds, programs from dependency array
+  }, [activeAcademicYear, activeSemester]);
 
   // Reset dialogs when component unmounts
   useEffect(() => {
     return () => {
-      setIsAssignDialogOpen(false)
-      setIsEditAssignmentDialogOpen(false)
       setShowValidationDialog(false)
-      setShowDeleteAssignmentDialog(false)
       setIsAssignAdviseeDialogOpen(false);
     }
   }, [])
-
-  const handleEditAssignment = (assignment) => {
-    const semesterId = semesterData.find(s => s.name === assignment.semester)?.id || "";
-    // Use the fetched sectionsData state variable here
-    const sectionId = sectionsData.find(s => s.name === assignment.section_name)?.id || "";
-    setSelectedAssignment(assignment)
-    setNewAssignment({
-      courseId: assignment.course_id.toString(),
-      sectionId: sectionId ? sectionId.toString() : "", // Ensure string for Select
-      semesterId: semesterId,
-    })
-    setIsEditAssignmentDialogOpen(true)
-  }
-
-  // --- Fetch Courses for Edit Dialog ---
-  useEffect(() => {
-    const fetchCoursesForEditDialog = async () => {
-      if (!isEditAssignmentDialogOpen || !newAssignment.sectionId || !activeAcademicYear?.id || !activeSemester?.id) {
-        setEditDialogCourses([]);
-        return;
-      }
-      setLoadingEditDialogCourses(true);
-      try {
-        const url = new URL(`${API_BASE_URL}/admin/get_courses_for_section.php`);
-        url.searchParams.append('section_id', newAssignment.sectionId);
-        url.searchParams.append('academic_year_id', activeAcademicYear.id);
-        url.searchParams.append('semester_id', activeSemester.id);
-        console.log("Fetching courses for edit dialog with URL:", url.toString());
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        console.log("Courses for edit dialog received from backend:", data);
-        setEditDialogCourses(data);
-      } catch (error) {
-        console.error("Error fetching courses for edit dialog:", error);
-        setEditDialogCourses([]);
-        toast.error("Failed to load courses", { description: "Could not fetch courses for the selected section in edit dialog." });
-      } finally {
-        setLoadingEditDialogCourses(false);
-      }
-    };
-    fetchCoursesForEditDialog();
-  }, [isEditAssignmentDialogOpen, newAssignment.sectionId, activeAcademicYear, activeSemester]);
-
-  const handleDeleteAssignment = (assignment) => {
-    console.log("Attempting to delete assignment:", assignment)
-    setAssignmentToDelete(assignment)
-    setShowDeleteAssignmentDialog(true)
-  }
-
-  const confirmDeleteAssignment = async () => {
-    if (!assignmentToDelete) return;
-    const toastId = toast.loading("Deleting assignment...");
-    try {
-      // --- API Call for Deleting ---
-      const response = await fetch(`${API_BASE_URL}/admin/delete_assignment.php`, {
-        method: 'POST', // Changed to POST
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignment_id: assignmentToDelete.assignment_id })
-      });
-      const data = await response.json();
-      toast.dismiss(toastId);
-      if (response.ok) {
-        toast.success("Assignment deleted successfully", {
-          id: `delete-assignment-success-${assignmentToDelete.assignment_id}-${Date.now()}`
-        });
-        // --- Direct State Update ---
-        // Re-fetch data to reflect deleted status
-        await fetchFacultyData();
-        // --- End Direct State Update ---
-        setShowDeleteAssignmentDialog(false);
-        setAssignmentToDelete(null);
-      } else {
-        console.error("Error deleting assignment:", data.message);
-        toast.error("Failed to delete assignment", { 
-          id: `delete-assignment-error-${assignmentToDelete.assignment_id}-${Date.now()}`,
-          description: data.message || "Please try again." 
-        });
-      }
-    } catch (error) {
-      toast.dismiss(toastId);
-      console.error("Error in delete API call:", error);
-      toast.error("Network error", {
-        id: `delete-assignment-network-error-${assignmentToDelete.assignment_id}-${Date.now()}`,
-        description: "Could not delete assignment."
-      });
-    }
-  }
 
   const handleUnassignAdviseeSection = (adviseeSection) => {
     console.log("Attempting to unassign advisee section:", adviseeSection);
@@ -374,146 +219,10 @@ export default function FacultyAssignment() {
       }
   };
 
-  // --- handleSaveAssignment (Updated to match ManageFaculty pattern) ---
-  const handleSaveAssignment = async (assignmentData) => {
-    if (!facultyInfo || !facultyInfo.faculty_id) {
-        toast.error("Faculty information is missing.");
-        return;
-    }
-    let toastId;
-    try {
-      toastId = toast.loading("Assigning course...", { description: "Processing your request." });
-      const completeAssignmentData = {
-        faculty_id: facultyInfo.faculty_id,
-        section_id: assignmentData.sectionId,
-        course_id: assignmentData.courseId
-      };
-      console.log("Saving course assignment:", completeAssignmentData);
-      const response = await fetch(`${API_BASE_URL}/admin/assign_course.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(completeAssignmentData)
-      });
-      const data = await response.json(); // Get response data
-
-      if (response.ok) {
-        toast.dismiss(toastId);
-        toast.success("Course assigned successfully", {
-          id: `assign-course-success-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
-          description: `${data.course_code || 'Course'} assigned to ${data.section_name || 'section'}`
-        });
-
-        // --- Direct State Update ---
-        // Ensure 'data' from API contains all necessary fields for the table row
-        // const newAssignmentEntry = {
-        //   assignment_id: data.assignment_id, // CRITICAL: API must return the new ID
-        //   course_id: data.course_id,
-        //   course_code: data.course_code,
-        //   course_title: data.course_title,
-        //   section_id: data.section_id,
-        //   section_name: data.section_name,
-        //   year_level: data.year_level, // Ensure API returns these
-        //   semester: data.semester,     // Ensure API returns these
-        // };
-
-        // // Add the new assignment to the local state
-        // setAssignedCourses(prevCourses => [...prevCourses, newAssignmentEntry]);
-
-        // // Optionally update facultyInfo counts displayed in the card
-        // setFacultyInfo(prevInfo => ({
-        //   ...prevInfo,
-        //   sectionsAssigned: (prevInfo.sectionsAssigned || 0) + 1 // Increment count
-        // }));
-        // --- End Direct State Update ---
-
-        // --- Refetch Data ---
-        await fetchFacultyData();
-        // --- End Refetch Data ---
-
-        setIsAssignDialogOpen(false); // Close the dialog
-
-      } else {
-        toast.dismiss(toastId);
-        console.error("Error assigning course:", data.message);
-        toast.error("Failed to assign course", {
-          id: `assign-course-error-${facultyInfo.faculty_id}-${assignmentData.sectionId}-${assignmentData.courseId}-${Date.now()}`,
-          description: data.message || "Error assigning the course. Please try again."
-        });
-      }
-    } catch (error) {
-      if (toastId) toast.dismiss(toastId);
-      console.error("Error in API call:", error);
-      toast.error("Network error", {
-        id: `assign-course-network-error-${facultyInfo.faculty_id}-${Date.now()}`,
-        description: "Connection problem. Please check your network and try again."
-      });
-    }
-  }
-
-  // --- handleSaveEditAssignment (Keep separate logic for the Edit Dialog if needed) ---
-  const handleSaveEditAssignment = async () => {
-    if (!newAssignment.courseId || !newAssignment.sectionId || !newAssignment.semesterId || !selectedAssignment) {
-      showError("Please select a course, section, and semester")
-      return
-    }
-    const toastId = toast.loading("Updating assignment...");
-    try {
-      // --- API Call for Update ---
-      const updateData = {
-          assignment_id: selectedAssignment.assignment_id,
-          course_id: newAssignment.courseId,
-          section_id: newAssignment.sectionId,
-          // Include semester_id if your backend needs it for update validation/logic
-          // semester_id: newAssignment.semesterId
-      };
-      console.log("Updating assignment:", updateData);
-      const response = await fetch(`${API_BASE_URL}/admin/update_assignment.php`, { // Replace with your actual update endpoint
-        method: 'PUT', // Or POST
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
-      });
-      const data = await response.json();
-      toast.dismiss(toastId);
-      if (response.ok) {
-        toast.success("Assignment updated successfully", {
-          id: `edit-assignment-success-${selectedAssignment.assignment_id}-${Date.now()}`
-        });
-        // --- Direct State Update ---
-        // Refetch data to ensure all counts and details are up-to-date
-        await fetchFacultyData();
-        setIsEditAssignmentDialogOpen(false);
-        setSelectedAssignment(null);
-        setNewAssignment({ courseId: "", sectionId: "", semesterId: "" });
-      } else {
-        console.error("Error updating assignment:", data.message);
-        toast.error("Failed to update assignment", {
-          id: `edit-assignment-error-${selectedAssignment.assignment_id}-${Date.now()}`,
-          description: data.message || "Please try again."
-        });
-      }
-    } catch (error) {
-      toast.dismiss(toastId);
-      console.error("Error in update API call:", error);
-      toast.error("Network error", {
-        id: `edit-assignment-network-error-${selectedAssignment.assignment_id}-${Date.now()}`,
-        description: "Could not update assignment."
-      });
-    }
-  }
-
   const showError = (message) => {
     setValidationMessage(message)
     setShowValidationDialog(true)
   }
-
-  // Filter assignments based on search query and course filter
-  const filteredAssignments = assignedCourses.filter(
-    (assignment) =>
-      (assignment.course_code?.toLowerCase().includes(searchQuery.toLowerCase()) || // Add null checks
-        assignment.course_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        assignment.section_name?.toLowerCase().includes(searchQuery.toLowerCase()))
-      // (!courseFilter || courseFilter === "all" || assignment.course_id?.toString() === courseFilter), // Removed courseFilter
-  )
 
   // Filter advisees based on search query and section filter
   const filteredAdvisees = advisees.filter(
@@ -526,12 +235,6 @@ export default function FacultyAssignment() {
     }
   )
 
-  // Calculate pagination for courses
-  const totalCoursesPages = Math.ceil(filteredAssignments.length / itemsPerPage)
-  const indexOfLastCourseItem = currentPage * itemsPerPage
-  const indexOfFirstCourseItem = indexOfLastCourseItem - itemsPerPage
-  const currentCoursesItems = filteredAssignments.slice(indexOfFirstCourseItem, indexOfLastCourseItem)
-
   // Calculate pagination for advisees
   const totalAdviseesPages = Math.ceil(filteredAdvisees.length / itemsPerPage)
   const indexOfLastAdviseeItem = currentPage * itemsPerPage
@@ -543,11 +246,6 @@ export default function FacultyAssignment() {
     setCurrentPage(1)
   }, [activeTab, searchQuery])
 
-  const paginateCourses = (pageNumber) => {
-    if (pageNumber > 0 && pageNumber <= totalCoursesPages) {
-      setCurrentPage(pageNumber)
-    }
-  }
   const paginateAdvisees = (pageNumber) => {
     if (pageNumber > 0 && pageNumber <= totalAdviseesPages) {
       setCurrentPage(pageNumber)
@@ -558,12 +256,6 @@ export default function FacultyAssignment() {
   const ValidationDialog = ({ open, onOpenChange }) => (
     <Dialog open={open} onOpenChange={(isOpen) => { onOpenChange(isOpen); if (!isOpen) setValidationMessage(""); }}>
       <DialogPortal><DialogContent><DialogHeader><DialogTitle>Invalid Input</DialogTitle></DialogHeader><p>{validationMessage}</p><DialogFooter><Button variant="green" onClick={() => onOpenChange(false)}>OK</Button></DialogFooter></DialogContent></DialogPortal>
-    </Dialog>
-  )
-
-  const DeleteConfirmationDialog = ({ open, onOpenChange }) => (
-    <Dialog open={open} onOpenChange={(isOpen) => { onOpenChange(isOpen); if (!isOpen) setAssignmentToDelete(null); }}>
-      <DialogPortal><DialogContent><DialogHeader><DialogTitle>Confirm Delete</DialogTitle></DialogHeader><p>Are you sure you want to delete this course assignment?</p><p className="text-sm text-muted-foreground">{assignmentToDelete && `${assignmentToDelete.course_code} - ${assignmentToDelete.course_title} (${assignmentToDelete.section_name})`}</p><DialogFooter className="flex justify-between"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button variant="destructive" onClick={confirmDeleteAssignment}>Delete</Button></DialogFooter></DialogContent></DialogPortal>
     </Dialog>
   )
 
@@ -597,156 +289,6 @@ export default function FacultyAssignment() {
       </DialogPortal>
     </Dialog>
   );
-
-  // --- AssignCourseDialog (Copied from ManageFaculty, uses sectionsData) ---
-  const AssignCourseDialog = ({ open, onOpenChange, faculty, onSave }) => {
-    const [assignment, setAssignment] = useState({ courseId: "", sectionId: "" });
-    const [dialogValidationError, setDialogValidationError] = useState("");
-    const sectionPopoverTriggerRef = useRef(null);
-    const coursePopoverTriggerRef = useRef(null);
-    const [sectionSearchTerm, setSectionSearchTerm] = useState("");
-    const [courseSearchTerm, setCourseSearchTerm] = useState("");
-    const { activeAcademicYear, activeSemester } = useActive();
-    const [filteredCourses, setFilteredCourses] = useState([]);
-    const [loadingCoursesForSection, setLoadingCoursesForSection] = useState(false);
-
-    useEffect(() => {
-      if (!open || !assignment.sectionId) { setFilteredCourses([]); return; }
-      const fetchCoursesForSection = async () => {
-        setLoadingCoursesForSection(true);
-        try {
-          const url = new URL(`${API_BASE_URL}/admin/get_courses_for_section.php`);
-          url.searchParams.append('section_id', assignment.sectionId);
-          if (activeAcademicYear?.id) url.searchParams.append('academic_year_id', activeAcademicYear.id);
-          if (activeSemester?.id) url.searchParams.append('semester_id', activeSemester.id);
-          console.log("Fetching courses for section with URL:", url.toString());
-          const response = await fetch(url);
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          const data = await response.json();
-          console.log("Courses received from backend:", data);
-          setFilteredCourses(data);
-        } catch (error) {
-          console.error("Error fetching courses for section:", error);
-          setFilteredCourses([]);
-          toast.error("Failed to load courses", { description: "Could not fetch courses for the selected section." });
-        } finally { setLoadingCoursesForSection(false); }
-      };
-      fetchCoursesForSection();
-    }, [assignment.sectionId, activeAcademicYear, activeSemester, open]);
-
-    const handleSaveClick = () => {
-      if (!assignment.courseId || !assignment.sectionId) { setDialogValidationError("Please select a course and section"); return; }
-      setDialogValidationError("");
-      onSave(assignment); // Calls the parent's handleSaveAssignment
-    };
-    const handleClose = () => { onOpenChange(false); };
-    useEffect(() => {
-      if (!open) {
-        setAssignment({ courseId: "", sectionId: "" });
-        setDialogValidationError("");
-        setSectionSearchTerm("");
-        setCourseSearchTerm("");
-        setFilteredCourses([]);
-        setLoadingCoursesForSection(false);
-      } else {
-         console.log("AssignCourseDialog opened for faculty:", faculty?.faculty_name);
-         console.log("AY/Sem:", activeAcademicYear?.year, activeSemester?.name);
-      }
-    }, [open, faculty]);
-    const handleSectionSelect = (sectionId) => {
-      const numericId = Number(sectionId);
-      setAssignment(prev => ({ ...prev, sectionId: numericId, courseId: "" }));
-      setSectionSearchTerm("");
-      sectionPopoverTriggerRef.current?.click();
-    };
-    const handleCourseSelect = (courseId) => {
-        setAssignment(prev => ({ ...prev, courseId: courseId }));
-        setCourseSearchTerm("");
-        coursePopoverTriggerRef.current?.click();
-    }
-
-    return (
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogPortal>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold">Assign Teaching Load</DialogTitle>
-              <DialogDescription>{faculty && `Assign a course to ${faculty.faculty_name} for ${activeAcademicYear?.year || 'N/A'} ${activeSemester?.name || 'N/A'}`}</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
-              <div className="space-y-4 py-4">
-                {dialogValidationError && (<p className="text-sm text-destructive">{dialogValidationError}</p>)}
-                <div className="space-y-2">
-                  <Label htmlFor="section">Section<span className="text-destructive">*</span></Label>
-                  <Popover>
-                    <PopoverTrigger asChild ref={sectionPopoverTriggerRef}>
-                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-auto min-h-10">
-                        <div className="flex items-center w-full">
-                          {/* Use sectionsData here */}
-                          <span className="text-left flex-1 truncate">{assignment.sectionId ? (sectionsData.find(section => Number(section.id) === Number(assignment.sectionId))?.name) : (<span className="text-muted-foreground">Select a section</span>)}</span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </div>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput placeholder="Search section..." value={sectionSearchTerm} onValueChange={setSectionSearchTerm} />
-                        <CommandList>
-                          {loadingSections ? ( <div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Loading sections...</span></div> ) : (
-                            <ScrollArea className="h-[200px]">
-                              <CommandEmpty>No section found.</CommandEmpty>
-                              {/* Use sectionsData here */}
-                              {sectionsData && sectionsData.length > 0 ? (
-                                sectionsData
-                                  .filter(option => option.name.toLowerCase().includes(sectionSearchTerm.toLowerCase()))
-                                  .map((section) => ( <CommandItem key={section.id} value={section.name} onSelect={() => handleSectionSelect(section.id)} className="cursor-pointer"> <Check className={cn("mr-2 h-4 w-4", Number(assignment.sectionId) === Number(section.id) ? "opacity-100" : "opacity-0")} /> {section.name} </CommandItem> ))
-                              ) : (<div className="p-4 text-center text-sm text-muted-foreground">No sections available for your programs in {activeAcademicYear?.year || 'AY'} {activeSemester?.name || 'Sem'}.</div>)}
-                            </ScrollArea>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label id="course-label">Course<span className="text-destructive">*</span></Label>
-                  <Popover>
-                    <PopoverTrigger asChild ref={coursePopoverTriggerRef}>
-                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-auto min-h-10" disabled={!assignment.sectionId || loadingCoursesForSection}>
-                        <div className="flex items-center w-full">
-                          {assignment.courseId ? ( <div className="flex-1 min-w-0 flex flex-col text-left"> <div className="text-sm font-medium">{filteredCourses.find((course) => course.id === assignment.courseId)?.course_code}</div> <div className="text-xs text-muted-foreground truncate pr-2">{filteredCourses.find((course) => course.id === assignment.courseId)?.course_title}</div> </div> ) : (<span className="text-muted-foreground flex-1 text-left">{!assignment.sectionId ? "Select section first" : loadingCoursesForSection ? "Loading courses..." : "Select a course"}</span>)}
-                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-                        </div>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput placeholder="Search course..." value={courseSearchTerm} onValueChange={setCourseSearchTerm} />
-                        <CommandList>
-                          {loadingCoursesForSection ? ( <div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Loading courses...</span></div> ) : filteredCourses.length === 0 ? ( <div className="p-4 text-center text-sm text-muted-foreground">No unassigned courses found for this section.</div> ) : (
-                            <ScrollArea className="h-[200px]">
-                              <CommandEmpty>No course found.</CommandEmpty>
-                              {filteredCourses
-                                .filter(course => course.course_code?.toLowerCase().includes(courseSearchTerm.toLowerCase()) || course.course_title?.toLowerCase().includes(courseSearchTerm.toLowerCase()))
-                                .map((course) => ( <CommandItem key={course.id} value={course.course_code} onSelect={() => handleCourseSelect(course.id)} className="cursor-pointer"> <Check className={cn("mr-2 h-4 w-4", assignment.courseId === course.id ? "opacity-100" : "opacity-0")} /> {course.course_code} <span className="ml-2 text-muted-foreground text-xs truncate">{course.course_title}</span> </CommandItem> ))}
-                            </ScrollArea>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-                <Button type="submit" variant="green" disabled={loadingCoursesForSection}>Assign Course</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </DialogPortal>
-      </Dialog>
-    );
-  };
 
   // --- AssignAdviseeDialog (Updated to show only unassigned sections) ---
   const AssignAdviseeDialog = ({ open, onOpenChange, faculty, onSave }) => {
@@ -890,7 +432,7 @@ export default function FacultyAssignment() {
                               ) : (
                                 <div className="p-4 text-center text-sm text-muted-foreground">
                                   {/* Updated message */}
-                                  {`No unassigned sections found for your programs in ${activeAcademicYear?.year || 'AY'} ${activeSemester?.name || 'Sem'}.`}
+                                  {`No unassigned sections found for ${activeAcademicYear?.year || 'AY'} ${activeSemester?.name || 'Sem'}.`}
                                 </div>
                               )}
                             </ScrollArea>
@@ -969,7 +511,7 @@ export default function FacultyAssignment() {
   };
 
   // --- Render Logic ---
-  if (isLoading) { // Removed loadingProgramData
+  if (isLoading) {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -991,8 +533,8 @@ export default function FacultyAssignment() {
         <main className="w-full">
           <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
           <div className="p-4 md:p-6">
-             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-faculty")}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Faculty
+             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-advisors")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Advisors
               </Button>
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -1012,8 +554,8 @@ export default function FacultyAssignment() {
         <main className="w-full">
           <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
           <div className="p-4 md:p-6">
-             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-faculty")}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Faculty
+             <Button variant="ghost" className="mb-4" onClick={() => navigate("/admin/manage-advisors")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Manage Advisors
               </Button>
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -1034,19 +576,11 @@ export default function FacultyAssignment() {
         <Header showSidebarTrigger={true} showNavLinks={false} showAuthButtons={false} />
         <div className="w-full">
           <ValidationDialog open={showValidationDialog} onOpenChange={setShowValidationDialog} />
-          <DeleteConfirmationDialog open={showDeleteAssignmentDialog} onOpenChange={setShowDeleteAssignmentDialog} />
           <UnassignAdviseeConfirmationDialog
             open={showUnassignAdviseeDialog}
             onOpenChange={setShowUnassignAdviseeDialog}
             adviseeSection={adviseeSectionToUnassign}
             onConfirm={confirmUnassignAdviseeSection}
-          />
-
-          <AssignCourseDialog
-            open={isAssignDialogOpen}
-            onOpenChange={setIsAssignDialogOpen}
-            faculty={facultyInfo}
-            onSave={handleSaveAssignment}
           />
 
           <AssignAdviseeDialog
@@ -1056,61 +590,9 @@ export default function FacultyAssignment() {
             onSave={handleSaveAdviseeAssignment}
           />
 
-          <Dialog open={isEditAssignmentDialogOpen} onOpenChange={setIsEditAssignmentDialogOpen}>
-             <DialogPortal>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold">Edit Teaching Load Assignment</DialogTitle>
-                  <DialogDescription>{selectedAssignment && `Editing ${selectedAssignment.course_code} - ${selectedAssignment.section_name}`}</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={(e) => { e.preventDefault(); handleSaveEditAssignment(); }}>
-                   <div className="space-y-4 py-4">
-                     <div className="space-y-2">
-                       <Label id="edit-semester-label">Semester<span className="text-destructive">*</span></Label>
-                       <Select aria-labelledby="edit-semester-label" value={newAssignment.semesterId} onValueChange={(value) => setNewAssignment({ ...newAssignment, semesterId: value, sectionId: '' })}>
-                         <SelectTrigger><SelectValue placeholder="Select a semester" /></SelectTrigger>
-                         <SelectContent>{semesterData.map((semester) => ( <SelectItem key={semester.id} value={semester.id}>{semester.name}</SelectItem> ))}</SelectContent>
-                       </Select>
-                     </div>
-                     <div className="space-y-2">
-                       <Label id="edit-section-label">Section<span className="text-destructive">*</span></Label>
-                       <Select aria-labelledby="edit-section-label" value={newAssignment.sectionId} onValueChange={(value) => setNewAssignment({ ...newAssignment, sectionId: value })} disabled={!newAssignment.semesterId || loadingSections}>
-                         <SelectTrigger><SelectValue placeholder={!newAssignment.semesterId ? "Select semester first" : loadingSections ? "Loading..." : "Select a section"} /></SelectTrigger>
-                         <SelectContent>
-                           {loadingSections ? ( <div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Loading...</span></div> ) : (
-                               // Use sectionsData here
-                               sectionsData
-                               // Optional: Filter sectionsData based on newAssignment.semesterId if needed
-                               .map((section) => ( <SelectItem key={section.id} value={section.id.toString()}>{section.name}</SelectItem> ))
-                           )}
-                           {!loadingSections && sectionsData.length === 0 && <div className="p-2 text-sm text-muted-foreground">No sections found for your programs.</div>}
-                         </SelectContent>
-                       </Select>
-                     </div>
-                     <div className="space-y-2">
-                       <Label id="edit-course-label">Course<span className="text-destructive">*</span></Label>
-                       <Select aria-labelledby="edit-course-label" value={newAssignment.courseId} onValueChange={(value) => setNewAssignment({ ...newAssignment, courseId: value })} disabled={!newAssignment.sectionId || loadingEditDialogCourses}>
-                         <SelectTrigger><SelectValue placeholder={!newAssignment.sectionId ? "Select section first" : loadingEditDialogCourses ? "Loading courses..." : "Select a course"} /></SelectTrigger>
-                         <SelectContent>
-                           {/* TODO: Populate with relevant courses. Fetch dynamically based on section/semester? */}
-                           {editDialogCourses.map((course) => ( <SelectItem key={course.id} value={course.id.toString()}>{course.course_code} - {course.course_title}</SelectItem> ))}
-                            {editDialogCourses.length === 0 && <div className="p-2 text-sm text-muted-foreground">No courses found.</div>}
-                         </SelectContent>
-                       </Select>
-                     </div>
-                   </div>
-                   <DialogFooter className="mt-6">
-                     <Button type="button" variant="outline" onClick={() => setIsEditAssignmentDialogOpen(false)}>Cancel</Button>
-                     <Button type="submit" variant="green">Update Assignment</Button>
-                   </DialogFooter>
-                </form>
-              </DialogContent>
-            </DialogPortal>
-          </Dialog>
-
           <div className="p-4 md:p-6">
             <div className="flex items-center mb-6">
-              <Button variant="ghost" className="mr-2" onClick={() => navigate("/admin/manage-faculty")}> <ArrowLeft className="h-4 w-4 mr-2" /> Back </Button>
+              <Button variant="ghost" className="mr-2" onClick={() => navigate("/admin/manage-advisors")}> <ArrowLeft className="h-4 w-4 mr-2" /> Back </Button>
               <div>
                 <h1 className="text-2xl font-semibold text-[#1b4b2a]">{facultyInfo.faculty_name}</h1>
                 <p className="text-muted-foreground">{facultyInfo.role} • {facultyInfo.department_name} • A.Y. {activeAcademicYear?.year || 'N/A'} {activeSemester?.name || 'N/A'}</p>
@@ -1119,113 +601,36 @@ export default function FacultyAssignment() {
 
             <Card className="mb-6 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-80">
               <CardHeader className="pb-3"><CardTitle>Faculty Information</CardTitle><CardDescription>Details and current assignments</CardDescription></CardHeader>
-              <CardContent><div className="flex flex-wrap items-baseline gap-x-6 gap-y-3"><div><p className="text-sm font-medium text-muted-foreground">Email</p><p className="text-base">{facultyInfo.email}</p></div><div className="md:pl-6 md:border-l border-gray-300"><p className="text-sm font-medium text-muted-foreground">Courses Taught</p><p className="text-base">{facultyInfo.sectionsAssigned}</p></div><div className="md:pl-6 md:border-l border-gray-300"><p className="text-sm font-medium text-muted-foreground">Assigned Advisee Sections</p><p className="text-base">{facultyInfo.advisedSectionsCount}</p></div><div className="md:pl-6 md:border-l border-gray-300"><p className="text-sm font-medium text-muted-foreground">Number of Advisees</p><p className="text-base">{facultyInfo.adviseesAssigned}</p></div></div></CardContent>
+              <CardContent><div className="flex flex-wrap items-baseline gap-x-6 gap-y-3"><div><p className="text-sm font-medium text-muted-foreground">Email</p><p className="text-base">{facultyInfo.email}</p></div><div className="md:pl-6 md:border-l border-gray-300"><p className="text-sm font-medium text-muted-foreground">Assigned Advisee Sections</p><p className="text-base">{facultyInfo.advisedSectionsCount}</p></div><div className="md:pl-6 md:border-l border-gray-300"><p className="text-sm font-medium text-muted-foreground">Number of Advisees</p><p className="text-base">{facultyInfo.adviseesAssigned}</p></div></div></CardContent>
             </Card>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {/* Removed: <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full"> */}
+            <div className="w-full">
               <div className="flex items-center justify-between mb-4">
-                <TabsList className="bg-emerald-50 dark:bg-emerald-900/30 border-[1px] border-emerald-200 dark:border-emerald-80">
-                  <TabsTrigger value="teaching load">Teaching Load</TabsTrigger>
+                {/* Removed: <TabsList className="bg-emerald-50 dark:bg-emerald-900/30 border-[1px] border-emerald-200 dark:border-emerald-80">
                   <TabsTrigger value="advisees">Advisees</TabsTrigger>
-                </TabsList>
+                </TabsList> */}
+                <h2 className="text-xl font-semibold text-[#1b4b2a]">Advisees</h2>
                 <div className="flex items-center gap-2">
                   <div className="relative w-full md:w-auto flex-grow sm:flex-grow-0 sm:w-60">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder={`Search ${activeTab}...`}
+                      placeholder={`Search advisees...`}
                       className="pl-8 h-9 rounded-md"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                  {activeTab === "teaching load" && (
-                    <>
-                      <Button variant="green" onClick={() => setIsAssignDialogOpen(true)}>
-                        <PlusCircle className="h-4 w-4 mr-1" /> Assign Teaching Load
-                      </Button>
-                    </>
-                  )}
-                  {activeTab === "advisees" && (
-                    <>
-                      <Button variant="green" onClick={() => setIsAssignAdviseeDialogOpen(true)}>
-                        <PlusCircle className="h-4 w-4 mr-1" /> Assign Advisee Section
-                      </Button>
-                    </>
-                  )}
+                  <>
+                    <Button variant="green" onClick={() => setIsAssignAdviseeDialogOpen(true)}>
+                      <PlusCircle className="h-4 w-4 mr-1" /> Assign Advisee Section
+                    </Button>
+                  </>
                 </div>
               </div>
 
-              <TabsContent value="teaching load" className="mt-0">
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader className="bg-muted/80">
-                      <TableRow>
-                        <TableHead className="px-3 py-2 font-medium">Course Code</TableHead>
-                        <TableHead className="px-3 py-2 font-medium">Course Title</TableHead>
-                        <TableHead className="px-3 py-2 font-medium">Section</TableHead>
-                        <TableHead className="px-3 py-2 font-medium">Year Level</TableHead>
-                        <TableHead className="px-3 py-2 font-medium">Semester</TableHead>
-                        <TableHead className="text-right px-3 py-2 font-medium">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currentCoursesItems.length > 0 ? (
-                        currentCoursesItems.map((assignment) => (
-                          <TableRow key={assignment.assignment_id}>
-                            <TableCell className="px-3 py-2 font-medium">{assignment.course_code}</TableCell>
-                            <TableCell className="px-3 py-2">{assignment.course_title}</TableCell>
-                            <TableCell className="px-3 py-2">{assignment.section_name}</TableCell>
-                            <TableCell className="px-3 py-2">{assignment.year_level}</TableCell>
-                            <TableCell className="px-3 py-2"><Badge variant="outline">{assignment.semester}</Badge></TableCell>
-                            <TableCell className="text-right px-3 py-2">
-                              <div className="flex justify-end gap-2">
-                                <Button size="icon" variant="outline" className="p-2 h-8 w-8" onClick={() => handleEditAssignment(assignment)} aria-label="Edit Assignment">
-                                  <Edit size={16} />
-                                </Button>
-                                <Button size="icon" variant="destructive" className="p-2 h-8 w-8" onClick={() => handleDeleteAssignment(assignment)} aria-label="Delete Assignment">
-                                  <Trash2 size={16} />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-24 text-center">
-                            {searchQuery ? "No matching teaching loads found." : "No teaching loads assigned yet."}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                {filteredAssignments.length > 0 && (
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4">
-                    <div className="flex flex-row items-center gap-4">
-                      <div className="text-sm text-muted-foreground">
-                        Showing <span className="font-medium">{indexOfFirstCourseItem + 1}</span> to <span className="font-medium">{Math.min(indexOfLastCourseItem, filteredAssignments.length)}</span> of <span className="font-medium">{filteredAssignments.length}</span> entries
-                      </div>
-                      <div className="flex items-center mt-0 sm:mt-0">
-                        <Select value={itemsPerPage.toString()} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                          <SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={itemsPerPage} /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="5">5</SelectItem>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="20">20</SelectItem>
-                            <SelectItem value="50">50</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <span className="ml-2 text-sm text-muted-foreground">per page</span>
-                      </div>
-                    </div>
-                    <div className="mt-4 sm:mt-0">
-                      <PaginationComponent currentPage={currentPage} totalPages={totalCoursesPages} onPageChange={paginateCourses} />
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="advisees" className="mt-0">
+              {/* Converted TabsContent to a div directly */} 
+              <div className="mt-0">
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader className="bg-muted/80">
@@ -1284,8 +689,8 @@ export default function FacultyAssignment() {
                     </div>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           </div>
         </div>
       </main>

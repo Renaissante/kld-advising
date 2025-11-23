@@ -44,6 +44,7 @@ if (!$faculty_id) {
 
 $academic_year_id = isset($_GET['academic_year_id']) ? $_GET['academic_year_id'] : null;
 $semester_id = isset($_GET['semester_id']) ? $_GET['semester_id'] : null;
+$status = isset($_GET['status']) ? $_GET['status'] : 'active'; // Default to 'active'
 
 // Log received academic_year_id and semester_id for debugging
 error_log("Received academic_year_id: " . $academic_year_id);
@@ -152,6 +153,7 @@ try {
                            WHERE sa.advisor_id = :faculty_id
                            AND sec.academic_year_id = :academic_year_id
                            AND sec.semester_id = :semester_id
+                           AND sa.status = :status
                            GROUP BY sec.id, sec.name, yl.level, sem.semester_name -- Group to get unique sections
                            ORDER BY sec.name";
 
@@ -160,6 +162,7 @@ try {
         $advisees_stmt->bindParam(':faculty_id', $faculty_id);
         $advisees_stmt->bindParam(':academic_year_id', $academic_year_id);
         $advisees_stmt->bindParam(':semester_id', $semester_id);
+        $advisees_stmt->bindParam(':status', $status);
         $advisees_stmt->execute();
         $response_data['advisees'] = $advisees_stmt->fetchAll(PDO::FETCH_ASSOC);
 

@@ -225,6 +225,7 @@ try {
         $fullGradeHistoryQuery = "SELECT
                                        cg.id,
                                        cg.transmutation,
+                                       cg.is_submitted,
                                        cg.remarks,
                                        c.id AS course_id,
                                        c.course_code,
@@ -235,11 +236,11 @@ try {
                                        cg.is_verified
                                    FROM course_grades cg
                                    JOIN courses c ON cg.course_id = c.id
-                                   WHERE cg.student_id = :student_id";
+                                   WHERE cg.student_id = :student_id AND cg.is_submitted = 1";
 
         $stmtFullGradeHistory = $conn->prepare($fullGradeHistoryQuery);
-         if ($stmtFullGradeHistory === false) {
-             throw new PDOException("Failed to prepare full grade history query: " . implode(" - ", $conn->errorInfo()));
+        if ($stmtFullGradeHistory === false) {
+            throw new PDOException("Failed to prepare full grade history query: " . implode(" - ", $conn->errorInfo()));
         }
         $stmtFullGradeHistory->bindParam(':student_id', $studentId);
         $stmtFullGradeHistory->execute();

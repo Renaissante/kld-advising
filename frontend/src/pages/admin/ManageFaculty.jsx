@@ -367,9 +367,9 @@ export default function ManageFaculty() {
                                 align="end"
                                 onInteractOutside={(e) => e.preventDefault()}
                               >
-                                      <DropdownMenuItem onClick={() => navigate(`/admin/faculty-assignment/${faculty.faculty_id}`)}>
+                                      <DropdownMenuItem onClick={() => navigate(`/admin/advisor-assignment/${faculty.faculty_id}`)}>
                                         <Calendar className="mr-2 h-4 w-4" />
-                                        View Assignments
+                                        View Advisee Assignments
                                       </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>

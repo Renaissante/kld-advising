@@ -108,7 +108,7 @@ export function AppSidebar() {
       ]
     },
     { title: "Curriculum", url: "/student/curriculum", icon: Inbox, roles: ["student"] },
-    { title: "Manage Faculty", url: "/admin/manage-faculty", basePath: "/admin/faculty-assignment", icon: ListPlus, roles: ["admin"] },
+    { title: "Manage Advisors", url: "/admin/manage-advisors", basePath: "/admin/advisor-assignment", icon: ListPlus, roles: ["admin"] },
     { title: "Manage Sections", url: "/admin/manage-sections", icon: Users, roles: ["admin"] },
     { title: "Audit Logs", url: "/admin/audit-logs", icon: ClipboardList, roles: ["admin"] },
     { title: "Advising Period", url: "/dean/advising-period", icon: CalendarDays, roles: ["dean"] }, // New item for Dean

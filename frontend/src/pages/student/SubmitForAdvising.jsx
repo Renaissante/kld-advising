@@ -39,6 +39,7 @@ export default function SubmitForAdvising() {
   const [studentActualYearLevelId, setStudentActualYearLevelId] = useState(null); // New state
   const [studentProfile, setStudentProfile] = useState(null); // New state for student profile
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // State for confirmation dialog
+  const [currentSemesterAdvisedCourses, setCurrentSemesterAdvisedCourses] = useState([]); // New state
 
   // Combine local loading with active context loading
   const isOverallLoading = isLoading || activeLoading;
@@ -101,23 +102,49 @@ export default function SubmitForAdvising() {
         setStudentActualYearLevelId(currentYearLevelId); // Set the state immediately
       }
 
-      // Initialize previousGrades based *only* on fetched data for the current semester
-      const initialGrades = [];
-      fetchedCourses.forEach(course => {
-        const units = (course.unit_lec || 0) + (course.unit_lab || 0);
-        // Use the locally determined currentYearLevelId for immediate filtering
-        if (course.year_level_id === currentYearLevelId && course.semester_id === activeSemester?.id) {
-          initialGrades.push({
-            course_id: course.id,
-            course_code: course.course_code,
-            course_title: course.course_title,
-            units: units,
-            gradeInput: course.grade !== null && course.grade !== undefined && course.grade !== '' ? course.grade.toString() : '',
-            isCredited: course.is_credited || false,
-            isSubmitted: course.is_submitted || false, // Include is_submitted status
-          });
+      let coursesForGradeInput = [];
+
+      // Check if the student is a 1st year, 1st semester student
+      const isFirstYearFirstSem = currentYearLevelId === 1 && activeSemester?.id === 1;
+
+      if (isFirstYearFirstSem) {
+        // For 1st year, 1st sem students: use courses directly from curriculum for the current active semester
+        coursesForGradeInput = fetchedCourses.filter(course => 
+          course.year_level_id === currentYearLevelId && 
+          course.semester_id === activeSemester?.id && 
+          !course.is_credited
+        );
+      } else {
+        // For succeeding semesters: fetch approved advised courses for the current semester
+        const advisedCoursesResponse = await fetch(`${API_BASE_URL}/student/get_current_semester_advised_courses.php?student_id=${user.id}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`);
+        if (!advisedCoursesResponse.ok) {
+          throw new Error(`HTTP error! status: ${advisedCoursesResponse.status}`);
         }
+        const advisedCoursesData = await advisedCoursesResponse.json();
+        const approvedAdvisedCourseIds = new Set(advisedCoursesData.advised_courses.map(course => course.id));
+        setCurrentSemesterAdvisedCourses(advisedCoursesData.advised_courses); // Store advised courses
+
+        coursesForGradeInput = fetchedCourses.filter(course => 
+          approvedAdvisedCourseIds.has(course.id) &&
+          course.year_level_id === currentYearLevelId && 
+          course.semester_id === activeSemester?.id && 
+          !course.is_credited
+        );
+      }
+
+      const initialGrades = coursesForGradeInput.map(course => {
+        const units = (course.unit_lec || 0) + (course.unit_lab || 0);
+        return {
+          course_id: course.id,
+          course_code: course.course_code,
+          course_title: course.course_title,
+          units: units,
+          gradeInput: course.grade !== null && course.grade !== undefined && course.grade !== '' ? course.grade.toString() : '',
+          isCredited: course.is_credited || false,
+          isSubmitted: course.is_submitted || false, // Include is_submitted status
+        };
       });
+
       // Only update previousGrades if the fetched initial grades are different to avoid unnecessary re-renders
       // This is a shallow comparison, but often sufficient for initial load.
       if (JSON.stringify(initialGrades) !== JSON.stringify(previousGrades)) {
