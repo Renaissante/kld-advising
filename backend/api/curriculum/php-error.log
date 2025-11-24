@@ -990,3 +990,15 @@
 [22-Nov-2025 16:06:04 Europe/Berlin] Attempting database connection...
 [22-Nov-2025 16:06:04 Europe/Berlin] Host: aws-1-ap-southeast-1.pooler.supabase.com | Port: 5432 | User: postgres.irnudqxgicdruxdjcbzj | DB: postgres
 [22-Nov-2025 16:06:04 Europe/Berlin] ✓ Database connection successful!
+[23-Nov-2025 15:55:44 Europe/Berlin] Loaded environment from .env file
+[23-Nov-2025 15:55:44 Europe/Berlin] Attempting database connection...
+[23-Nov-2025 15:55:44 Europe/Berlin] Host: aws-1-ap-southeast-1.pooler.supabase.com | Port: 5432 | User: postgres.irnudqxgicdruxdjcbzj | DB: postgres
+[23-Nov-2025 15:55:44 Europe/Berlin] ✓ Database connection successful!
+[23-Nov-2025 17:15:17 Europe/Berlin] Loaded environment from .env file
+[23-Nov-2025 17:15:17 Europe/Berlin] Attempting database connection...
+[23-Nov-2025 17:15:17 Europe/Berlin] Host: aws-1-ap-southeast-1.pooler.supabase.com | Port: 5432 | User: postgres.irnudqxgicdruxdjcbzj | DB: postgres
+[23-Nov-2025 17:15:17 Europe/Berlin] ✓ Database connection successful!
+[24-Nov-2025 01:29:08 Europe/Berlin] Loaded environment from .env file
+[24-Nov-2025 01:29:08 Europe/Berlin] Attempting database connection...
+[24-Nov-2025 01:29:08 Europe/Berlin] Host: aws-1-ap-southeast-1.pooler.supabase.com | Port: 5432 | User: postgres.irnudqxgicdruxdjcbzj | DB: postgres
+[24-Nov-2025 01:29:08 Europe/Berlin] ✓ Database connection successful!

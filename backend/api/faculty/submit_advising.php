@@ -16,16 +16,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = json_decode(file_get_contents("php://input"));
 
 // Validate input
-if (empty($data->student_id) || empty($data->advisor_id) || empty($data->academic_year_id) || empty($data->semester_id) || !isset($data->selected_course_ids) || !is_array($data->selected_course_ids) || count($data->selected_course_ids) === 0) {
+if (empty($data->student_id) || empty($data->advisor_id) || empty($data->advising_academic_year_id) || empty($data->advising_semester_id) || !isset($data->selected_course_ids) || !is_array($data->selected_course_ids) || count($data->selected_course_ids) === 0) {
     http_response_code(400);
-    echo json_encode(["message" => "Invalid input. Required fields: student_id, advisor_id, academic_year_id, semester_id, and non-empty selected_course_ids array."]);
+    echo json_encode(["message" => "Invalid input. Required fields: student_id, advisor_id, advising_academic_year_id, advising_semester_id, and non-empty selected_course_ids array."]);
     exit;
 }
 
 $studentId = $data->student_id;
 $advisorId = $data->advisor_id;
-$academicYearId = $data->academic_year_id;
-$semesterId = $data->semester_id;
+$advisingAcademicYearId = $data->advising_academic_year_id;
+$advisingSemesterId = $data->advising_semester_id;
 $selectedCourseIds = $data->selected_course_ids;
 $gradesToUpdate = isset($data->grades) ? $data->grades : []; // Expect an array of grades
 
@@ -118,11 +118,11 @@ try {
     $failedInsertions = [];
 
     // 1. Fetch existing advised courses for the student, academic year, and semester
-    $existingAdvisedCoursesQuery = "SELECT course_id, advised_course_id, status FROM advised_courses WHERE student_id = :student_id AND academic_year_id = :academic_year_id AND semester_id = :semester_id";
+    $existingAdvisedCoursesQuery = "SELECT course_id, advised_course_id, status FROM advised_courses WHERE student_id = :student_id AND academic_year_id = :advising_academic_year_id AND semester_id = :advising_semester_id";
     $stmtExistingAdvisedCourses = $conn->prepare($existingAdvisedCoursesQuery);
     $stmtExistingAdvisedCourses->bindParam(':student_id', $studentId);
-    $stmtExistingAdvisedCourses->bindParam(':academic_year_id', $academicYearId);
-    $stmtExistingAdvisedCourses->bindParam(':semester_id', $semesterId);
+    $stmtExistingAdvisedCourses->bindParam(':advising_academic_year_id', $advisingAcademicYearId);
+    $stmtExistingAdvisedCourses->bindParam(':advising_semester_id', $advisingSemesterId);
     $stmtExistingAdvisedCourses->execute();
     $existingAdvisedCourses = $stmtExistingAdvisedCourses->fetchAll(PDO::FETCH_ASSOC);
 
@@ -170,7 +170,7 @@ try {
         $placeholders = implode(',', array_fill(0, count($coursesToApprove), '?'));
         $sqlUpdate = "UPDATE advised_courses SET status = 'approved', advisor_id = ?, advising_date = CURRENT_DATE WHERE student_id = ? AND academic_year_id = ? AND semester_id = ? AND course_id IN ($placeholders)";
         $stmtUpdate = $conn->prepare($sqlUpdate);
-        $stmtUpdate->execute(array_merge([$advisorId, $studentId, $academicYearId, $semesterId], $coursesToApprove));
+        $stmtUpdate->execute(array_merge([$advisorId, $studentId, $advisingAcademicYearId, $advisingSemesterId], $coursesToApprove));
         $totalProcessed += $stmtUpdate->rowCount();
     }
 
@@ -184,8 +184,8 @@ try {
                 $stmtInsert->bindParam(':student_id', $studentId);
                 $stmtInsert->bindParam(':course_id', $courseId, PDO::PARAM_INT);
                 $stmtInsert->bindParam(':advisor_id', $advisorId);
-                $stmtInsert->bindParam(':academic_year_id', $academicYearId);
-                $stmtInsert->bindParam(':semester_id', $semesterId);
+                $stmtInsert->bindParam(':academic_year_id', $advisingAcademicYearId);
+                $stmtInsert->bindParam(':semester_id', $advisingSemesterId);
                 $stmtInsert->execute();
                 $totalProcessed++;
             } catch (PDOException $e) {
@@ -203,7 +203,7 @@ try {
         $placeholders = implode(',', array_fill(0, count($coursesToDelete), '?'));
         $sqlDelete = "DELETE FROM advised_courses WHERE student_id = ? AND academic_year_id = ? AND semester_id = ? AND course_id IN ($placeholders) AND status = 'pending'";
         $stmtDelete = $conn->prepare($sqlDelete);
-        $stmtDelete->execute(array_merge([$studentId, $academicYearId, $semesterId], $coursesToDelete));
+        $stmtDelete->execute(array_merge([$studentId, $advisingAcademicYearId, $advisingSemesterId], $coursesToDelete));
         // Note: Not adding to totalProcessed as it's a removal, not an addition/approval
     }
 

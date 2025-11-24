@@ -57,6 +57,7 @@ const CreditCourses = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const navigate = useNavigate();
   const { activeAcademicYear, activeSemester, loading: activeLoading } = useActive(); // Use useActive hook
+  const [isExporting, setIsExporting] = useState(false);
 
   // --- Get student_id from localStorage (temporary for now) ---
   const studentId = useParams().studentId; // Get studentId from URL parameters
@@ -127,6 +128,59 @@ const CreditCourses = () => {
       setIsLoading(false);
     }
   }, [studentId, activeAcademicYear?.id, activeSemester?.id, activeLoading]);
+
+  // --- Handle PDF Export ---
+  const handleExportPdf = async () => {
+    if (!studentId || !activeAcademicYear?.id || !activeSemester?.id) {
+      toast.error("Missing student ID or active academic period information to export PDF.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const exportUrl = `${API_BASE_URL}/faculty/export_student_curriculum.php?student_id=${studentId}&academic_year_id=${activeAcademicYear.id}&semester_id=${activeSemester.id}`;
+      
+      const response = await fetch(exportUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/pdf',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (jsonError) {
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const filename = `Credit_Courses_${studentId}_${activeAcademicYear.academic_year_name}_${activeSemester.semester_name}.pdf`;
+
+      // Create a temporary URL for the blob and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF export initiated successfully.");
+
+    } catch (err) {
+      console.error("Error exporting PDF:", err);
+      toast.error(`Failed to export PDF: ${err.message}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // --- Destructure fetched data ---
   const { curriculumName, yearLevels, semesters, courses } = curriculumData;
@@ -288,7 +342,6 @@ const CreditCourses = () => {
     );
   }
 
-
   return (
     <SidebarProvider>
       <Toaster richColors position="bottom-right" />
@@ -429,6 +482,13 @@ const CreditCourses = () => {
                       }}
                     >
                       Reset
+                    </Button>
+                    <Button
+                      onClick={handleExportPdf}
+                      className="bg-[#1b4b2a] hover:bg-[#153d22] text-white"
+                      disabled={isOverallLoading || isExporting}
+                    >
+                      Export PDF
                     </Button>
                     
                     <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

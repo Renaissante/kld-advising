@@ -42,8 +42,10 @@ export default function AdvisingModal({
   const [advisingCompleted, setAdvisingCompleted] = useState(false) // Flag from backend
   const [isLoadingAdvisingData, setIsLoadingAdvisingData] = useState(false)
   const [advisingDataError, setAdvisingDataError] = useState(null)
-  const [nextAcademicYearId, setNextAcademicYearId] = useState(null); // New state for next academic year ID
-  const [nextSemesterId, setNextSemesterId] = useState(null); // New state for next semester ID
+  const [nextAcademicYearId, setNextAcademicYearId] = useState(null); // This will store the *calendar* next academic year ID
+  const [nextSemesterId, setNextSemesterId] = useState(null); // This will store the *calendar* next semester ID (same as curriculum for now)
+  const [nextCurriculumYearLevelId, setNextCurriculumYearLevelId] = useState(null); // New state for next curriculum year level ID
+  const [nextCurriculumSemesterId, setNextCurriculumSemesterId] = useState(null); // New state for next curriculum semester ID
   const [allCurriculumCoursesMap, setAllCurriculumCoursesMap] = useState({}); // New state for all curriculum courses map
   const [prerequisitesMap, setPrerequisitesMap] = useState({}); // New state for prerequisites map
 
@@ -124,8 +126,10 @@ export default function AdvisingModal({
                setEligibleCourses([]);
                setStudentSubmittedCourses([]);
                setSelectedCourses(data.data.faculty_approved_advised_courses.map(course => course.course_id));
-               setNextAcademicYearId(parseInt(data.data.next_year_level_id) || null); // Corrected to use next_year_level_id
-               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Ensure it's an integer
+               setNextAcademicYearId(parseInt(data.data.next_academic_year_for_advising) || null); // Use the new backend field
+               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Still the curriculum semester for advising
+               setNextCurriculumYearLevelId(parseInt(data.data.next_year_level_id) || null); // Store curriculum year level separately
+               setNextCurriculumSemesterId(parseInt(data.data.next_semester_id) || null); // Store curriculum semester separately
                setEditableGrades({}); // Clear editable grades when advising is completed
                setAllCurriculumCoursesMap(data.data.all_curriculum_courses_map || {}); // Set all curriculum courses map
                setPrerequisitesMap(data.data.prerequisites_map || {}); // Set prerequisites map
@@ -156,16 +160,20 @@ export default function AdvisingModal({
                    setSelectedCourses([]);
                }
                setFacultyApprovedCourses([]);
-               setNextAcademicYearId(parseInt(data.data.next_year_level_id) || null); // Corrected to use next_year_level_id
-               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Ensure it's an integer
+               setNextAcademicYearId(parseInt(data.data.next_academic_year_for_advising) || null); // Use the new backend field
+               setNextSemesterId(parseInt(data.data.next_semester_id) || null); // Still the curriculum semester for advising
+               setNextCurriculumYearLevelId(parseInt(data.data.next_year_level_id) || null); // Store curriculum year level separately
+               setNextCurriculumSemesterId(parseInt(data.data.next_semester_id) || null); // Store curriculum semester separately
                setAllCurriculumCoursesMap(data.data.all_curriculum_courses_map || {}); // Set all curriculum courses map
                setPrerequisitesMap(data.data.prerequisites_map || {}); // Set prerequisites map
            }
 
            console.log("Advising data state set:", data.data);
            console.log("Frontend advisingCompleted:", data.data.advising_completed);
-           console.log("Frontend nextAcademicYearId:", data.data.next_year_level_id); // Log the raw value from backend
-           console.log("Frontend nextSemesterId:", data.data.next_semester_id); // Log the raw value from backend
+           console.log("Frontend nextAcademicYearId (calendar):", data.data.next_academic_year_for_advising); // Log the raw value from backend
+           console.log("Frontend nextSemesterId (calendar/curriculum):", data.data.next_semester_id); // Log the raw value from backend
+           console.log("Frontend nextCurriculumYearLevelId:", data.data.next_year_level_id); // Log the raw value from backend
+           console.log("Frontend nextCurriculumSemesterId:", data.data.next_semester_id); // Log the raw value from backend
            console.log("Frontend studentSubmittedCourses (initial):", data.data.student_submitted_advised_courses);
            console.log("Frontend selectedCourses (initial):", (data.data.student_submitted_advised_courses || []).map(course => course.course_id));
         } else {
@@ -288,8 +296,8 @@ export default function AdvisingModal({
     const advisingData = {
         student_id: student.id,
         advisor_id: user.id, // Get advisor ID from the logged-in user
-        academic_year_id: nextAcademicYearId, // Use next academic year ID
-        semester_id: nextSemesterId, // Use next semester ID
+        advising_academic_year_id: nextAcademicYearId, // Use the correct naming for the backend
+        advising_semester_id: nextSemesterId, // Use the correct naming for the backend
         selected_course_ids: selectedCourses,
         grades: gradesToSubmit,
     };
@@ -348,8 +356,8 @@ export default function AdvisingModal({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     student_id: student.id,
-                    academic_year: activeAcademicYear.year || activeAcademicYear.name,
-                    semester: activeSemester.name,
+                    academic_year_id: nextAcademicYearId, // Pass the calendar academic year ID
+                    semester_id: nextSemesterId, // Pass the curriculum semester ID
                   }),
                 });
                 toast.success("Advising form sent to student via email.");
@@ -709,8 +717,10 @@ export default function AdvisingModal({
 
         {console.log("Render Check - advisingCompleted:", advisingCompleted)}
         {console.log("Render Check - selectedCourses:", selectedCourses)}
-        {console.log("Render Check - nextAcademicYearId:", nextAcademicYearId)}
-        {console.log("Render Check - nextSemesterId:", nextSemesterId)}
+        {console.log("Render Check - nextAcademicYearId (calendar):", nextAcademicYearId)}
+        {console.log("Render Check - nextSemesterId (curriculum):", nextSemesterId)}
+        {console.log("Render Check - nextCurriculumYearLevelId:", nextCurriculumYearLevelId)}
+        {console.log("Render Check - nextCurriculumSemesterId:", nextCurriculumSemesterId)}
         {/* Dialog Footer */}
         <DialogFooter className="mt-6 pt-4 border-t">
           {/* Info section on the left */}

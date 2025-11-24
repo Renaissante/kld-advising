@@ -25,6 +25,7 @@ export default function SubmitForAdvising() {
   const { activeAcademicYear, activeSemester, loading: activeLoading } = useActive(); // Use useActive hook
   const [selectedTab, setSelectedTab] = useState("eligible")
   const [selectedCourses, setSelectedCourses] = useState([])
+  const [failedCourses, setFailedCourses] = useState([]); // New state for failed courses
 
   const [curriculumId, setCurriculumId] = useState(null);
   const [studentCourses, setStudentCourses] = useState([]); // All courses from curriculum fetched from API
@@ -125,10 +126,7 @@ export default function SubmitForAdvising() {
         setCurrentSemesterAdvisedCourses(advisedCoursesData.advised_courses); // Store advised courses
 
         coursesForGradeInput = fetchedCourses.filter(course => 
-          approvedAdvisedCourseIds.has(course.id) &&
-          course.year_level_id === currentYearLevelId && 
-          course.semester_id === activeSemester?.id && 
-          !course.is_credited
+          approvedAdvisedCourseIds.has(course.id)
         );
       }
 
@@ -179,6 +177,19 @@ export default function SubmitForAdvising() {
       setRequestedCourses(curriculumData.requested_courses || []);
       setNextAcademicYearId(curriculumData.next_academic_year_id || null);
       setNextSemesterId(curriculumData.next_semester_id || null);
+
+      const nextAYId = curriculumData.next_academic_year_id || null;
+      const nextSemId = curriculumData.next_semester_id || null;
+
+      if (nextAYId && nextSemId) {
+        // Fetch failed courses for retake in the next semester
+        const failedCoursesResponse = await fetch(`${API_BASE_URL}/student/get_failed_courses_for_retake.php?student_id=${user.id}&next_semester_id=${nextSemId}`);
+        if (!failedCoursesResponse.ok) {
+          throw new Error(`HTTP error! status: ${failedCoursesResponse.status}`);
+        }
+        const failedCoursesData = await failedCoursesResponse.json();
+        setFailedCourses(failedCoursesData.failed_courses_for_retake || []);
+      }
 
     } catch (err) {
       console.error("Error fetching student data:", err);
@@ -252,6 +263,17 @@ export default function SubmitForAdvising() {
   }, [studentCourses, previousGrades, activeAcademicYear?.id, activeAcademicYear?.year, activeSemester?.id, isAdvisingRequestSubmitted, isAdvisingRequestApproved, studentActualYearLevelId]);
 
   if (!user) return null // Only check for user now
+  
+  // Memoize failedCourses calculation (New)
+  const failedCoursesForRetake = useMemo(() => {
+    return failedCourses.map(course => ({ // Directly use failedCourses from state
+      id: course.id,
+      course_code: course.course_code,
+      course_title: course.course_title,
+      units: course.units,
+      grade: course.grade_remarks, // Use grade_remarks from the backend
+    }));
+  }, [failedCourses]);
 
   // Use the combined loading state here
   if (isOverallLoading) {
@@ -575,8 +597,9 @@ export default function SubmitForAdvising() {
                     </div>
                   ) : (
                     <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-                      <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsList className="grid w-full grid-cols-3 mb-4">
                         <TabsTrigger value="eligible">Available Courses</TabsTrigger>
+                        <TabsTrigger value="failed">Failed Courses ({failedCoursesForRetake.length})</TabsTrigger>
                         <TabsTrigger value="selected">Selected ({selectedCourses.length})</TabsTrigger>
                       </TabsList>
 
@@ -682,6 +705,73 @@ export default function SubmitForAdvising() {
                         </div>
                       </TabsContent>
 
+                      <TabsContent value="failed">
+                        <Alert className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 mb-4">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>Failed Courses</AlertTitle>
+                          <AlertDescription>
+                            These are courses you have previously failed and are eligible to retake in the upcoming semester. You may select them to be included in your advising request.
+                          </AlertDescription>
+                        </Alert>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="py-2">Code</TableHead>
+                                <TableHead className="py-2">Title</TableHead>
+                                <TableHead className="text-center py-2">Grade</TableHead>
+                                <TableHead className="text-center py-2">Units</TableHead>
+                                <TableHead className="text-center py-2">Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {failedCoursesForRetake.length > 0 ? (
+                                failedCoursesForRetake.map((course) => {
+                                  const isSelected = selectedCourses.includes(course.id);
+                                  return (
+                                    <TableRow key={course.id}>
+                                      <TableCell className="font-medium py-2">{course.course_code}</TableCell>
+                                      <TableCell className="py-2">{course.course_title}</TableCell>
+                                      <TableCell className="text-center py-2">
+                                        <Badge variant="destructive" className="text-xs">{course.grade}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-center py-2">{course.units}</TableCell>
+                                      <TableCell className="text-center py-2">
+                                        <Button
+                                          variant={isSelected ? "secondary" : "outline"}
+                                          size="sm"
+                                          onClick={() => handleSelectCourse(course.id)}
+                                          disabled={isOverallLoading || isAdvisingRequestSubmitted || isAdvisingRequestApproved} // Only disable if overall loading, or advising request is submitted/approved
+                                          className="h-8"
+                                        >
+                                          {isSelected ? (
+                                            <>
+                                              <X className="h-4 w-4 mr-1.5" />
+                                              Remove
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Plus className="h-4 w-4 mr-1.5" />
+                                              Select
+                                            </>
+                                          )}
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground py-2">
+                                    No failed courses found for retake.
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TabsContent>
+
                       <TabsContent value="selected">
                         <div className="rounded-md border">
                           <Table>
@@ -696,7 +786,8 @@ export default function SubmitForAdvising() {
                             <TableBody>
                               {selectedCourses.length > 0 ? (
                                 selectedCourses.map((courseId) => {
-                                  const course = eligibleCourses.find((c) => c.id === courseId)
+                                  const course = eligibleCourses.find((c) => c.id === courseId) ||
+                                                 failedCoursesForRetake.find((c) => c.id === courseId);
                                   if (!course) return null
                                   return (
                                     <TableRow key={course.id}>

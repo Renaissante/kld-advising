@@ -183,7 +183,14 @@ try {
         }
     }
 
-    // Only proceed if next academic period is valid
+    // Determine the next calendar academic year for advising
+    // This increments if the current semester is the last one in the academic year.
+    $nextAcademicYearForAdvising = $activeAcademicYearId;
+    if ($currentSemIndex !== false && $currentSemIndex === count($allSemesters) - 1) {
+        $nextAcademicYearForAdvising++;
+    }
+
+    // Only proceed if next academic period is valid (curriculum progression)
     if ($nextYearLevelId !== null && $nextSemesterId !== null) {
         // --- 2. Check if Advising is Already Completed for the NEXT AY/Semester ---
         $advisedCoursesQuery = "SELECT
@@ -205,7 +212,7 @@ try {
              throw new PDOException("Failed to prepare advised courses query for next period: " . implode(" - ", $conn->errorInfo()));
         }
         $stmtAdvisedCourses->bindParam(':student_id', $studentId);
-        $stmtAdvisedCourses->bindParam(':next_academic_year_id', $nextYearLevelId);
+        $stmtAdvisedCourses->bindParam(':next_academic_year_id', $nextAcademicYearForAdvising); // Use the calculated next calendar academic year
         $stmtAdvisedCourses->bindParam(':next_semester_id', $nextSemesterId);
         $stmtAdvisedCourses->execute();
         $allAdvisedCoursesForNextPeriod = $stmtAdvisedCourses->fetchAll(PDO::FETCH_ASSOC);
@@ -404,8 +411,9 @@ try {
             "eligible_courses" => $eligibleCourses,
             "current_year_level_id" => $currentYearLevelId,
             "current_semester_id" => $currentSemesterId,
-            "next_year_level_id" => $nextYearLevelId,
-            "next_semester_id" => $nextSemesterId,
+            "next_year_level_id" => $nextYearLevelId, // This is still the curriculum year level
+            "next_semester_id" => $nextSemesterId, // This is still the curriculum semester
+            "next_academic_year_for_advising" => $nextAcademicYearForAdvising, // Add the correct calendar academic year
             "all_curriculum_courses_map" => $allCurriculumCoursesMap, // Add this
             "prerequisites_map" => $prerequisitesMap, // Add this
         )

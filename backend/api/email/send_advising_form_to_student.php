@@ -19,15 +19,15 @@ if (strpos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === 0) {
     }
 }
 
-// Accept POST or GET parameters
+// Accept POST or GET parameters, now expecting IDs
 $def_input = function($k){return $_POST[$k]??$_GET[$k]??null;};
 $student_id = $def_input('student_id');
-$academic_year = $def_input('academic_year');
-$semester = $def_input('semester');
+$academic_year_id = $def_input('academic_year_id');
+$semester_id = $def_input('semester_id');
 
-if (!$student_id || !$academic_year || !$semester) {
+if (!$student_id || !$academic_year_id || !$semester_id) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Missing required parameters.']);
+    echo json_encode(['success' => false, 'message' => 'Missing required parameters: student_id, academic_year_id, or semester_id.']);
     exit();
 }
 
@@ -43,11 +43,26 @@ try {
     $recipientName = $student['name'];
     $recipientEmail = $student['email'];
 
-    // 2. Download PDF using export endpoint (internal server call)
+    // 2. Fetch academic year name and semester name using the IDs
+    $ay_query = 'SELECT academic_year_name FROM academic_years WHERE academic_year_id = ?';
+    $ay_stmt = $conn->prepare($ay_query);
+    $ay_stmt->execute([$academic_year_id]);
+    $ay_name = $ay_stmt->fetchColumn();
+
+    $sem_query = 'SELECT semester_name FROM semesters WHERE semester_id = ?';
+    $sem_stmt = $conn->prepare($sem_query);
+    $sem_stmt->execute([$semester_id]);
+    $sem_name = $sem_stmt->fetchColumn();
+
+    if (!$ay_name || !$sem_name) {
+        throw new Exception('Academic year or semester name not found for provided IDs.');
+    }
+
+    // 3. Download PDF using export endpoint (internal server call)
     $apiBase = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['SCRIPT_NAME']));
-    $pdfUrl = $apiBase . "/dean/export_advising_forms.php?student_id=".urlencode($student_id)
-             . "&academic_year=".urlencode($academic_year)
-             . "&semester=".urlencode($semester)
+    $pdfUrl = $apiBase . "/student/export_advising_form.php?student_id=".urlencode($student_id)
+             . "&academic_year=".urlencode($ay_name) // Pass the name to the export form
+             . "&semester=".urlencode($sem_name)     // Pass the name to the export form
              . "&format=pdf";
     $ch = curl_init($pdfUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -70,9 +85,9 @@ try {
         $filename = $matches[1];
     }
 
-    // 3. Send email with PDF attachment (using PHPMailer directly)
-    $subject = "Your Academic Advising Form ($academic_year $semester)";
-    $body = "Dear ".htmlspecialchars($recipientName).",<br><br>Your academic advising form for $academic_year $semester is attached as a PDF.<br><br>Thank you,<br>".SENDER_NAME;
+    // 4. Send email with PDF attachment (using PHPMailer directly)
+    $subject = "Your Academic Advising Form ($ay_name $sem_name)"; // Use fetched names
+    $body = "Dear ".htmlspecialchars($recipientName).",<br><br>Your academic advising form for $ay_name $sem_name is attached as a PDF.<br><br>Thank you,<br>".SENDER_NAME;
 
     $mail = new PHPMailer(true);
     $mail->isSMTP();
